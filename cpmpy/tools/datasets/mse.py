@@ -1,19 +1,18 @@
 """
-MaxSAT Evaluation (MSE) Dataset
-
-https://maxsat-evaluations.github.io/
+The MaxSAT Evaluation (MSE) is an annual competition of MaxSAT solvers, providing benchmark instances.
+Origin: https://maxsat-evaluations.github.io/
 """
 
+from __future__ import annotations
 
 import os
 import lzma
-from typing import Optional
 import zipfile
 import pathlib
 import io
+from typing import Any, Optional, Dict, Callable
 
 from cpmpy.tools.datasets.core import FileDataset
-from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 
 class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
@@ -27,47 +26,34 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
     If the dataset is not available locally, it can be automatically
     downloaded and extracted.
 
-    More information on the competition can be found here: https://maxsat-evaluations.github.io/
-    """
+    - Origin: https://maxsat-evaluations.github.io/
 
-    # -------------------------- Dataset-level metadata -------------------------- #
+    Arguments:
+        root (str): Root directory where datasets are stored or will be downloaded to (default="."). If `dataset_dir` is provided, this argument is ignored.
+        year (int): Competition year of the dataset to use (default=2024).
+        track (str): Track name specifying which subset of the competition instances to load (default="exact-unweighted").
+        transform (callable, optional): Optional transform applied to the instance file path.
+        target_transform (callable, optional): Optional transform applied to the metadata dictionary.
+        download (bool): If True, downloads the dataset if it does not exist locally (default=False).
+        dataset_dir (Optional[os.PathLike]): Path to the dataset directory. If not provided, it will be inferred from the root and year/track.
+    """
 
     name = "maxsateval"
     description = "MaxSAT Evaluation competition benchmark instances."
     homepage = "https://maxsat-evaluations.github.io/"
     citation = []
 
-    features = FeaturesInfo({
-        "wcnf_num_variables":        ("int", "Number of propositional variables"),
-        "wcnf_num_clauses":          ("int", "Total number of clauses (hard + soft)"),
-        "wcnf_num_hard_clauses":     ("int", "Number of hard clauses"),
-        "wcnf_num_soft_clauses":     ("int", "Number of soft clauses"),
-        "wcnf_total_literals":       ("int", "Total number of literals across all clauses"),
-        "wcnf_num_distinct_weights": ("int", "Number of distinct soft clause weights"),
-    })
-
-    # ---------------------------------------------------------------------------- #
-
     def __init__(
-            self, 
-            root: str = ".", 
-            year: int = 2024, track: str = "exact-unweighted", 
-            transform=None, target_transform=None, 
+            self,
+            root: str = ".",
+            year: int = 2024, track: str = "exact-unweighted",
+            transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
             dataset_dir: Optional[os.PathLike] = None,
-            **kwargs
+            **kwargs: Any
         ):
         """
         Constructor for a dataset object of the MaxSAT Evaluation competition.
-
-        Arguments:
-            root (str): Root directory where datasets are stored or will be downloaded to (default="."). If `dataset_dir` is provided, this argument is ignored.
-            year (int): Competition year of the dataset to use (default=2024).
-            track (str): Track name specifying which subset of the competition instances to load (default="exact-unweighted").
-            transform (callable, optional): Optional transform applied to the instance file path.
-            target_transform (callable, optional): Optional transform applied to the metadata dictionary.
-            download (bool): If True, downloads the dataset if it does not exist locally (default=False).
-            dataset_dir (Optional[os.PathLike]): Path to the dataset directory. If not provided, it will be inferred from the root and year/track.
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
@@ -95,16 +81,13 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         )
 
 
-    def category(self) -> dict:
+    def categories(self) -> Dict[str, Any]:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def categories(self) -> dict:
-        return self.category()
-
-    def collect_instance_metadata(self, file) -> dict:
+    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
         """
         Extract statistics from WCNF header comments.
 
@@ -112,7 +95,7 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         nvars, ncls, nhards, nsofts, total_lits, nsoft_wts, and length stats.
         """
         import re
-        result = {}
+        result: Dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 for line in f:
@@ -162,7 +145,8 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         # Clean up the zip file
         target_download_path.unlink()
 
-    def open(self, instance: os.PathLike) -> io.TextIOBase:
+    @classmethod
+    def open(cls, instance: os.PathLike) -> io.TextIOBase:
         return lzma.open(instance, "rt") if str(instance).endswith(".xz") else open(instance)
 
 

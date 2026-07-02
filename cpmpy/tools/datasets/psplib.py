@@ -1,22 +1,33 @@
 """
-PSPlib Dataset
-
-https://www.om-db.wi.tum.de/psplib/getdata_sm.html
+PSPLib is a library of Project Scheduling Problem (RCPSP) benchmark instances.
+Origin: https://www.om-db.wi.tum.de/psplib/main.html
 """
+
+from __future__ import annotations
 
 import os
 import pathlib
 import zipfile
+from typing import Any, Optional, Dict, Callable
+import builtins
 
 from cpmpy.tools.datasets.core import FileDataset
-from cpmpy.tools.datasets.metadata import FeaturesInfo, FieldInfo
-
+from cpmpy.tools.io.rcpsp import _parse_rcpsp
 
 class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     """
     PSPlib Dataset in a PyTorch compatible format.
 
-    More information on PSPlib can be found here: https://www.om-db.wi.tum.de/psplib/main.html
+    - Origin: https://www.om-db.wi.tum.de/psplib/main.html
+    - Reference: Kolisch, R., Sprecher, A. PSPLIB - A project scheduling problem library. European Journal of Operational Research, 96(1), 205-216, 1997.
+
+    Arguments:
+        root (str): Root directory containing the psplib instances (if 'download', instances will be downloaded to this location)
+        variant (str): scheduling variant (only 'rcpsp' is supported for now)
+        family (str): family name (e.g. j30, j60, etc...)
+        transform (callable, optional): Optional transform to be applied on the instance data (the file path of each problem instance)
+        target_transform (callable, optional): Optional transform to be applied on the metadata (the metadata dictionary of each problem instance)
+        download (bool): If True, downloads the dataset from the internet and puts it in `root` directory
     """
 
     name = "psplib"
@@ -26,31 +37,11 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         "Kolisch, R., Sprecher, A. PSPLIB - A project scheduling problem library. European Journal of Operational Research, 96(1), 205-216, 1997.",
     ]
 
-    features = FeaturesInfo({
-        "num_jobs":                        ("int",  "Number of jobs (activities) in the project"),
-        "horizon":                         ("int",  "Planning horizon (maximum makespan upper bound)"),
-        "num_renewable_resources":         ("int",  "Number of renewable resource types"),
-        "num_nonrenewable_resources":      FieldInfo("int",  "Number of non-renewable resource types", nullable=True),
-        "num_doubly_constrained_resources":FieldInfo("int",  "Number of doubly-constrained resource types", nullable=True),
-        "duedate":                         FieldInfo("int",  "Project due date", nullable=True),
-        "tardcost":                        FieldInfo("int",  "Tardiness cost per unit time", nullable=True),
-        "mpm_time":                        FieldInfo("int",  "Minimum project makespan (MPM)", nullable=True),
-        "resource_availabilities":         FieldInfo("list", "Available units per resource type", nullable=True),
-    })
-
-
-    def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False, **kwargs):
+    def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30",
+                 transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
+                 download: bool = False, **kwargs: Any):
         """
         Constructor for a dataset object for PSPlib.
-
-        Arguments:
-            root (str): Root directory containing the psplib instances (if 'download', instances will be downloaded to this location)
-            variant (str): scheduling variant (only 'rcpsp' is supported for now)
-            family (str): family name (e.g. j30, j60, etc...)
-            transform (callable, optional): Optional transform to be applied on the instance data
-            target_transform (callable, optional): Optional transform to be applied on the file path
-            download (bool): If True, downloads the dataset from the internet and puts it in `root` directory
-
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
@@ -81,25 +72,24 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         )
 
     @classmethod
-    def parse(cls, instance: os.PathLike):
+    def parse(cls, instance: os.PathLike) -> tuple[dict[str, Any], dict[str, Any]]:
         """
         Parse a PSPLIB RCPSP instance into job data and capacities.
         """
-        return parse_rcpsp(instance)
-        
-    def category(self) -> dict:
+        return _parse_rcpsp(instance, open=cls.open)
+
+    def categories(self) -> Dict[str, Any]:
         return {
             "variant": self.variant,
             "family": self.family
         }
 
-    def categories(self) -> dict:
-        return self.category()
-
-    def collect_instance_metadata(self, file) -> dict:
-        """Extract project metadata from SM file header."""
+    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+        """
+        Extract project metadata from SM file header.
+        """
         import re
-        result = {}
+        result: Dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 lines = f.readlines()
@@ -184,20 +174,3 @@ if __name__ == "__main__":
     dataset = PSPLibDataset(variant="rcpsp", family="j30", download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])
-
-
-def parse_rcpsp(filename: str):
-    """
-    Parse an RCPSP instance into tabular task data and resource capacities.
-    """
-    from cpmpy.tools.io.rcpsp import _parse_rcpsp
-    with open(filename, "r") as f:
-        return _parse_rcpsp(f)
-
-
-def model_rcpsp(job_data, capacities):
-    """
-    Build a CPMpy RCPSP model from parsed task data and capacities.
-    """
-    from cpmpy.tools.io.rcpsp import _model_rcpsp
-    return _model_rcpsp(job_data=job_data, capacities=capacities)

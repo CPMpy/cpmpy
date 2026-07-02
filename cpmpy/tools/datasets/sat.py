@@ -1,19 +1,21 @@
 """
-SAT Competition Dataset.
-
+The SAT Competition provides benchmark instances in DIMACS CNF format.
 Instances are fetched from benchmark-database.de via ``getinstances``.
 Each returned line is an instance URL, usually served as XZ-compressed DIMACS.
+Origin: https://benchmark-database.de/
 """
+
+from __future__ import annotations
 
 import io
 import lzma
 import os
 import pathlib
 import re
+from typing import Any, Optional, Dict, Callable
 from urllib.request import Request, urlopen
 
 from cpmpy.tools.datasets.core import FileDataset
-from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 
 INSTANCE_LIST_URL = "https://benchmark-database.de/getinstances"
@@ -22,39 +24,35 @@ INSTANCE_LIST_URL = "https://benchmark-database.de/getinstances"
 class SATDataset(FileDataset):
     """
     SAT competition benchmark dataset (DIMACS CNF).
+
+    - Origin: https://benchmark-database.de/
+
+    Arguments:
+        root (str): Root directory where the dataset is stored or will be downloaded (default=".").
+        track (str): Track query parameter for getinstances (default="main_2025").
+        context (str): Context query parameter for getinstances (default="cnf").
+        transform (callable, optional): Optional transform applied to the instance file path.
+        target_transform (callable, optional): Optional transform applied to the metadata dict.
+        download (bool): If True, download the instance list and all instances if not present (default=False).
     """
 
     name = "sat"
     description = "SAT competition benchmark instances (DIMACS CNF) from benchmark-database.de."
     homepage = "https://benchmark-database.de/"
     citation = []
-    
-    features = FeaturesInfo({
-        "dimacs_num_variables": ("int", "Number of propositional variables from DIMACS p-line"),
-        "dimacs_num_clauses": ("int", "Number of clauses from DIMACS p-line"),
-    })
 
     def __init__(
         self,
         root: str = ".",
         track: str = "main_2025",
         context: str = "cnf",
-        transform=None,
-        target_transform=None,
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
         download: bool = False,
-        **kwargs
+        **kwargs: Any
     ):
         """
         Constructor for the SAT competition dataset.
-
-        Arguments:
-            root (str): Root directory where the dataset is stored or will be downloaded (default=".").
-            track (str): Track query parameter for getinstances (default="main_2025").
-            context (str): Context query parameter for getinstances (default="cnf").
-            transform (callable, optional): Optional transform applied to the instance file path.
-            target_transform (callable, optional): Optional transform applied to the metadata dict.
-            download (bool): If True, download the instance list and all instances if not present (default=False).
-            **kwargs: Passed through to download() (e.g. workers for parallel downloads).
         """
         self.root = pathlib.Path(root)
         self.track = track
@@ -70,18 +68,16 @@ class SATDataset(FileDataset):
             **kwargs,
         )
 
-    def category(self) -> dict:
+    def categories(self) -> Dict[str, Any]:
         return {"track": self.track, "context": self.context}
 
-    def categories(self) -> dict:
-        return self.category()
-
-    def open(self, instance: os.PathLike) -> io.TextIOBase:
+    @classmethod
+    def open(cls, instance: os.PathLike) -> io.TextIOBase:
         path = str(instance)
         return lzma.open(instance, "rt") if path.endswith(".xz") else open(instance, "r")
 
-    def collect_instance_metadata(self, file) -> dict:
-        result = {}
+    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 for line in f:

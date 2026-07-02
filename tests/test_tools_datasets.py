@@ -6,6 +6,13 @@ import pytest
 import cpmpy as cp
 
 from cpmpy.tools.datasets.xcsp3 import XCSP3Dataset
+from cpmpy.tools.datasets.jsplib import JSPLibDataset
+from cpmpy.tools.datasets.psplib import PSPLibDataset
+from cpmpy.tools.datasets.miplib import MIPLibDataset
+from cpmpy.tools.datasets.mse import MaxSATEvalDataset
+from cpmpy.tools.datasets.opb import OPBDataset
+from cpmpy.tools.datasets.sat import SATDataset
+from cpmpy.tools.datasets.nurserostering import NurseRosteringDataset
 
 
 # ---------------------------------------------------------------------------- #
@@ -37,6 +44,86 @@ RAW_DATASET_SPECS = [
             {"year": 2024, "track": ["COP", "CSP"]},
         ],
         "expected_instance_suffix": ".xml.lzma",
+        "expected_categories": {},
+    },
+    {
+        "id": "jsplib",
+        "dataset_cls": JSPLibDataset,
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": None,  # no category dimensions
+        "expected_instance_suffix": "",  # JSPLib instances have no file extension
+        "expected_categories": {},
+    },
+    {
+        "id": "psplib",
+        "dataset_cls": PSPLibDataset,
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": [
+            {"variant": "rcpsp", "family": "j30"},
+        ],
+        "expected_instance_suffix": ".sm",
+        "expected_categories": {},
+    },
+    {
+        "id": "miplib",
+        "dataset_cls": MIPLibDataset,
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": [
+            {"year": 2024, "track": "exact-unweighted"},
+        ],
+        "expected_instance_suffix": ".mps.gz",
+        "expected_categories": {},
+    },
+    {
+        "id": "mse",
+        "dataset_cls": MaxSATEvalDataset,
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": [
+            {"year": 2024, "track": "exact-unweighted"},
+        ],
+        "expected_instance_suffix": ".wcnf.xz",
+        "expected_categories": {},
+    },
+    {
+        "id": "opb",
+        "dataset_cls": OPBDataset,
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": [
+            {"year": 2024, "track": "OPT-LIN"},
+        ],
+        "expected_instance_suffix": ".opb.xz",
+        "expected_categories": {},
+    },
+    {
+        "id": "sat",
+        "dataset_cls": SATDataset,
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": [
+            {"track": "main_2025", "context": "cnf"},
+        ],
+        "expected_instance_suffix": ".cnf.xz",
+        "expected_categories": {},
+    },
+    {
+        "id": "nurserostering",
+        "dataset_cls": NurseRosteringDataset,
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": None,  # no category dimensions
+        "expected_instance_suffix": ".txt",
         "expected_categories": {},
     },
 ]

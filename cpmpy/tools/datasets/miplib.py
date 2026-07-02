@@ -1,15 +1,16 @@
 """
-MIPLib Dataset
-
-https://maxsat-evaluations.github.io/
+MIPLib is the Mixed Integer Programming Library of benchmark instances.
+Origin: https://miplib.zib.de/
 """
 
+from __future__ import annotations
 
 import os
 import gzip
 import zipfile
 import pathlib
 import io
+from typing import Any, Optional, Dict, Callable
 
 from cpmpy.tools.datasets.core import FileDataset
 
@@ -19,7 +20,16 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     """
     MIPLib Dataset in a PyTorch compatible format.
 
-    More information on MIPLib can be found here: https://miplib.zib.de/
+    - Origin: https://miplib.zib.de/
+    - Reference: Gleixner, A., et al. MIPLIB 2017: Data-Driven Compilation of the 6th Mixed-Integer Programming Library. Mathematical Programming Computation, 2021.
+
+    Arguments:
+        root (str): Root directory where datasets are stored or will be downloaded to (default=".").
+        year (int): Year of the dataset to use (default=2024).
+        track (str): Track name specifying which subset of the dataset instances to load (default="exact-unweighted").
+        transform (callable, optional): Optional transform applied to the instance file path.
+        target_transform (callable, optional): Optional transform applied to the metadata dictionary.
+        download (bool): If True, downloads the dataset if it does not exist locally (default=False).
     """
 
     name = "miplib"
@@ -29,26 +39,16 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         "Gleixner, A., Hendel, G., Gamrath, G., Achterberg, T., Bastubbe, M., Berthold, T., Christophel, P. M., Jarck, K., Koch, T., Linderoth, J., Lubbecke, M., Mittelmann, H. D., Ozyurt, D., Ralphs, T. K., Salvagnin, D., and Shinano, Y. MIPLIB 2017: Data-Driven Compilation of the 6th Mixed-Integer Programming Library. Mathematical Programming Computation, 2021. https://doi.org/10.1007/s12532-020-00194-3.",
     ]
 
-
-
     def __init__(
-            self, 
-            root: str = ".", 
-            year: int = 2024, track: str = "exact-unweighted", 
-            transform=None, target_transform=None, 
+            self,
+            root: str = ".",
+            year: int = 2024, track: str = "exact-unweighted",
+            transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
-            **kwargs
+            **kwargs: Any
         ):
         """
         Constructor for a dataset object of the MIPLib competition.
-
-        Arguments:
-            root (str): Root directory where datasets are stored or will be downloaded to (default="."). 
-            year (int): Year of the dataset to use (default=2024).
-            track (str): Track name specifying which subset of the dataset instances to load (default="exact-unweighted").
-            transform (callable, optional): Optional transform applied to the instance file path.
-            target_transform (callable, optional): Optional transform applied to the metadata dictionary.
-            download (bool): If True, downloads the dataset if it does not exist locally (default=False).
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
@@ -68,15 +68,12 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    def category(self) -> dict:
+    def categories(self) -> Dict[str, Any]:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def categories(self) -> dict:
-        return self.category()
-    
     def download(self):
         
         url = "https://miplib.zib.de/downloads/"
@@ -103,9 +100,11 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         # Clean up the zip file
         target_download_path.unlink()
 
-    def collect_instance_metadata(self, file) -> dict:
-        """Extract row/column counts from MPS file sections."""
-        result = {}
+    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+        """
+        Extract row/column counts from MPS file sections.
+        """
+        result: Dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 section = None
@@ -143,7 +142,8 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             pass
         return result
 
-    def open(self, instance: os.PathLike) -> io.TextIOBase:
+    @classmethod
+    def open(cls, instance: os.PathLike) -> io.TextIOBase:
         return gzip.open(instance, "rt") if str(instance).endswith(".gz") else open(instance)
 
 

@@ -1,8 +1,9 @@
 """
-Pseudo Boolean Competition (PB) Dataset
-
-https://www.cril.univ-artois.fr/PB25/
+The Pseudo-Boolean (PB) Competition provides benchmark instances in OPB format.
+Origin: https://www.cril.univ-artois.fr/PB25/
 """
+
+from __future__ import annotations
 
 import fnmatch
 import lzma
@@ -10,9 +11,9 @@ import os
 import pathlib
 import tarfile
 import io
+from typing import Any, Optional, Dict, Callable
 
 from cpmpy.tools.datasets.core import FileDataset
-from cpmpy.tools.datasets.metadata import FeaturesInfo, FieldInfo
 
 
 class OPBDataset(FileDataset):
@@ -25,7 +26,17 @@ class OPBDataset(FileDataset):
     If the dataset is not available locally, it can be automatically
     downloaded and extracted.
 
-    More information on the competition can be found here: https://www.cril.univ-artois.fr/PB25/
+    - Origin: https://www.cril.univ-artois.fr/PB25/
+    - Reference: Berre, D. L., Parrain, A. The Pseudo-Boolean Evaluation 2011. JSAT, 7(1), 2012.
+
+    Arguments:
+        root (str): Root directory where datasets are stored or will be downloaded to (default=".").
+        year (int): Competition year of the dataset to use (default=2024).
+        track (str): Track name specifying which subset of the competition instances to load (default="OPT-LIN").
+        competition (bool): If True, the dataset will filtered on competition-used instances.
+        transform (callable, optional): Optional transform applied to the instance file path.
+        target_transform (callable, optional): Optional transform applied to the metadata dictionary.
+        download (bool): If True, downloads the dataset if it does not exist locally (default=False).
     """
 
     name = "opb"
@@ -35,34 +46,17 @@ class OPBDataset(FileDataset):
         "Berre, D. L., Parrain, A. The Pseudo-Boolean Evaluation 2011. JSAT, 7(1), 2012.",
     ]
 
-    features = FeaturesInfo({
-        "author":              ("str", "Author extracted from filename convention"),
-        "opb_num_variables":   ("int", "Number of Boolean variables (from OPB header)"),
-        "opb_num_constraints": ("int", "Number of constraints (from OPB header)"),
-        "opb_num_products":    FieldInfo("int", "Number of non-linear product terms (from OPB header)", nullable=True),
-    })
-
     def __init__(
-            self, 
-            root: str = ".", 
-            year: int = 2024, track: str = "OPT-LIN", 
+            self,
+            root: str = ".",
+            year: int = 2024, track: str = "OPT-LIN",
             competition: bool = True,
-            transform=None, target_transform=None, 
+            transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
-            **kwargs
+            **kwargs: Any
         ):
         """
         Constructor for a dataset object of the PB competition.
-
-        Arguments:
-            root (str): Root directory where datasets are stored or will be downloaded to (default="."). 
-            year (int): Competition year of the dataset to use (default=2024).
-            track (str): Track name specifying which subset of the competition instances to load (default="OPT-LIN").
-            competition (bool): If True, the dataset will filtered on competition-used instances.
-            transform (callable, optional): Optional transform applied to the instance file path.
-            target_transform (callable, optional): Optional transform applied to the metadata dictionary.
-            download (bool): If True, downloads the dataset if it does not exist locally (default=False).
-
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
@@ -89,23 +83,21 @@ class OPBDataset(FileDataset):
             **kwargs
         )
 
-    def category(self) -> dict:
+    def categories(self) -> Dict[str, Any]:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def categories(self) -> dict:
-        return self.category()
-
-    def collect_instance_metadata(self, file: os.PathLike) -> dict:
-        """Extract metadata from OPB filename and file header.
+    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+        """
+        Extract metadata from OPB filename and file header.
 
         Parses the `* #variable= ... #constraint= ...` header line and
         extracts the author from the filename convention (first part before `_`).
         """
         import re
-        result = {}
+        result: Dict[str, Any] = {}
         # Author from filename
         filename = pathlib.Path(file).name
         parts = filename.split("_")
@@ -203,7 +195,8 @@ class OPBDataset(FileDataset):
         # Clean up the tar file
         target_download_path.unlink()
 
-    def open(self, instance: os.PathLike) -> io.TextIOBase:
+    @classmethod
+    def open(cls, instance: os.PathLike) -> io.TextIOBase:
         return lzma.open(instance, 'rt') if str(instance).endswith(".xz") else open(instance)
 
 

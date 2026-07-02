@@ -5,6 +5,13 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
 **Available datasets:**
 
 - :doc:`XCSP3Dataset </api/tools/datasets/xcsp3>`: XCSP3 competition benchmark instances for constraint satisfaction and optimization.
+- :doc:`JSPLibDataset </api/tools/datasets/jsplib>`: Job Shop Scheduling Problem benchmark library.
+- :doc:`PSPLibDataset </api/tools/datasets/psplib>`: Project Scheduling Problem Library (RCPSP) benchmark instances.
+- :doc:`MIPLibDataset </api/tools/datasets/miplib>`: Mixed Integer Programming Library benchmark instances.
+- :doc:`MaxSATEvalDataset </api/tools/datasets/mse>`: MaxSAT Evaluation competition benchmark instances.
+- :doc:`OPBDataset </api/tools/datasets/opb>`: Pseudo-Boolean Competition benchmark instances.
+- :doc:`SATDataset </api/tools/datasets/sat>`: SAT competition benchmark instances (DIMACS CNF).
+- :doc:`NurseRosteringDataset </api/tools/datasets/nurserostering>`: Nurse rostering benchmark instances.
 
 
 .. note::
@@ -17,6 +24,13 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
     Dataset (ABC)
     └── FileDataset (ABC)
         └── XCSP3Dataset
+        └── JSPLibDataset
+        └── PSPLibDataset
+        └── MIPLibDataset
+        └── MaxSATEvalDataset
+        └── OPBDataset
+        └── SATDataset
+        └── NurseRosteringDataset
         └── (your dataset here)
 
 Whilst the class hierarchy will support more exotic dataset types in the future, with a structure put in place 
@@ -365,10 +379,8 @@ class FileDataset(Dataset):
     @abstractmethod
     def categories(self) -> Dict[str, Any]:
         """
-        Labels to distinguish instances into categories matching to those of the dataset.
-        E.g.
-            - year
-            - track
+        Labels to distinguish instances into categories matching to those of the dataset,
+        e.g. ``year`` or ``track``.
         """
         pass
 
