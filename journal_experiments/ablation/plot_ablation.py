@@ -75,9 +75,9 @@ def load_results(results_dir):
     df = pd.DataFrame(records)
     df['error'] = df['error'].fillna("OK")
 
-    memlimit = 8
-    print(f"Filering to runs with {memlimit}GB of memory")
-    df = df[df['memory_limit'] == memlimit]
+    #memlimit = 8
+    #print(f"Filering to runs with {memlimit}GB of memory")
+    #df = df[df['memory_limit'] == memlimit]
 
     # fill baseline
     df["ablate"] = df["ablate"].fillna("baseline")
@@ -177,6 +177,7 @@ def plot_runtime(df, figures_dir, runtime_col="runtime", subtitle=None, fname=No
         if subtitle is not None:
             title += f"\n{subtitle}"
         ax.set_title(title)
+        sns.move_legend(obj=ax, title=None, loc="best")
         if fname is None:
             fname = "ablation_{}"
         save_figure(fig, os.path.join(figures_dir,fname.format(solver)))
