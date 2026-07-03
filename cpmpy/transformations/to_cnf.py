@@ -5,6 +5,15 @@ Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of 
 import cpmpy as cp
 from ..solvers.pindakaas import CPM_pindakaas
 
+from cpmpy.expressions.variables import NegBoolView, _IntVarImpl
+
+from cpmpy.transformations.negation import push_down_negation_objective
+from cpmpy.transformations.safening import safen_objective
+from cpmpy.transformations.flatten_model import flatten_objective
+from cpmpy.transformations.linearize import decompose_linear_objective, only_positive_coefficients_
+from cpmpy.transformations.int2bool import _encode_lin_expr
+from cpmpy.transformations.cse import CSEMap
+
 
 def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     """
@@ -58,3 +67,60 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     clauses += ((x | ~x) for x in free_vars)  # add free variables so they are "known" by the CNF
 
     return clauses
+
+def to_cnf_objective(expr, encoding="auto", csemap=None, ivarmap=None, supported=frozenset(), supported_reified=frozenset()):
+    """
+    Transform objective into weighted Boolean literals plus helper constraints.
+
+    Arguments:
+        encoding: the encoding used for `int2bool`
+        csemap: optional shared CSE cache (populated in-place)
+        ivarmap: optional shared integer variable encoding dict (populated in-place)
+        supported: supported global constraints for objective decomposition
+        supported_reified: supported reified global constraints for objective decomposition
+
+    Returns:
+        (weights, xs, const, extra_cons)
+    """
+    if csemap is None:
+        csemap = CSEMap()
+    if ivarmap is None:
+        ivarmap = dict()
+    obj, safe_cons = safen_objective(expr)
+    obj = push_down_negation_objective(obj)
+    obj, decomp_cons = decompose_linear_objective(
+        obj,
+        supported=supported,
+        supported_reified=supported_reified,
+        csemap=csemap,
+    )
+    obj, flat_cons = flatten_objective(obj, csemap=csemap)
+
+    weights, xs, const = [], [], 0
+    # we assume obj is a var, a sum or a wsum (over int and bool vars)
+    if isinstance(obj, _IntVarImpl) or isinstance(obj, NegBoolView):  # includes _BoolVarImpl
+        weights = [1]
+        xs = [obj]
+    elif obj.name == "sum":
+        xs = obj.args
+        weights = [1] * len(xs)
+    elif obj.name == "wsum":
+        weights, xs = obj.args
+    else:
+        raise NotImplementedError(f"DIMACS: Non supported objective {obj} (yet?)")
+
+    terms, enc_cons, k = _encode_lin_expr(ivarmap, xs, weights, encoding, csemap=csemap)
+    const += k
+
+    extra_cons = safe_cons + decomp_cons + flat_cons + enc_cons
+
+    # remove terms with coefficient 0 (`only_positive_coefficients_` may return them and RC2 does not accept them)
+    terms = [(w, x) for w, x in terms if w != 0]
+    if len(terms) == 0:
+        return [], [], const, extra_cons
+
+    ws, xs = zip(*terms)  # unzip
+    new_weights, new_xs, k = only_positive_coefficients_(ws, xs)
+    const += k
+
+    return list(new_weights), list(new_xs), const, extra_cons
