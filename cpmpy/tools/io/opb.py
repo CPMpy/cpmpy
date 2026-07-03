@@ -150,8 +150,9 @@ def _parse_constraint(line, vars):
 
     rhs = int(ind_term) if ind_term.lstrip("+-").isdigit() else vars[ind_term]
 
+    op_name = "==" if op == "=" else op
     return cp.expressions.core.Comparison(
-        name="==" if op == "=" else ">=",
+        name=op_name,
         left=lhs,
         right=rhs
     )
