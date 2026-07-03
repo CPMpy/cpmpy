@@ -34,6 +34,7 @@ List of submodules
     :nosignatures:
 
     parser_callbacks
+    parser
     analyze
     benchmark
     xcsp3_cpmpy
@@ -41,82 +42,38 @@ List of submodules
     globals
 """
 
-from io import StringIO
-import lzma
 import os
+import lzma
+from io import StringIO
+from typing import Union, TextIO, Callable
+import builtins
+import warnings
 import cpmpy as cp
-
-# Special case for optional cpmpy dependencies
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pycsp3.parser.xparser import ParserXCSP3
-
 from cpmpy.tools.datasets.xcsp3 import XCSP3Dataset  # for easier importing
+from .parser import load_xcsp3 
 
 
-def _parse_xcsp3(path: os.PathLike) -> "ParserXCSP3":
+# Backward compatibility alias
+def read_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins.open) -> cp.Model:
     """
-    Parses an XCSP3 instance file (.xml) and returns a `ParserXCSP3` instance.
+    .. deprecated:: 1.0.0
+          Please use :func:`load_xcsp3` instead.
 
-    Arguments:
-        path: location of the XCSP3 instance to read (expects a .xml file).
-
-    Returns:
-        A parser object.
-    """
-    try:
-        from pycsp3.parser.xparser import ParserXCSP3
-    except ImportError as e:
-        raise ImportError(
-            "The 'pycsp3' package is required to parse XCSP3 files. "
-            "Please install it with `pip install pycsp3`."
-        ) from e
-
-    parser = ParserXCSP3(path)
-    return parser
-
-
-def _load_xcsp3(parser: "ParserXCSP3") -> cp.Model:
-    """
-    Takes in a `ParserXCSP3` instance and loads its captured model as a CPMpy model.
-
-    Arguments:
-        parser (ParserXCSP3): A parser object to load from.
-
-    Returns:
-        The XCSP3 instance loaded as a CPMpy model.
-    """
-    from .parser_callbacks import CallbacksCPMPy
-    from pycsp3.parser.xparser import CallbackerXCSP3
-
-    callbacks = CallbacksCPMPy()
-    callbacks.force_exit = True
-    callbacker = CallbackerXCSP3(parser, callbacks)
-    callbacker.load_instance()
-    model = callbacks.cpm_model
-
-    return model
-
-
-def read_xcsp3(path: os.PathLike) -> cp.Model:
-    """
     Reads in an XCSP3 instance (.xml or .xml.lzma) and returns its matching CPMpy model.
 
     Arguments:
-        path: location of the XCSP3 instance to read (expects a .xml or .xml.lzma file).
+        xcsp3 (str or os.PathLike or TextIO):
+            - A file path to an XCSP3 instance file (.xml or .xml.lzma), or
+            - A string containing the XCSP3 content directly, or
+            - A TextIO object already open for reading
+        open (Callable): callable to open the file for reading (default: builtin ``open``).
+            Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.xml.lzma``.
 
     Returns:
         The XCSP3 instance loaded as a CPMpy model.
     """
-    # Decompress on the fly if still in .lzma format
-    if str(path).endswith(".lzma"):
-        path = decompress_lzma(path)
-
-    # Parse and create CPMpy model
-    parser = _parse_xcsp3(path)
-    model = _load_xcsp3(parser)
-    return model
+    warnings.warn("Deprecated, use load_xcsp3 instead", DeprecationWarning)
+    return load_xcsp3(xcsp3, open=open)
 
 
 def decompress_lzma(path: os.PathLike) -> StringIO:
