@@ -845,7 +845,7 @@ def _is_invalid_name(name: Any) -> bool:
         else:
             id = int(name[len(_IV_PREFIX):])
             if _IntVarImpl.counter > id:
-                warnings.warn(f"Creating a variable with name {name} that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
+                warnings.warn("Creating a variable with a name that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
             return False
     
     elif name.startswith(_BV_PREFIX):
@@ -854,8 +854,7 @@ def _is_invalid_name(name: Any) -> bool:
         else:
             id = int(name[len(_BV_PREFIX):])
             if _BoolVarImpl.counter > id:
-                # TODO: reduce warning frequency? Now reported for every variable
-                warnings.warn(f"Creating a variable with name {name} that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
+                warnings.warn("Creating a variable with a name that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
             return False
     
     return False
