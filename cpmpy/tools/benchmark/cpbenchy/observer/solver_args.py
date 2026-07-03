@@ -182,7 +182,8 @@ class SolverArgsObserver(Observer):
         if solver_params:
             res |= solver_params
 
-        res |= {"IntegralityFocus": 1} # to fix precision errors related to the MIPGap
+        res |= {"IntegralityFocus": 1} # enforce true integrality of solutions
+        res |= {"MIPGap": 0} # default 1e-4 allows terminating with a near-optimal solution reported as optimal
 
         if intermediate and model.has_objective():
 
