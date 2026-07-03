@@ -46,7 +46,7 @@
     ==============
 """
 from typing import Optional, Iterable
-
+import warnings
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -215,8 +215,30 @@ class CPM_z3(SolverInterface):
                 # check if optimal solution found and proven, i.e. bounds are equal
                 lower_bound = self.z3_solver.lower(self.obj_handle)
                 upper_bound = self.z3_solver.upper(self.obj_handle)
-                if lower_bound == upper_bound: # found optimal
+                # Soundness guard: z3's Optimize engine can return an internally
+                # inconsistent result (a proven bound that the returned model does
+                # not actually achieve, e.g. GolombRuler where z3 4.16.0 reports
+                # bound==20 but the model has objective 500). Only trust OPTIMAL if
+                # the returned model truly attains the claimed bound; if Z3 claims
+                # a proven bound that its model does not attain, treat the result as
+                # UNKNOWN because the solver evidence is inconsistent.
+                model_obj = self.z3_solver.model().evaluate(self.z3_solver.objectives()[0])
+                bounds_are_equal = z3.is_int_value(model_obj) and \
+                    z3.is_int_value(lower_bound) and z3.is_int_value(upper_bound) and \
+                    lower_bound.as_long() == upper_bound.as_long()
+                bound_matches_model = False
+                if bounds_are_equal:
+                    # z3 stores a maximisation objective internally negated, while
+                    # lower()/upper() report it in the original (user) sense; undo
+                    # the negation on the model value before comparing.
+                    model_val = model_obj.as_long() if self._minimize else -1*model_obj.as_long()
+                    bound_matches_model = (lower_bound.as_long() == model_val)
+                    if not bound_matches_model:
+                        warnings.warn("Z3 bound does not match model value. This is a known issue with Z3. See issue #1036.")
+                if bound_matches_model: # found and verified optimal
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                elif bounds_are_equal: # inconsistent proven bound / model evidence
+                    self.cpm_status.exitstatus = ExitStatus.UNKNOWN
                 else: # suboptimal / not proven
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # CSP
@@ -583,6 +605,5 @@ class CPM_z3(SolverInterface):
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
-
 
 
