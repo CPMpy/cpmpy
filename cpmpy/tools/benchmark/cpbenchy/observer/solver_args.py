@@ -183,7 +183,7 @@ class SolverArgsObserver(Observer):
             res |= solver_params
 
         res |= {"IntegralityFocus": 1} # enforce true integrality of solutions
-        res |= {"MIPGap": 0} # default 1e-4 allows terminating with a near-optimal solution reported as optimal
+        res |= {"MIPGap": 1e-6} # default 1e-4 allows terminating with a near-optimal solution reported as optimal
 
         if intermediate and model.has_objective():
 
@@ -330,6 +330,11 @@ class SolverArgsObserver(Observer):
             res |= {"threads": cores}
         if seed is not None:
             res |= {"random_seed": seed}
+
+        # default 1e-9 drops small scaled coefficients on badly-scaled instances (false UNSAT)
+        res |= {"small_matrix_value": 1e-12}
+        # default mip_rel_gap=1e-4 allows reporting a near-optimal solution as optimal
+        res |= {"mip_rel_gap": 0, "mip_abs_gap": 0}
 
         internal_options = None
         if intermediate and model.has_objective():
