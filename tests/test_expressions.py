@@ -278,6 +278,38 @@ class TestNDVarArrayBroadcast:
 
 class TestArrayExpressions:
 
+    def test_scalar_expr_with_ndarray(self):
+        x = intvar(0, 5, shape=3, name=tuple("abc"))
+        y = intvar(0, 5, name="y")
+        xy, yx = x * y, y * x
+        assert isinstance(xy, NDVarArray) and isinstance(yx, NDVarArray)
+        for i in range(3):
+            assert set(xy[i].args) == set(yx[i].args)
+            assert set((x + y)[i].args) == set((y + x)[i].args)
+        assert str(x == y) == str(y == x)
+
+    def test_scalar_expr_left_of_ndarray_mul(self):
+        # y * x must broadcast element-wise, not wrap the whole array in one Multiplication
+        from cpmpy.expressions.globalfunctions import Multiplication
+
+        x = intvar(0, 10, shape=3, name=tuple("abc"))
+        y = intvar(0, 10, name="y")
+        assert isinstance(x * y, NDVarArray)
+        yx = y * x
+        assert isinstance(yx, NDVarArray)
+        assert not isinstance(yx, Multiplication)
+        assert yx.shape == (3,)
+        assert all(a is y or b is y for a, b in (e.args for e in yx))
+
+    def test_scalar_expr_with_numpy_array(self):
+        e = sum(cp.boolvar(3))
+        y = np.array([1, 2, 3])
+        ey, ye = e * y, y * e
+        assert isinstance(ey, NDVarArray)
+        assert ey.shape == ye.shape == (3,)
+        for a, b in zip(ey, ye):
+            assert str(a) == str(b)
+
     def test_sum(self):
         x = intvar(0,5,shape=10, name="x")
         y = intvar(0, 1000, name="y")
