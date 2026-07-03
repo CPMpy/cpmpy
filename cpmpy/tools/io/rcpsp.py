@@ -54,22 +54,17 @@ def load_rcpsp(rcpsp: Union[str, os.PathLike, TextIO], open:Callable=builtins.op
     Returns:
         cp.Model: The CPMpy model of the PSPLIB RCPSP instance.
     """
-    data = parse_rcpsp(rcpsp, open=open)
+    with _handle_loader_input(rcpsp, open=open) as f:
+        data = parse_rcpsp(f)
     model, _ = _model_rcpsp(**data)
     return model
 
-
-def parse_rcpsp(instance: Union[str, os.PathLike, TextIO], open: Callable = builtins.open) -> dict[str, Any]:
+def parse_rcpsp(f: TextIO) -> dict[str, Any]:
     """
-    Parse a PSPLIB RCPSP instance.
+    Parse a PSPLIB RCPSP instance file.
 
     Arguments:
-        instance (str or os.PathLike or TextIO):
-            - A file path to a PSPLIB RCPSP file, or
-            - A string containing the RCPSP content directly, or
-            - A TextIO object already open for reading
-        open (Callable):
-            If instance is the path to a file, a callable to "open" that file (default=python standard library's 'open').
+        f (TextIO): The file to parse.
 
     Returns:
         dict[str, Any]: Native Python structures with keys ``jobs``, ``resource_names``,
@@ -78,45 +73,44 @@ def parse_rcpsp(instance: Union[str, os.PathLike, TextIO], open: Callable = buil
     Note:
         Use :func:`to_dataframe` to convert job data to a pandas DataFrame if needed.
     """
-    with _handle_loader_input(instance, open=open) as f:
-        data = dict()
+    data = dict()
 
+    line = f.readline()
+    while not line.startswith("PRECEDENCE RELATIONS:"):
         line = f.readline()
-        while not line.startswith("PRECEDENCE RELATIONS:"):
-            line = f.readline()
-
-        f.readline() # skip keyword line
-        line = f.readline() # first line of table, skip
-        while not line.startswith("*****"):
-            jobnr, n_modes, n_succ, *succ = [int(x) for x in line.split(" ") if len(x.strip())]
-            assert len(succ) == n_succ, "Expected %d successors for job %d, got %d" % (n_succ, jobnr, len(succ))
-            data[jobnr] = dict(num_modes=n_modes, successors=succ)
-            line = f.readline()
-
-        # skip to job info
-        while not line.startswith("REQUESTS/DURATIONS:"):
-            line = f.readline()
-
+    
+    f.readline() # skip keyword line
+    line = f.readline() # first line of table, skip
+    while not line.startswith("*****"):
+        jobnr, n_modes, n_succ, *succ = [int(x) for x in line.split(" ") if len(x.strip())]
+        assert len(succ) == n_succ, "Expected %d successors for job %d, got %d" % (n_succ, jobnr, len(succ))
+        data[jobnr] = dict(num_modes=n_modes, successors=succ)
         line = f.readline()
-        _j, _m, _d, *_r = [x.strip() for x in line.split(" ") if len(x.strip())] # first line of table
-        resource_names = [f"{_r[i]}{_r[i+1]}" for i in range(0,len(_r),2)]
-        line = f.readline() # first line of table
-        if line.startswith("----") or line.startswith("*****"): # intermediate line in table...
-            line = f.readline() # skip
 
-        while not line.startswith("*****"):
-            jobnr, mode, duration, *resources = [int(x) for x in line.split(" ") if len(x.strip())]
-            assert len(resources) == len(resource_names), "Expected %d resources for job %d, got %d" % (len(resource_names), jobnr, len(resources))
-            data[jobnr].update(dict(mode=mode, duration=duration))
-            data[jobnr].update({name : req for name, req in zip(resource_names, resources)})
-            line = f.readline()
+    # skip to job info
+    while not line.startswith("REQUESTS/DURATIONS:"):
+        line = f.readline()
 
-        # read resource availabilities
-        while not line.startswith("RESOURCEAVAILABILITIES:"):
-            line = f.readline()
+    line = f.readline()
+    _j, _m, _d, *_r = [x.strip() for x in line.split(" ") if len(x.strip())] # first line of table
+    resource_names = [f"{_r[i]}{_r[i+1]}" for i in range(0,len(_r),2)]
+    line = f.readline() # first line of table
+    if line.startswith("----") or line.startswith("*****"): # intermediate line in table...
+        line = f.readline() # skip
 
-        f.readline() # skip header
-        capacities = [int(x) for x in f.readline().split(" ") if len(x)]
+    while not line.startswith("*****"):
+        jobnr, mode, duration, *resources = [int(x) for x in line.split(" ") if len(x.strip())]
+        assert len(resources) == len(resource_names), "Expected %d resources for job %d, got %d" % (len(resource_names), jobnr, len(resources))
+        data[jobnr].update(dict(mode=mode, duration=duration))
+        data[jobnr].update({name : req for name, req in zip(resource_names, resources)})
+        line = f.readline()
+    
+    # read resource availabilities
+    while not line.startswith("RESOURCEAVAILABILITIES:"):
+        line = f.readline()
+    
+    f.readline() # skip header
+    capacities = [int(x) for x in f.readline().split(" ") if len(x)]
 
     return {
         "jobs": data,

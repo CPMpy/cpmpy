@@ -5,6 +5,7 @@ Generic load/write/round-trip coverage lives in ``test_tools_io.py``. These test
 focus on CNF parser edge cases, p-line validation, writer output shape, etc.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -21,8 +22,17 @@ TSEITIN_CNF_PATH = DATA_DIR / "tseitin_n18.cnf"
 TSEITIN_CNF = TSEITIN_CNF_PATH.read_text()
 
 
+def _natural_key(var):
+    # Sort auto-named variables (e.g. "BV8", "BV9", "BV10") by their numeric
+    # index rather than lexicographically. The global variable counter can sit
+    # anywhere depending on what ran earlier (it differs per solver run), and a
+    # plain str sort breaks across digit boundaries ("BV10" < "BV8"), which made
+    # these tests pass or fail depending on the counter's magnitude.
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", str(var))]
+
+
 def _vars(model):
-    return sorted(get_variables_model(model), key=str)
+    return sorted(get_variables_model(model), key=_natural_key)
 
 
 def _writer_model():

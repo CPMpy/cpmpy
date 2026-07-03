@@ -22,7 +22,7 @@ import builtins
 
 import cpmpy as cp
 from cpmpy.tools.io.dimacs import load_dimacs
-from cpmpy.tools.io.scip_formats import load_scip
+from cpmpy.tools.io.scip_formats import load_scip_format
 from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.io.opb import load_opb
 from cpmpy.tools.io.xcsp3 import load_xcsp3
@@ -33,12 +33,12 @@ from cpmpy.tools.io.utils import _derive_format, _is_potential_path
 
 # mapping format names to appropriate loader functions
 _loader_map: dict[str, Callable[..., cp.Model]] = {
-    "mps": partial(load_scip, type="mps"),
-    "lp": partial(load_scip, type="lp"),
-    "cip": partial(load_scip, type="cip"),
-    "fzn": partial(load_scip, type="fzn"),
-    "gms": partial(load_scip, type="gms"),
-    "pip": partial(load_scip, type="pip"),
+    "mps": partial(load_scip_format , type="mps"),
+    "lp": partial(load_scip_format, type="lp"),
+    "cip": partial(load_scip_format, type="cip"),
+    "fzn": partial(load_scip_format, type="fzn"),
+    "gms": partial(load_scip_format, type="gms"),
+    "pip": partial(load_scip_format, type="pip"),
     "dimacs": load_dimacs,
     "opb": load_opb,
     "cnf": partial(load_dimacs, type="cnf"),
