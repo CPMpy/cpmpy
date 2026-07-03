@@ -132,7 +132,10 @@ def _handle_loader_input(
     elif isinstance(source, (str, os.PathLike)) and _is_potential_path(source):
         path = Path(source)
         if path.exists():
-            f = open(path, "r")
+            # ``open`` is documented as a single-argument, path-only callable, so
+            # custom decompressing openers (e.g. ``lambda p: lzma.open(p, 'rt')``)
+            # and dataset ``open`` methods work without accepting a mode argument.
+            f = open(path)
             should_close = True
         elif isinstance(source, str):
             # e.g. "p cnf 0 0" — no newlines, not an existing path: inline content

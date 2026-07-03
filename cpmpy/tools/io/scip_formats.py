@@ -321,9 +321,9 @@ def write_scip(
             Pass an empty string to skip adding a header.
         verbose (bool): If True, allow SCIP to print progress.
         open (Callable): Callable to open the file for writing (default: builtin ``open``).
-            Called as ``open(path, "w")``. Mirrors the ``open=`` argument in loaders and
+            Called as ``open(path)``. Mirrors the ``open=`` argument in loaders and
             allows custom compression or I/O (e.g.
-            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+            ``lambda p: lzma.open(p, 'wt')``).
 
     Returns:
         str: The file content as a string (whether written to ``path`` or not).

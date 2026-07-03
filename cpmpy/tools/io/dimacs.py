@@ -103,9 +103,9 @@ def write_dimacs(
             If None, a default CPMpy header is created only when writing to ``path``.
             Pass an empty string to skip adding a header.
         open (Callable): callable to open the file for writing (default: builtin ``open``).
-            Called as ``open(path, "w")``. This mirrors the ``open=`` argument
+            Called as ``open(path)``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
-            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+            ``lambda p: lzma.open(p, 'wt')``).
         annotate_bool (BooleanEncodingAnnotator, optional): encoding annotator, annotates 
             boolean variables with names describing how they contribute to an encoded integer variable.
             When provided, each DIMACS literal ID is mapped back to that name via a

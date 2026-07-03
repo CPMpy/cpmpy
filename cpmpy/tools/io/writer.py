@@ -106,9 +106,9 @@ def write(
         verbose (bool): Whether to print verbose output.
         header (Optional[str]): The header to put at the top of the file. If None, a default header will be created. Pass an empty string to skip adding a header.
         open (Callable): callable to open the file for writing (default: builtin ``open``).
-            Called as ``open(path, "w")``. This mirrors the ``open=`` argument
+            Called as ``open(path)``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
-            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+            ``lambda p: lzma.open(p, 'wt')``).
         **kwargs: Additional arguments to pass to the writer.
 
     Raises:
