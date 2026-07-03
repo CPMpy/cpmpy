@@ -6,11 +6,12 @@ Boolean variables. For example, a direct (or one-hot) encoding of an integer var
 `[0, 10]` requires 11 Boolean variables, one for each possible value of `x`. 
 
 When writing to file, this mapping between the integer variable and the Boolean variables is typically lost. 
-Through annotation, we can keep track of this mapping and later recover it. 
+If we also save an annotation to the file, a mapping from Boolean variable name to integer variable name, 
+then an external tool can recover it later.
 
 Additionally, some formats don't support arbitrary variable naming. In DIMACS for example, 
-variables are referenced by integer IDs. Annotation again allows us to keep track of the original 
-variable names. 
+variables are referenced by integer IDs. Storing an annotation in the file allows again 
+to map it back later if needed.
 
 ===============
 List of classes
@@ -31,7 +32,6 @@ from cpmpy.transformations.int2bool import IntVarEnc, IntVarEncDirect, IntVarEnc
 
 
 class BooleanEncodingAnnotator(ABC):
-
     """
     Abstract base class for encoding annotators.
 
@@ -48,7 +48,6 @@ class BooleanEncodingAnnotator(ABC):
         pass
 
 class SugarAnnotator(BooleanEncodingAnnotator):
-
     """
     Return Sugar-style annotations for Boolean encoding variables.
 
