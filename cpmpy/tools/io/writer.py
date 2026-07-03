@@ -21,25 +21,25 @@ import builtins
 
 import cpmpy as cp
 from cpmpy.tools.io.dimacs import write_dimacs
-from cpmpy.tools.io.scip_formats import write_scip
+from cpmpy.tools.io.scip_formats import write_scip_format
 from cpmpy.tools.io.opb import write_opb
 from cpmpy.tools.io.utils import _derive_format
 
 # mapping format names to appropriate writer functions
 _writer_map: dict[str, Callable[..., str]] = {
-    "mps": partial(write_scip, format="mps"),
-    "lp": partial(write_scip, format="lp"),
-    "cip": partial(write_scip, format="cip"),
-    # "cnf": partial(write_scip, format="cnf"),      # requires SIMPL, not included in pip package
-    # "diff": partial(write_scip, format="diff"),    # requires SIMPL, not included in pip package
-    "fzn": partial(write_scip, format="fzn"),
-    "gms": partial(write_scip, format="gms"),
-    # "opb": partial(write_scip, format="opb"),      # requires SIMPL, not included in pip package
-    # "osil": partial(write_scip, format="osil"),
-    "pip": partial(write_scip, format="pip"),
-    # "sol": partial(write_scip, format="sol"),      # requires SIMPL, not included in pip package
-    # "wbo": partial(write_scip, format="wbo"),      # requires SIMPL, not included in pip package   
-    # "zpl": partial(write_scip, format="zpl"),      # requires SIMPL, not included in pip package
+    "mps": partial(write_scip_format, format="mps"),
+    "lp": partial(write_scip_format, format="lp"),
+    "cip": partial(write_scip_format, format="cip"),
+    # "cnf": partial(write_scip_format, format="cnf"),      # requires SIMPL, not included in pip package
+    # "diff": partial(write_scip_format, format="diff"),    # requires SIMPL, not included in pip package
+    "fzn": partial(write_scip_format, format="fzn"),
+    "gms": partial(write_scip_format, format="gms"),
+    # "opb": partial(write_scip_format, format="opb"),      # requires SIMPL, not included in pip package
+    # "osil": partial(write_scip_format, format="osil"),
+    "pip": partial(write_scip_format, format="pip"),
+    # "sol": partial(write_scip_format, format="sol"),      # requires SIMPL, not included in pip package
+    # "wbo": partial(write_scip_format, format="wbo"),      # requires SIMPL, not included in pip package   
+    # "zpl": partial(write_scip_format, format="zpl"),      # requires SIMPL, not included in pip package
     "dimacs": write_dimacs,
     "cnf": write_dimacs,
     "wcnf": write_dimacs,

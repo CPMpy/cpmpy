@@ -24,8 +24,8 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    load_scip
-    write_scip
+    load_scip_format
+    write_scip_format
 """
 
 
@@ -48,7 +48,7 @@ from cpmpy.model import _update_variable_counters
 from cpmpy.tools.io.utils import _create_header, _derive_format, get_extension
 
 
-def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtins.open, assume_integer:bool=False, type: Optional[str]=None) -> cp.Model:
+def load_scip_format(instance: Union[str, os.PathLike, TextIO], open:Callable = builtins.open, assume_integer:bool=False, type: Optional[str]=None) -> cp.Model:
     """
     Load a SCIP-compatible model from a file and return a CPMpy model.
 
@@ -291,7 +291,7 @@ class _SCIPWriter(CPM_scip):
             f.writelines(lines)
 
 
-def write_scip(
+def write_scip_format(
         model: cp.Model, 
         path: Optional[Union[str, os.PathLike]] = None, 
         format: str = "mps", 

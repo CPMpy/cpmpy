@@ -104,7 +104,7 @@ from .rcpsp import load_rcpsp
 
 # Standard format loaders and writers
 from .opb import load_opb, write_opb
-from .scip_formats import load_scip, write_scip
+from .scip_formats import load_scip_format, write_scip_format
 from .wcnf import load_wcnf
 from .dimacs import load_dimacs, write_dimacs
 from .xcsp3 import load_xcsp3
@@ -116,8 +116,8 @@ _all__ = [
     "write_formats",
     "load_opb",
     "write_opb",
-    "load_scip",
-    "write_scip",
+    "load_scip_format",
+    "write_scip_format",
     "load_dimacs",
     "write_dimacs",
     "load_wcnf",
