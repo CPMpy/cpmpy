@@ -144,14 +144,15 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     def download(self):
 
-        url = "https://www.om-db.wi.tum.de/psplib/files/"
-        target = f"{self.family}.{self.family_codes[self.variant]}.zip"
-        target_download_path = self.root / target
-        
+        code = self.family_codes[self.variant]
+        url = "https://www.om-db.wi.tum.de/psplib/"
+        target = f"download_dataset.php?set={self.family}&mode={code}&format=zip"
+        target_download_path = self.root / f"{self.family}.{code}.zip"
+
         print(f"Downloading PSPLib {self.variant} {self.family} instances from www.om-db.wi.tum.de")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), desc=f"{self.family}.{code}.zip")
         except ValueError as e:
             raise ValueError(f"No dataset available for variant {self.variant} and family {self.family}. Error: {str(e)}")
         
