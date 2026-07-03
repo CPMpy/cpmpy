@@ -271,6 +271,15 @@ class TestNDVarArrayBroadcast:
         for idx in np.ndindex(expr.shape):
             assert str(expr[idx]) == str(ref[idx])
 
+    def test_numpy_expr_mul(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        e = cp.boolvar() | cp.boolvar()
+        expr = x * e
+        ref = np.multiply(x, e)
+        assert expr.shape == ref.shape
+        for idx in np.ndindex(expr.shape):
+            assert str(expr[idx]) == str(ref[idx])
+
     def test_incompatible_broadcast_raises(self):
         x = intvar(0, 10, shape=(3, 4), name="x")
         with pytest.raises(ValueError, match="broadcast"):
