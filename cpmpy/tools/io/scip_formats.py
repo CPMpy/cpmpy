@@ -242,52 +242,53 @@ class _SCIPWriter(CPM_scip):
         super().__init__(model)
         self.scip_model.setProbName(problem_name)
 
-def _add_header(path: Union[str, os.PathLike], format: str, header: Optional[str] = None):
-    """
-    Add a header to a file.
+    @staticmethod
+    def _add_header(path: Union[str, os.PathLike], format: str, header: Optional[str] = None):
+        """
+        Add a header to a file.
 
-    Arguments:
-        path (str or os.PathLike): The path to the file to add the header to.
-        format (str): The format of the file.
-        header (Optional[str]): The header to add.
-    """
+        Arguments:
+            path (str or os.PathLike): The path to the file to add the header to.
+            format (str): The format of the file.
+            header (Optional[str]): The header to add.
+        """
 
-    if header is None:
-        header = ""
+        if header is None:
+            header = ""
 
-    with open(path, "r") as f:
-        lines = f.readlines()
+        with open(path, "r") as f:
+            lines = f.readlines()
 
-    if format == "mps":
-        header_lines = ["* " + line + "\n" for line in header.splitlines()]
-        lines = header_lines + lines
-        
-    elif format == "lp":
-        header_lines = ["\\ " + line + "\n" for line in header.splitlines()]
-        lines = header_lines + lines
+        if format == "mps":
+            header_lines = ["* " + line + "\n" for line in header.splitlines()]
+            lines = header_lines + lines
+            
+        elif format == "lp":
+            header_lines = ["\\ " + line + "\n" for line in header.splitlines()]
+            lines = header_lines + lines
 
-    elif format == "cip":
-        header_lines = ["# " + line + "\n" for line in header.splitlines()]
-        lines = header_lines + lines
+        elif format == "cip":
+            header_lines = ["# " + line + "\n" for line in header.splitlines()]
+            lines = header_lines + lines
 
-    elif format == "fzn":
-        header_lines = ["% " + line + "\n" for line in header.splitlines()]
-        lines = header_lines + lines
+        elif format == "fzn":
+            header_lines = ["% " + line + "\n" for line in header.splitlines()]
+            lines = header_lines + lines
 
-    elif format == "gms":
-        header_lines = ["* " + line + "\n" for line in header.splitlines()]
-        lines = [lines[0]] + header_lines + lines[1:] # handle first line: $OFFLISTING
+        elif format == "gms":
+            header_lines = ["* " + line + "\n" for line in header.splitlines()]
+            lines = [lines[0]] + header_lines + lines[1:] # handle first line: $OFFLISTING
 
-    elif format == "pip":
-        header_lines = ["\\ " + line + "\n" for line in header.splitlines()]
-        lines = header_lines + lines
+        elif format == "pip":
+            header_lines = ["\\ " + line + "\n" for line in header.splitlines()]
+            lines = header_lines + lines
 
-    else:
-        warnings.warn(f"Unsupported format for header: {format}")
-        return
+        else:
+            warnings.warn(f"Unsupported format for header: {format}")
+            return
 
-    with open(path, "w") as f:
-        f.writelines(lines)
+        with open(path, "w") as f:
+            f.writelines(lines)
 
 
 def write_scip(
@@ -352,7 +353,7 @@ def write_scip(
             os.close(old_stdout)
         if not verbose:
             writer.scip_model.hideOutput(quiet=False)
-        _add_header(tmp_fname, format, header)
+        writer._add_header(tmp_fname, format, header)
         with builtins.open(tmp_fname, "r") as f:
             content = f.read()
         if path is not None:
