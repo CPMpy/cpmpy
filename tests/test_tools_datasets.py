@@ -20,7 +20,7 @@ from cpmpy.tools.io import (
     load_xcsp3,
     load_jsplib,
     load_rcpsp,
-    load_scip,
+    load_scip_format,
     load_wcnf,
     load_opb,
     load_dimacs,
@@ -87,7 +87,7 @@ RAW_DATASET_SPECS = [
     {
         "id": "miplib",
         "dataset_cls": MIPLibDataset,
-        "loader": load_scip,
+        "loader": load_scip_format,
         "download_timeout": 3600,  # collection.zip is several GB
         # Not every MIPLib instance is representable in CPMpy (e.g. continuous
         # variables); point the loader tests at the pure-integer 'gen-ip' family.
