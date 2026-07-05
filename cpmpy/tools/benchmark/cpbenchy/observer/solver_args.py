@@ -8,6 +8,38 @@ from ..runner.runner import Runner
 from .base import Observer
 
 
+# largest coefficient magnitude considered safe for HiGHS default matrix scaling;
+# the observed false-UNSAT instances had coefficients ~1e9 (drops occur when scaled
+# entries fall below small_matrix_value=1e-9), 1e6 leaves 3 orders of magnitude margin
+_HIGHS_SAFE_COEFFICIENT_MAGNITUDE = 1e6
+
+
+def _max_abs_constant(model: cp.Model, stop_at=None):
+    """Largest absolute numeric constant in the model (weights, bounds, ...).
+       With `stop_at`, returns early once that magnitude is reached."""
+    import numpy as np
+    from cpmpy.expressions.core import Expression
+    from cpmpy.expressions.variables import _NumVarImpl
+
+    mx = 0
+    stack = list(model.constraints)
+    if model.has_objective():
+        stack.append(model.objective_)
+    while stack:
+        e = stack.pop()
+        if isinstance(e, _NumVarImpl):
+            continue
+        if isinstance(e, Expression):
+            stack.extend(e.args)
+        elif isinstance(e, (list, tuple, np.ndarray)):
+            stack.extend(e)
+        elif isinstance(e, (int, float, np.integer, np.floating)):
+            mx = max(mx, abs(e))
+            if stop_at is not None and mx >= stop_at:
+                return mx
+    return mx
+
+
 class SolverArgsObserver(Observer):
 
     def __init__(self, **kwargs):
@@ -323,6 +355,23 @@ class SolverArgsObserver(Observer):
         **kwargs
     ):
         res = dict()
+        # HiGHS is a float MIP solver; defaults trade exactness for speed, which is
+        # unsound for competition answers:
+        # - default mip_rel_gap=1e-4 lets HiGHS report near-optimal solutions as OPTIMAL.
+        #   CPMpy objectives are integer-valued, so an absolute gap < 1 already proves
+        #   optimality: rel_gap=0 + abs_gap=0.99 is exact yet stops earlier than the
+        #   default gaps (no need to close the gap to 0).
+        res |= {
+            "mip_rel_gap": 0.0,
+            "mip_abs_gap": 0.99,
+        }
+        # - default small_matrix_value=1e-9 drops scaled matrix entries on instances with
+        #   large coefficients, turning satisfiable instances into false UNSAT. Lowering
+        #   it perturbs the search on all instances, so only do it when coefficients are
+        #   large enough for scaling to produce sub-1e-9 entries.
+        if _max_abs_constant(model, stop_at=_HIGHS_SAFE_COEFFICIENT_MAGNITUDE) \
+                >= _HIGHS_SAFE_COEFFICIENT_MAGNITUDE:
+            res |= {"small_matrix_value": 1e-12}  # minimum allowed by HiGHS
         if cores is not None:
             res |= {"threads": cores}
         if seed is not None:

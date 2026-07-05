@@ -118,6 +118,7 @@ class CPM_highs(SolverInterface):
 
         self._inf = highspy.kHighsInf
         self._obj_cols = None
+        self._objective_expr = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -297,6 +298,7 @@ class CPM_highs(SolverInterface):
         import highspy
 
         get_variables(expr, collect=self.user_vars)
+        self._objective_expr = expr
 
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_linear_objective(
@@ -431,7 +433,12 @@ class CPM_highs(SolverInterface):
                     cpm_var._value = int(round(val))
 
             if self.has_objective():
-                self.objective_value_ = info.objective_function_value
+                # evaluate the user's objective expression on the (rounded) solution values;
+                # HiGHS reports a float objective which can deviate from the true integer value
+                obj_val = self._objective_expr.value()
+                if obj_val is None:  # e.g. objective posted as a raw constant
+                    obj_val = info.objective_function_value
+                self.objective_value_ = obj_val
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
