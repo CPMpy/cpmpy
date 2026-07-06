@@ -478,10 +478,9 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
         t0 = time.time()
         if sname == "exact": # requires setting args during init
             solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
-            solve_kwargs = {}
+            solver_kwargs = dict()
         else:
-            solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
-            solve_kwargs = solver_kwargs
+            solver = cp.SolverLookup.get(sname, model)
 
         record["transformation_time"] = time.time() - t0
         if hasattr(solver, "transform_stats"):
@@ -500,7 +499,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
         return record
 
     try:
-        solver.solve(time_limit=time_limit, **solve_kwargs)
+        solver.solve(time_limit=time_limit, **solver_kwargs)
 
         status = solver.status()
         record["runtime"] = status.runtime
