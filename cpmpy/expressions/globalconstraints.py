@@ -962,7 +962,7 @@ class Regular(GlobalConstraint):
         # define the rest of the automaton using transition table
         cons.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
         # last state must be accepting
-        value = [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])]
+        value : list[Expression] = [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])]
         if complete:
             # constraint is satisfied iff last state is accepting
             return value, cons
