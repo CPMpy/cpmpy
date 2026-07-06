@@ -60,7 +60,6 @@ import gc
 
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.transformations.flatten_model import toplevel_list, flatten_constraint
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -152,6 +151,16 @@ def pick_decompose(ablate, base_decompose):
     return base_decompose
 
 
+def count_transform_stats(cpm_cons):
+    vars = get_variables(cpm_cons)
+    n_bool = sum(1 for v in vars if v.is_bool())
+    return {
+        "n_constraints": len(cpm_cons),
+        "n_integer": len(vars) - n_bool,
+        "n_boolean": n_bool,
+    }
+
+
 # The ablated transform pipelines. These were originally written as solver
 # subclasses in journal_experiments/ablation.py; they are inlined here as plain
 # (self, cpm_expr) methods so this script is self-contained. Each solver has a
@@ -185,6 +194,7 @@ def gurobi_transform(self, cpm_expr, ablate):
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub", "min", "max", "mul", "abs", "pow"}), csemap=self._csemap)  # the core of the MIP-linearization
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
 
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 
@@ -209,6 +219,7 @@ def pysat_transform(self, cpm_expr, ablate):
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization
     cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
     cpm_cons = only_positive_coefficients(cpm_cons)
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 
@@ -230,6 +241,7 @@ def scip_transform(self, cpm_expr, ablate):
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 
@@ -251,6 +263,7 @@ def highs_transform(self, cpm_expr, ablate):
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum"}), csemap=self._csemap)
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 
@@ -275,6 +288,7 @@ def exact_transform(self, cpm_expr, ablate):
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "mul"}), csemap=self._csemap)
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 
@@ -300,6 +314,7 @@ def pindakaas_transform(self, cpm_expr, ablate):
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)
     cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 def choco_transform(self, cpm_expr, ablate):
@@ -318,6 +333,7 @@ def choco_transform(self, cpm_expr, ablate):
                              supported=self.supported_global_constraints | {"sum", "wsum"},
                              csemap=self._csemap)
     cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 
@@ -336,6 +352,7 @@ def ortools_transform(self, cpm_expr, ablate):
     cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
     cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+    self.transform_stats = count_transform_stats(cpm_cons)
     return cpm_cons
 
 
@@ -420,7 +437,7 @@ def patch_transform(solver_name, ablate):
     if base not in SOLVER_TRANSFORM:
         raise ValueError("No ablation pipeline for solver '{}' (have: {})".format(
             solver_name, ", ".join(sorted(SOLVER_TRANSFORM))))
-    if ablate not in SOLVER_ABLATIONS[base]:
+    if ablate is not None and ablate not in SOLVER_ABLATIONS[base]:
         raise ValueError("Ablation '{}' not supported for solver '{}' (choose from: {})".format(
             ablate, solver_name, ", ".join(sorted(SOLVER_ABLATIONS[base]))))
 
@@ -434,18 +451,6 @@ def patch_transform(solver_name, ablate):
     return solver_cls
 
 
-def count_transform_stats(solver, cpm_expr):
-    """Run ``solver.transform`` and return final model-size metrics."""
-    cpm_cons = solver.transform(cpm_expr)
-    vars = get_variables(cpm_cons)
-    n_bool = sum(1 for v in vars if v.is_bool())
-    n_int = len(vars) - n_bool
-    return {
-        "n_constraints": len(cpm_cons),
-        "n_integer": n_int,
-        "n_boolean": n_bool,
-    }
-
 def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_kwargs, stop_after_transform=False):
     """Load a pickled model, optionally patch the transform, solve, return a record."""
     model = cp.Model.from_file(model_path)
@@ -453,9 +458,11 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
     if model.has_objective() and sname == "pysat":
         sname = "rc2" # PySAT cannot handle objectives, switch to RC2 Max-SAT solver
 
-    if ablate is not None:
-        solver_cls = patch_transform(sname, ablate)
-        print("Patched solver {} for ablation {}".format(sname, ablate))
+    base = sname.split(":", 1)[0].lower()
+    if base in SOLVER_TRANSFORM:
+        patch_transform(sname, ablate)
+        if ablate is not None:
+            print("Patched solver {} for ablation {}".format(sname, ablate))
 
     record = new_run_record(
         model_path=model_path,
@@ -469,13 +476,17 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
 
     try:
         t0 = time.time()
-        solver = cp.SolverLookup.get(sname)
-        transform_stats = count_transform_stats(solver, model.constraints)
-        transformation_time = time.time() - t0
+        if sname == "exact": # requires setting args during init
+            solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
+            solve_kwargs = {}
+        else:
+            solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
+            solve_kwargs = solver_kwargs
 
-        record["transformation_time"] = transformation_time
-        record.update(transform_stats)
-    
+        record["transformation_time"] = time.time() - t0
+        if hasattr(solver, "transform_stats"):
+            record.update(solver.transform_stats)
+
     except Exception as e:
         # clean up memory, its probably a memory error...
         gc.collect()
@@ -489,16 +500,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
         return record
 
     try:
-        # do the solve
-        # re-initialize the solver... no easy way to count transform and also do the solve...
-        # could split it up, but lets keep this for now...
-        if sname == "exact": # requires setting args during init
-            solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
-            solver_kwargs = dict()
-        else:
-            solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
-
-        solver.solve(time_limit=time_limit, **solver_kwargs)
+        solver.solve(time_limit=time_limit, **solve_kwargs)
 
         status = solver.status()
         record["runtime"] = status.runtime
