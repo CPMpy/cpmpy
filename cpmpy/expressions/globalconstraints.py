@@ -961,12 +961,13 @@ class Regular(GlobalConstraint):
         cons: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
         # define the rest of the automaton using transition table
         cons.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
-
+        # last state must be accepting
+        value = [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])]
         if complete:
             # constraint is satisfied iff last state is accepting
-            return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], cons
+            return value, cons
         else:
-            return cons, []
+            return value + cons, []
 
     def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
         return self.decompose_linear(complete=False)

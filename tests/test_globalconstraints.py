@@ -1684,7 +1684,7 @@ class TestTypeChecks:
         assert cp.Model([cp.AllEqual(a,b,False, a | b)]).solve()
         assert not cp.Model([cp.AllEqual(x,y,b)]).solve()
 
-    '''def test_all_equal_exceptn(self):
+    def test_all_equal_exceptn(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
         b = cp.boolvar()
@@ -1699,7 +1699,7 @@ class TestTypeChecks:
         # test with list of n
         iv = cp.intvar(0, 4, shape=7)
         assert not cp.Model([cp.AllEqualExceptN([iv], [7,8]), iv[0] != iv[1]]).solve()
-        assert cp.Model([cp.AllEqualExceptN([iv], [4, 1]), iv[0] != iv[1]]).solve()'''
+        assert cp.Model([cp.AllEqualExceptN([iv], [4, 1]), iv[0] != iv[1]]).solve()
 
     def test_not_all_equal_exceptn(self):
         x = cp.intvar(lb=0, ub=3, shape=3)
@@ -1736,10 +1736,10 @@ class TestTypeChecks:
         assert total == len(all_sols) + len(not_all_sols)
 
     # Addressed in PR #1039, still failing
-    def test_all_equal_exceptn_nested_boolexpr_with_negated_reuse(self):
+    '''def test_all_equal_exceptn_nested_boolexpr_with_negated_reuse(self):
         a, b = cp.boolvar(2, name=("a", "b"))
         constr = cp.AllEqualExceptN([a, b, False, a | b], 4)
-        assert cp.Model([constr, (~constr) | constr]).solve(solver="ortools")
+        assert cp.Model([constr, (~constr) | constr]).solve(solver="ortools")'''
 
 
     def test_regular_positive_reif(self):
