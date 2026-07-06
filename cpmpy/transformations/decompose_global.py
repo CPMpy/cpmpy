@@ -90,8 +90,11 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             if csemap is not None:
                 decomp = csemap.get_decomposition(expr)
                 if decomp is not None:
-                    assert decomp.name == "and", "decompose_in_tree: expected a conjunction but got {decomp}"
-                    newlist.extend(decomp.args)
+                    assert isinstance(decomp, Expression)
+                    if decomp.name == "and":
+                        newlist.extend(decomp.args)
+                    else:
+                        newlist.append(decomp)
                     continue
 
             # First see if a custom decomposition is provided for positive context, then for any context, otherwise use the default
