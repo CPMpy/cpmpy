@@ -18,7 +18,9 @@ finish and write a JSON record even when the limit is exceeded.
 
 `--out=<path>` writes the JSON record to that exact file (parent dirs created
 as needed); without it, a timestamped file is written into the default output
-directory.
+directory. When solver kwargs are passed on the command line, they are also
+encoded in the output filename as ``key1-value1_key2-value2`` (inserted before
+the ablation segment in ``model__solver__ablation.json`` paths).
 
 `--ablate=` optionally disables one transformation optimization for the run by
 monkey-patching the solver class's `transform` method with an ablated pipeline
@@ -75,6 +77,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 
 # Predefined output directory for the run records.
 OUTPUT_DIR = os.path.join(_HERE, "run_results")
+
+DEFAULT_FAILURE_ERROR = "run_model.py exited nonzero (killed: OOM/segfault)"
 
 # Valid --ablate choices.
 ABLATE_NO_ILPFRIENDLY = "no-ilpfriendly"
@@ -381,6 +385,34 @@ def cpmpy_git_info():
         return None, None
 
 
+def format_kwarg_value(value):
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, separators=(",", ":"))
+
+
+def solver_kwargs_filename_segment(solver_kwargs):
+    """Encode solver kwargs as ``key1-value1_key2-value2`` for use in filenames."""
+    if not solver_kwargs:
+        return ""
+    return "_".join(
+        "{}-{}".format(key, format_kwarg_value(solver_kwargs[key]))
+        for key in sorted(solver_kwargs)
+    )
+
+
+def out_path_with_solver_kwargs(out_path, solver_kwargs):
+    """Insert a solver-kwargs segment into a ``model__solver__ablation.json`` path."""
+    segment = solver_kwargs_filename_segment(solver_kwargs)
+    if not segment or segment in out_path:
+        return out_path
+    root, ext = os.path.splitext(out_path)
+    base, sep, tail = root.rpartition("__")
+    if not sep:
+        return "{}__{}{}".format(root, segment, ext)
+    return "{}__{}__{}{}".format(base, segment, tail, ext)
+
+
 def patch_transform(solver_name, ablate):
     """Replace the `transform` of the solver class for `solver_name` with the
     ablated pipeline `ablate`. Returns a short description of what was patched."""
@@ -425,24 +457,15 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
         solver_cls = patch_transform(sname, ablate)
         print("Patched solver {} for ablation {}".format(sname, ablate))
 
-    cpmpy_commit, cpmpy_commit_message = cpmpy_git_info()
-    record = {
-        "model": os.path.basename(model_path),
-        "model_path": os.path.abspath(model_path),
-        "solver": solver_name,
-        "solver_kwargs": solver_kwargs,
-        "time_limit": time_limit,
-        "memory_limit": memory_limit,
-        "ablate": ablate,
-        "stop_after_transform": stop_after_transform,
-        "cpmpy_commit": cpmpy_commit,
-        "cpmpy_commit_message": cpmpy_commit_message,
-        "transformation_time": None,
-        "runtime": None,
-        "status": None,
-        "objective_value": None,
-        "error": None
-    }
+    record = new_run_record(
+        model_path=model_path,
+        solver_name=solver_name,
+        ablate=ablate,
+        time_limit=time_limit,
+        memory_limit=memory_limit,
+        solver_kwargs=solver_kwargs,
+        stop_after_transform=stop_after_transform,
+    )
 
     try:
         t0 = time.time()
@@ -491,7 +514,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
         return record
 
 
-if __name__ == "__main__":
+def build_arg_parser():
     parser = argparse.ArgumentParser(
         description="Load a pickled CPMpy model and solve it with a given solver.")
     parser.add_argument("--model-path", help="path to model.pickle")
@@ -507,19 +530,12 @@ if __name__ == "__main__":
                         help="run transform pipeline only, skip solve")
     parser.add_argument("solver_kwargs", nargs="*",
                         help="solver kwargs as key=value (values parsed as JSON when possible)")
-    args = parser.parse_args()
+    return parser
 
-    model_path = args.model_path
-    solver_name = args.solver_name
-    ablate = args.ablate
-    out_path = args.out
-    memory_limit_gb = args.memory_limit_gb
-    time_limit = args.time_limit
-    stop_after_transform = args.stop_after_transform
 
-    # Parse the "key=value" arguments into solver kwargs.
-    solver_kwargs = {}
-    for arg in args.solver_kwargs:
+def parse_explicit_solver_kwargs(solver_kwargs_args):
+    explicit_solver_kwargs = {}
+    for arg in solver_kwargs_args:
         if "=" not in arg:
             print("Ignoring malformed kwarg (expected key=value): {}".format(arg), file=sys.stderr)
             continue
@@ -528,37 +544,126 @@ if __name__ == "__main__":
             value = json.loads(raw_value)  # int/float/bool/null/list when possible
         except json.JSONDecodeError:
             value = raw_value  # leave as plain string
-        solver_kwargs[key] = value
+        explicit_solver_kwargs[key] = value
+    return explicit_solver_kwargs
 
+
+def prepare_solver_kwargs(solver_name, explicit_solver_kwargs):
+    solver_kwargs = dict(explicit_solver_kwargs)
     if solver_name == "gurobi":
-        solver_kwargs['Threads'] = 1
+        solver_kwargs["Threads"] = 1
     if solver_name == "ortools":
-        solver_kwargs['num_workers'] = 1
+        solver_kwargs["num_workers"] = 1
+    return solver_kwargs
 
-    # set memory limit if specified
-    if memory_limit_gb is not None:
-        print("Setting memory limit to {} GB".format(memory_limit_gb), file=sys.stderr)
-        limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
-        resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, # convert to bytes
-                                                resource.RLIM_INFINITY))
 
-    record = do_solve(model_path=model_path, 
-                      solver_name=solver_name, 
-                      ablate=ablate, 
-                      time_limit=time_limit,
-                      memory_limit=memory_limit_gb,
-                      solver_kwargs=solver_kwargs,
-                      stop_after_transform=stop_after_transform)
-
+def resolve_out_path(model_path, solver_name, ablate, out_path, explicit_solver_kwargs):
     if out_path is None:
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         model_name = os.path.splitext(os.path.basename(model_path))[0]
-        out_name = "{}_{}_{}.json".format(model_name, solver_name, int(time.time() * 1000))
-        out_path = os.path.join(OUTPUT_DIR, out_name)
-    else:
-        os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+        ablate_name = ablate or "baseline"
+        kwargs_segment = solver_kwargs_filename_segment(explicit_solver_kwargs)
+        if kwargs_segment:
+            out_name = "{}__{}__{}__{}.json".format(
+                model_name, solver_name, kwargs_segment, ablate_name)
+        else:
+            out_name = "{}__{}__{}.json".format(model_name, solver_name, ablate_name)
+        return os.path.join(OUTPUT_DIR, out_name)
+
+    out_path = out_path_with_solver_kwargs(out_path, explicit_solver_kwargs)
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    return out_path
+
+
+def new_run_record(model_path, solver_name, ablate, time_limit, memory_limit, solver_kwargs,
+                   stop_after_transform):
+    cpmpy_commit, cpmpy_commit_message = cpmpy_git_info()
+    return {
+        "model": os.path.basename(model_path),
+        "model_path": os.path.abspath(model_path),
+        "solver": solver_name,
+        "solver_kwargs": solver_kwargs,
+        "time_limit": time_limit,
+        "memory_limit": memory_limit,
+        "ablate": ablate,
+        "stop_after_transform": stop_after_transform,
+        "cpmpy_commit": cpmpy_commit,
+        "cpmpy_commit_message": cpmpy_commit_message,
+        "transformation_time": None,
+        "runtime": None,
+        "status": None,
+        "objective_value": None,
+        "error": None,
+    }
+
+
+def make_failure_record(model_path, solver_name, ablate, time_limit, memory_limit, solver_kwargs,
+                        stop_after_transform, error=DEFAULT_FAILURE_ERROR):
+    record = new_run_record(
+        model_path=model_path,
+        solver_name=solver_name,
+        ablate=ablate,
+        time_limit=time_limit,
+        memory_limit=memory_limit,
+        solver_kwargs=solver_kwargs,
+        stop_after_transform=stop_after_transform,
+    )
+    record["status"] = "error"
+    record["error"] = error
+    return record
+
+
+def collect_run_settings(args):
+    explicit_solver_kwargs = parse_explicit_solver_kwargs(args.solver_kwargs)
+    solver_kwargs = prepare_solver_kwargs(args.solver_name, explicit_solver_kwargs)
+    out_path = resolve_out_path(
+        args.model_path, args.solver_name, args.ablate, args.out, explicit_solver_kwargs)
+    return {
+        "model_path": args.model_path,
+        "solver_name": args.solver_name,
+        "ablate": args.ablate,
+        "time_limit": args.time_limit,
+        "memory_limit": args.memory_limit_gb,
+        "solver_kwargs": solver_kwargs,
+        "stop_after_transform": args.stop_after_transform,
+        "out_path": out_path,
+    }
+
+
+def write_record(out_path, record):
     with open(out_path, "w") as f:
         json.dump(record, f, indent=2)
 
-    print("[run_model] wrote run record to {}".format(out_path), file=sys.stderr)
+
+def emit_record(out_path, record, tag):
+    write_record(out_path, record)
+    print("[{}] wrote run record to {}".format(tag, out_path), file=sys.stderr)
     print(json.dumps(record, indent=2))
+
+
+def apply_memory_limit(memory_limit_gb):
+    if memory_limit_gb is not None:
+        print("Setting memory limit to {} GB".format(memory_limit_gb), file=sys.stderr)
+        limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, resource.RLIM_INFINITY))
+
+
+def run_from_args(args):
+    settings = collect_run_settings(args)
+    apply_memory_limit(args.memory_limit_gb)
+    out_path = settings.pop("out_path")
+    record = do_solve(**settings)
+    emit_record(out_path, record, "run_model")
+
+
+def write_failure_from_args(args, error=None):
+    if error is None:
+        error = getattr(args, "error", DEFAULT_FAILURE_ERROR)
+    settings = collect_run_settings(args)
+    out_path = settings.pop("out_path")
+    record = make_failure_record(error=error, **settings)
+    emit_record(out_path, record, "write_dummy_file")
+
+
+if __name__ == "__main__":
+    run_from_args(build_arg_parser().parse_args())
