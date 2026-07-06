@@ -492,7 +492,12 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
         # do the solve
         # re-initialize the solver... no easy way to count transform and also do the solve...
         # could split it up, but lets keep this for now...
-        solver = cp.SolverLookup.get(sname, model)
+        if sname == "exact": # requires setting args during init
+            solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
+            solver_kwargs = dict()
+        else:
+            solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
+            
         solver.solve(time_limit=time_limit, **solver_kwargs)
 
         status = solver.status()
