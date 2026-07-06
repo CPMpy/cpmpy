@@ -958,12 +958,15 @@ class Regular(GlobalConstraint):
         state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
+        cons: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
         # define the rest of the automaton using transition table
-        defining.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
+        cons.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
 
-        # constraint is satisfied iff last state is accepting
-        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+        if complete:
+            # constraint is satisfied iff last state is accepting
+            return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], cons
+        else:
+            return cons, []
 
     def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
         return self.decompose_linear(complete=False)
