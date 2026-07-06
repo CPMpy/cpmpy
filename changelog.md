@@ -1,5 +1,157 @@
 # Change log
 
+## 1.0.0
+
+### Added
+
+* **IO** module with file format readers and writers [#842](https://github.com/CPMpy/cpmpy/pull/842)
+* **Datasets**: PyTorch-compatible dataset class providing single-line access to datastes from the CO community [#900](https://github.com/CPMpy/cpmpy/pull/900)
+* **New Solvers** 
+    * **HiGHS** open source ILP solver [#868](https://github.com/CPMpy/cpmpy/pull/868)
+    * **SCIP** open source Mixed Integer Programming (MIP) and Mixed Integer Nonlinear Programming (MINLP) solver [#412](https://github.com/CPMpy/cpmpy/pull/412) [#955](https://github.com/CPMpy/cpmpy/pull/955) [#982](https://github.com/CPMpy/cpmpy/pull/982)
+* **New transformations** 
+    * Positive decomposition [#980](https://github.com/CPMpy/cpmpy/pull/980) [#1006](https://github.com/CPMpy/cpmpy/pull/1006)
+    * Decompose linear [#836](https://github.com/CPMpy/cpmpy/pull/836)
+* **New Globals** 
+    * Multi-dimensional element `NDElement` [#926](https://github.com/CPMpy/cpmpy/pull/926) [#1018](https://github.com/CPMpy/cpmpy/pull/1018)
+    * FloatSum to still enable floats in objective [#957](https://github.com/CPMpy/cpmpy/pull/957)
+    * Markov Decision Diagram (MDD) [#924](https://github.com/CPMpy/cpmpy/pull/924)
+    * Converted multiplication to a global function [#850](https://github.com/CPMpy/cpmpy/pull/850)
+    * `CumulativeOptional`, `NoOverlapOptional` [#676](https://github.com/CPMpy/cpmpy/pull/676)
+* MyPy static type checking [#864](https://github.com/CPMpy/cpmpy/pull/864) [#867](https://github.com/CPMpy/cpmpy/pull/867)
+    * Global constraint typing [#871](https://github.com/CPMpy/cpmpy/pull/871) [#873](https://github.com/CPMpy/cpmpy/pull/873) [#874](https://github.com/CPMpy/cpmpy/pull/874)
+    * Global functions and variables [#877](https://github.com/CPMpy/cpmpy/pull/877)
+    * `BoolVal`/`Comparison`/`Operator` in core [#878](https://github.com/CPMpy/cpmpy/pull/878)
+    * `NDVarArray` [#886](https://github.com/CPMpy/cpmpy/pull/886)
+    * `Expression` init [#894](https://github.com/CPMpy/cpmpy/pull/894) 
+    * `BoolExprLike` type [#941](https://github.com/CPMpy/cpmpy/pull/941)
+    * `Min`/`Max` [#965](https://github.com/CPMpy/cpmpy/pull/965)
+    * Nested constraints and `cpm_array` input [#1023](https://github.com/CPMpy/cpmpy/pull/1023)
+    * Other [#901](https://github.com/CPMpy/cpmpy/pull/901) [#918](https://github.com/CPMpy/cpmpy/pull/918) [#907](https://github.com/CPMpy/cpmpy/pull/907) [#934](https://github.com/CPMpy/cpmpy/pull/934) [#958](https://github.com/CPMpy/cpmpy/pull/958)
+* Support `Regular` global natively for MiniZinc [#952](https://github.com/CPMpy/cpmpy/pull/952)
+* Linearize reified variables [#855](https://github.com/CPMpy/cpmpy/pull/855)[ #860](https://github.com/CPMpy/cpmpy/pull/860)
+* Custom and typed CSEMap object for Common Subexpression Elimination [#917](https://github.com/CPMpy/cpmpy/pull/917)
+* Add encoding variables as expressions to CSE [#781](https://github.com/CPMpy/cpmpy/pull/781)
+* IIS-based MUS algorithm [#880](https://github.com/CPMpy/cpmpy/pull/880) [#971](https://github.com/CPMpy/cpmpy/pull/971)
+* Native MUS computation for Exact [#909](https://github.com/CPMpy/cpmpy/pull/909)
+* Multi-instance tuner [#757](https://github.com/CPMpy/cpmpy/pull/757)
+* Add verbosity parameter to tuners [#771](https://github.com/CPMpy/cpmpy/pull/771)
+* 'subsolvers' filter argument for `SolverLookup.supported()` [#1030](https://github.com/CPMpy/cpmpy/pull/1030) 
+* Decorator for non-strict variable name checks [#839](https://github.com/CPMpy/cpmpy/pull/839)
+* `Description` class for human-readable metadata in `Expression` [#903](https://github.com/CPMpy/cpmpy/pull/903)
+* Aspirational unit tests [#883](https://github.com/CPMpy/cpmpy/pull/883)
+* Instructions on python-cov [#937](https://github.com/CPMpy/cpmpy/pull/937)
+* Sudoku variant examples [#777](https://github.com/CPMpy/cpmpy/pull/777)
+* Template docstrings [#724](https://github.com/CPMpy/cpmpy/pull/724)
+* Dev script to time transformations [#853](https://github.com/CPMpy/cpmpy/pull/853) [848febd](https://github.com/CPMpy/cpmpy/commit/848febd9f8831cbf6796ae0175d6547ba679b1ab)
+* Dev script to extract release notes [#671](https://github.com/CPMpy/cpmpy/pull/671)
+
+
+### Internal improvements
+
+* Improvements to toplevel safening [#1026](https://github.com/CPMpy/cpmpy/pull/1026)
+* New pattern for `simplify_boolean` [#959](https://github.com/CPMpy/cpmpy/pull/959)
+* `push_down_negation` before `decompose`[#916](https://github.com/CPMpy/cpmpy/pull/916)
+* Improved MUS for Gurobi [#993](https://github.com/CPMpy/cpmpy/pull/993) [#1016](https://github.com/CPMpy/cpmpy/pull/1016)
+* Improved `GCC` decomposition [#1007](https://github.com/CPMpy/cpmpy/pull/1007)
+* Save `lhs` and `rhs` of reification to `CSEMap` [#1010](https://github.com/CPMpy/cpmpy/pull/1010)
+* Reduction technique for MDD [#949](https://github.com/CPMpy/cpmpy/pull/949) 
+* Use order encoding for inequalities [#994](https://github.com/CPMpy/cpmpy/pull/994)
+* Linear decomposition for `Table` using `MDD` [#945](https://github.com/CPMpy/cpmpy/pull/945)
+* Fast path solver var [#995](https://github.com/CPMpy/cpmpy/pull/995)
+* Canonicalize inequalities [#996](https://github.com/CPMpy/cpmpy/pull/996)
+* Refactor `decompose` in typed pattern [#929](https://github.com/CPMpy/cpmpy/pull/929)
+* Simple `solver_vars` improvements [#992](https://github.com/CPMpy/cpmpy/pull/992)
+* Canonicalize `neq` comparison in `CSEMap` [#969](https://github.com/CPMpy/cpmpy/pull/969)
+* Avoid making auxiliary variables in `safening` [#935](https://github.com/CPMpy/cpmpy/pull/935)
+* Loop optimisations [#928](https://github.com/CPMpy/cpmpy/pull/928)
+* Refactor `push_down_negation` [#914](https://github.com/CPMpy/cpmpy/pull/914)
+* Make `expr._has_subexpr` an attribute [#895](https://github.com/CPMpy/cpmpy/pull/895)
+* Simplify `Circuit` and `Inverse` decompositions [#889](https://github.com/CPMpy/cpmpy/pull/889)
+* Refactor safening transformation [#875](https://github.com/CPMpy/cpmpy/pull/875)
+* PySAT pb reification optimisation; let PySAT handle conditionals [#783](https://github.com/CPMpy/cpmpy/pull/783)
+* Optimize `has_subexpr` for tables [#596](https://github.com/CPMpy/cpmpy/pull/596)
+* Refactor `decompose_in_tree` [#835](https://github.com/CPMpy/cpmpy/pull/835)
+
+### Changed
+
+* Improve docs for testing a (new) solver [#1031](https://github.com/CPMpy/cpmpy/pull/1031)
+* Standardize reporting intermediate solutions [#561](https://github.com/CPMpy/cpmpy/pull/561)
+* Remove `frozendict` dependency [#1019](https://github.com/CPMpy/cpmpy/pull/1019)
+* Varname in varmap instead of variable object [#990](https://github.com/CPMpy/cpmpy/pull/990)
+* GCS refresh install docs, sanitise variable names with commas [#973](https://github.com/CPMpy/cpmpy/pull/973) (thanks [Ciaran](https://github.com/ciaranm))
+* Update incrementality test [#976](https://github.com/CPMpy/cpmpy/pull/976)
+* Convert assumptions to list [#712](https://github.com/CPMpy/cpmpy/pull/712)
+* Modernize examples
+    * Counterfactual [#931](https://github.com/CPMpy/cpmpy/pull/931)
+    * CP explanations [#943](https://github.com/CPMpy/cpmpy/pull/943)
+    * Diverse solutions [#944](https://github.com/CPMpy/cpmpy/pull/944)
+    * Maximal propagate [#953](https://github.com/CPMpy/cpmpy/pull/953)
+    * Stepwise explanations [#954](https://github.com/CPMpy/cpmpy/pull/954)
+    * Use of `NoOverlapOptional` in flex jobshop example [#947](https://github.com/CPMpy/cpmpy/pull/947)
+* Print display in solver interface superclass [#921](https://github.com/CPMpy/cpmpy/pull/921)
+* Small docs/solvers update to be more complete [#920](https://github.com/CPMpy/cpmpy/pull/920)
+* Modern `__init__` files [#905](https://github.com/CPMpy/cpmpy/pull/905)
+* `linearize` doc update [#898](https://github.com/CPMpy/cpmpy/pull/898)
+* Use is None ruff warning [#904](https://github.com/CPMpy/cpmpy/pull/904)
+* Remove import \* from cpmpy/ tests/ and docs/ [#890](https://github.com/CPMpy/cpmpy/pull/890)
+* Don't download examples data files during testsuite [#899](https://github.com/CPMpy/cpmpy/pull/899)
+* Refactor infix printing in `Operator` for improved readability [#893](https://github.com/CPMpy/cpmpy/pull/893)
+* Seperate GitHub action runners [#885](https://github.com/CPMpy/cpmpy/pull/885)
+* Upgrade pindakaas to v0.5.0 & re-enable BVA for CaDiCal [#852](https://github.com/CPMpy/cpmpy/pull/852) [#869](https://github.com/CPMpy/cpmpy/pull/869)
+* Upgrade Pumpkin interface to v0.3.0 [#854](https://github.com/CPMpy/cpmpy/pull/854)
+* OR-Tools and Python version bumps [#847](https://github.com/CPMpy/cpmpy/pull/847)
+* Remove solver version upper limits [#848](https://github.com/CPMpy/cpmpy/pull/848)
+* Convert TestCase to plain pytest classes [#818](https://github.com/CPMpy/cpmpy/pull/818)
+
+
+### Fixed
+
+* Fix `Expr OP NDArr` by doing `NDArr ROP Expr` [#1035](https://github.com/CPMpy/cpmpy/pull/1035)
+* Solver var consistent return type [#1017](https://github.com/CPMpy/cpmpy/pull/1017)
+* Enforce version upper limit on HiGHS due to upstream bug [#1032](https://github.com/CPMpy/cpmpy/pull/1032)
+* Enforce version upper limit on Choco due to upstream bug [#1013](https://github.com/CPMpy/cpmpy/pull/1013)
+* Missing RC2 depdendencies in setup.py [#1028](https://github.com/CPMpy/cpmpy/pull/1028)
+* `Table` subexpression check [#1029](https://github.com/CPMpy/cpmpy/pull/1029)
+* Mark inconsistent tests as 'flaky' [#1024](https://github.com/CPMpy/cpmpy/pull/1024)
+* Fix tests and update `requires_solver` docs [#1002](https://github.com/CPMpy/cpmpy/pull/1002)
+* Edge case in `canonical_comparison` [#1014](https://github.com/CPMpy/cpmpy/pull/1014)
+* Bounds for `pow` and `mod` [#1012](https://github.com/CPMpy/cpmpy/pull/1012)
+* Fix URL PSPLib [#1004](https://github.com/CPMpy/cpmpy/pull/1004)
+* Read integers with `round` instead of `int` for ILP solvers [#884](https://github.com/CPMpy/cpmpy/pull/884)
+* Set stale values to None after infeasability (Exact and pindakaas) [#1001](https://github.com/CPMpy/cpmpy/pull/1001)
+* Upstream criptominisat fix, remove suppression [#978](https://github.com/CPMpy/cpmpy/pull/978)
+* Re-export `make_assump_model` from `tools.explain` for legacy code [#974](https://github.com/CPMpy/cpmpy/pull/974)
+* Edge case in tuner where time limit can become negative [#970](https://github.com/CPMpy/cpmpy/pull/970)
+* Use `get_or_make_var` for end task variables [#964](https://github.com/CPMpy/cpmpy/pull/964)
+* Don't store `end` args when not given for `Cumulative` and `NopOverlap` [#830](https://github.com/CPMpy/cpmpy/pull/830) 
+* MiniZinc `time_limit` deprecation warning [#927](https://github.com/CPMpy/cpmpy/pull/927) 
+* Remove duplicate `Comparison` handling [#951](https://github.com/CPMpy/cpmpy/pull/951) 
+* Forgotten comma in `supported_globals` OR-Tools [#942](https://github.com/CPMpy/cpmpy/pull/942)
+* `Xor` simplification in decomposition [#908](https://github.com/CPMpy/cpmpy/pull/908)
+* Fix `self +=` pattern [#930](https://github.com/CPMpy/cpmpy/pull/930)
+* Warnings in testsuite [#919](https://github.com/CPMpy/cpmpy/pull/919)
+* Re-introduce deprecated variable functions [#915](https://github.com/CPMpy/cpmpy/pull/915)
+* Resolve duplicate test names [#863](https://github.com/CPMpy/cpmpy/pull/863)
+* Update expression test to not randomly fail [#865](https://github.com/CPMpy/cpmpy/pull/865)
+* Fix solution values in int2bool [#857](https://github.com/CPMpy/cpmpy/pull/857)
+* Skip tests if Pumpkin not supported [#856](https://github.com/CPMpy/cpmpy/pull/856)
+* Make tests solver-independent [#779](https://github.com/CPMpy/cpmpy/pull/779)
+* `test_transf_comp` without increasing counters [#638](https://github.com/CPMpy/cpmpy/pull/638)
+* Update value checks on `Xor`, `Cumulative` and `Circuit` [#872](https://github.com/CPMpy/cpmpy/pull/872)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.10.1...v1.0.0
+
+## 0.10.1
+
+### Fixed
+
+This is a hotfix release due to a bug discovered in bounds computation.
+
+* Bounds for pow and mod (cherry picked for this hotfix) [#1012](https://github.com/CPMpy/cpmpy/pull/1012)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.10.0...v0.10.1
+
 ## 0.10.0
 
 ### Added
