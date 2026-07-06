@@ -251,6 +251,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     decomp = csemap.get_decomposition(arg)
                     if decomp is not None:
                         newargs.append(decomp)
+                        changed = True
                         continue
                 arg_orig = arg
 

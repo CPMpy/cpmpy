@@ -1735,6 +1735,12 @@ class TestTypeChecks:
 
         assert total == len(all_sols) + len(not_all_sols)
 
+    # Addressed in PR #1039, still failing
+    def test_all_equal_exceptn_nested_boolexpr_with_negated_reuse(self):
+        a, b = cp.boolvar(2, name=("a", "b"))
+        constr = cp.AllEqualExceptN([a, b, False, a | b], 4)
+        assert cp.Model([constr, (~constr) | constr]).solve(solver="ortools")
+
 
     def test_increasing(self):
         x = cp.intvar(-8, 8)
@@ -1757,6 +1763,23 @@ class TestTypeChecks:
         assert not cp.Model([cp.Decreasing(x,y,b)]).solve()
         z = cp.intvar(2,5)
         assert cp.Model([cp.Decreasing(z,b)]).solve()
+
+    # PR #1039, now fixed
+    def test_decreasing_nested_boolexpr_with_negated_reuse(self):
+        ivv63, ivv64 = cp.intvar(-8, 8, shape=2)
+        iv0 = cp.intvar(-8, 8, name="x")
+        derived = (iv0 - 10 * ivv64 - 8) // 10
+
+        constr = cp.Decreasing(ivv63, ivv64)
+        derived_constr = cp.Decreasing(ivv63, derived)
+
+        model = cp.Model([
+            constr,
+            constr.implies(constr),
+            derived_constr,
+            derived_constr.implies(derived_constr),
+        ])
+        assert model.solve(solver="ortools")
 
     def test_increasing_strict(self):
         x = cp.intvar(-8, 8)
