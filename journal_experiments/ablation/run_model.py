@@ -497,7 +497,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_k
             solver_kwargs = dict()
         else:
             solver = cp.SolverLookup.get(sname, model, **solver_kwargs)
-            
+
         solver.solve(time_limit=time_limit, **solver_kwargs)
 
         status = solver.status()
@@ -538,8 +538,8 @@ def build_arg_parser():
     return parser
 
 
-def parse_explicit_solver_kwargs(solver_kwargs_args):
-    explicit_solver_kwargs = {}
+def parse_solver_kwargs(solver_kwargs_args):
+    solver_kwargs = {}
     for arg in solver_kwargs_args:
         if "=" not in arg:
             print("Ignoring malformed kwarg (expected key=value): {}".format(arg), file=sys.stderr)
@@ -549,25 +549,16 @@ def parse_explicit_solver_kwargs(solver_kwargs_args):
             value = json.loads(raw_value)  # int/float/bool/null/list when possible
         except json.JSONDecodeError:
             value = raw_value  # leave as plain string
-        explicit_solver_kwargs[key] = value
-    return explicit_solver_kwargs
-
-
-def prepare_solver_kwargs(solver_name, explicit_solver_kwargs):
-    solver_kwargs = dict(explicit_solver_kwargs)
-    if solver_name == "gurobi":
-        solver_kwargs["Threads"] = 1
-    if solver_name == "ortools":
-        solver_kwargs["num_workers"] = 1
+        solver_kwargs[key] = value
     return solver_kwargs
 
 
-def resolve_out_path(model_path, solver_name, ablate, out_path, explicit_solver_kwargs):
+def resolve_out_path(model_path, solver_name, ablate, out_path, solver_kwargs):
     if out_path is None:
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         model_name = os.path.splitext(os.path.basename(model_path))[0]
         ablate_name = ablate or "baseline"
-        kwargs_segment = solver_kwargs_filename_segment(explicit_solver_kwargs)
+        kwargs_segment = solver_kwargs_filename_segment(solver_kwargs)
         if kwargs_segment:
             out_name = "{}__{}__{}__{}.json".format(
                 model_name, solver_name, kwargs_segment, ablate_name)
@@ -575,7 +566,7 @@ def resolve_out_path(model_path, solver_name, ablate, out_path, explicit_solver_
             out_name = "{}__{}__{}.json".format(model_name, solver_name, ablate_name)
         return os.path.join(OUTPUT_DIR, out_name)
 
-    out_path = out_path_with_solver_kwargs(out_path, explicit_solver_kwargs)
+    out_path = out_path_with_solver_kwargs(out_path, solver_kwargs)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     return out_path
 
@@ -619,10 +610,9 @@ def make_failure_record(model_path, solver_name, ablate, time_limit, memory_limi
 
 
 def collect_run_settings(args):
-    explicit_solver_kwargs = parse_explicit_solver_kwargs(args.solver_kwargs)
-    solver_kwargs = prepare_solver_kwargs(args.solver_name, explicit_solver_kwargs)
+    solver_kwargs = parse_solver_kwargs(args.solver_kwargs)
     out_path = resolve_out_path(
-        args.model_path, args.solver_name, args.ablate, args.out, explicit_solver_kwargs)
+        args.model_path, args.solver_name, args.ablate, args.out, solver_kwargs)
     return {
         "model_path": args.model_path,
         "solver_name": args.solver_name,
@@ -670,5 +660,13 @@ def write_failure_from_args(args, error=None):
     emit_record(out_path, record, "write_dummy_file")
 
 
+def print_kwargs_segment(argv):
+    """Print the filename segment for ``key=value`` solver kwargs (for Make)."""
+    print(solver_kwargs_filename_segment(parse_solver_kwargs(argv)))
+
+
 if __name__ == "__main__":
-    run_from_args(build_arg_parser().parse_args())
+    if len(sys.argv) > 1 and sys.argv[1] == "--kwargs-segment":
+        print_kwargs_segment(sys.argv[2:])
+    else:
+        run_from_args(build_arg_parser().parse_args())

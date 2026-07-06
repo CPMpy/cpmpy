@@ -45,19 +45,31 @@ MODELS_DIR   ?= models
 RESULTS_DIR  ?= $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),run-ablation-stats,run-ablation)
 FIGURES_DIR  ?= $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),figures-stats,figures)
 
+SOLVER_KWARGS_gurobi  ?= Threads=1
+SOLVER_KWARGS_ortools ?= num_workers=1
+SOLVER_KWARGS_exact   ?= lp=0.1
+SOLVER_KWARGS_pysat   ?=
+
+_ABLATION_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+_RUN_MODEL := $(_ABLATION_DIR)run_model.py
+$(foreach s,$(ILP_SOLVERS) $(CP_SOLVERS),$(eval \
+  KWARGS_SEGMENT_$(s) := $(shell $(PYTHON) $(_RUN_MODEL) --kwargs-segment $(SOLVER_KWARGS_$(s)))))
+
+result_json_suffix = __$(1)$(if $(KWARGS_SEGMENT_$(1)),__$(KWARGS_SEGMENT_$(1)),)__$(2).json
+
 MODEL_PICKLES := $(wildcard $(MODELS_DIR)/*.pickle)
 
-# run-ablation/<model>__<solver>__<ablation>.json
+# run-ablation/<model>__<solver>__[<kwargs>]__<ablation>.json
 RESULTS := $(foreach s,$(ILP_SOLVERS),$(foreach a,$(ILP_ABLATIONS),\
-             $(patsubst $(MODELS_DIR)/%.pickle,$(RESULTS_DIR)/%__$(s)__$(a).json,$(MODEL_PICKLES)))) \
+             $(patsubst $(MODELS_DIR)/%.pickle,$(RESULTS_DIR)/%$(call result_json_suffix,$(s),$(a)),$(MODEL_PICKLES)))) \
            $(foreach s,$(CP_SOLVERS),$(foreach a,$(CP_ABLATIONS),\
-             $(patsubst $(MODELS_DIR)/%.pickle,$(RESULTS_DIR)/%__$(s)__$(a).json,$(MODEL_PICKLES))))
+             $(patsubst $(MODELS_DIR)/%.pickle,$(RESULTS_DIR)/%$(call result_json_suffix,$(s),$(a)),$(MODEL_PICKLES))))
 
 PLOT_STAMP := $(FIGURES_DIR)/.plot.stamp
 
 ablate_arg = $(if $(filter baseline,$(1)),,--ablate=$(1))
 stop_after_transform_arg = $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),--stop-after-transform,)
-run_model_args = --model-path=$$< --solver-name=$(1) $(call ablate_arg,$(2)) $(stop_after_transform_arg) --out=$$@ --time-limit=$(TIME_LIMIT) --memory-limit=$(MEMORY_LIMIT_GB)
+run_model_args = --model-path=$$< --solver-name=$(1) $(call ablate_arg,$(2)) $(stop_after_transform_arg) --out=$$@ --time-limit=$(TIME_LIMIT) --memory-limit=$(MEMORY_LIMIT_GB) $(SOLVER_KWARGS_$(1))
 run_with_timeout = $(TIMEOUT_CMD) --signal=TERM --kill-after=$(TIME_LIMIT_KILL_AFTER) $(TIME_LIMIT)
 
 .PHONY: all run-ablation plot clean clean-errors
@@ -72,7 +84,7 @@ run-ablation: $(RESULTS)
 plot: $(PLOT_STAMP)
 
 define ABLATION_RULE
-$(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle
+$(RESULTS_DIR)/%$(call result_json_suffix,$(1),$(2)): $(MODELS_DIR)/%.pickle
 	@mkdir -p $(RESULTS_DIR)
 	$(run_with_timeout) $(PYTHON) run_model.py $(call run_model_args,$(1),$(2)) \
 		|| $(PYTHON) write_dummy_file.py $(call run_model_args,$(1),$(2))
