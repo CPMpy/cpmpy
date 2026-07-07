@@ -138,7 +138,7 @@
 import copy
 import warnings
 from collections import defaultdict
-from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
+from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING, reveal_type
 import numpy as np
 
 import cpmpy as cp
@@ -1137,7 +1137,7 @@ class MDD(GlobalConstraint):
         for id1, v, id2 in transitions:
             self.mapping[id1][v] = id2
 
-        self.levels = {self.root_node: 0}
+        self.levels : dict[int | str, int] = {self.root_node: 0}
         current_nodes = [self.root_node]
         for level in range(len(array)):
             new_nodes = []
@@ -1188,7 +1188,8 @@ class MDD(GlobalConstraint):
                     self.mapping.pop(node, None)
                     self.levels.pop(node, None)
 
-    def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]], dict[int|str, int]]:
+    def _get_complete_mdd(self, mapping : dict[int, dict[int, int]], levels: dict[int, int], sink_node: int
+                          ) -> tuple[dict[int, dict[int, int]], set[tuple[int, int]], dict[int, int]]:
         """
         Auxiliary function that extends the MDD with invalid edges, which are directed to level-specific dummy nodes.
         Any path reaching a dummy node is directed to the sink node level by level, for all subsequent variable assignments.
@@ -1199,42 +1200,40 @@ class MDD(GlobalConstraint):
             (source node, transition value) that are added to the MDD.
         """
         arr = self.args[0]
-        invalid_edges = set()
-        extended_mapping = copy.deepcopy(self.mapping)
+        invalid_edges : set[tuple[int, int]] = set()
+        extended_mapping : dict[int , dict[int, int]] = copy.deepcopy(mapping)
 
         n = len(arr)
-        levels = self.levels.copy()
+        levels = levels.copy()
 
-        all_nodes = set(levels.keys())
+        next_id = len(levels) + 1
 
-        dummy_nodes : list[str|int] = []
-        i = 0
-        while len(dummy_nodes) < n - 1:
-            dummy_nodes += [name] if (name := f"__dummy_{i}__") not in all_nodes else []
-            i += 1
-        dummy_nodes.append(self.sink_node)
+        dummy_nodes: list[int] = [next_id + i for i in range(n - 1)]
+        dummy_nodes.append(sink_node)
 
         for i, dummy in enumerate(dummy_nodes):
             levels[dummy] = i + 1
 
+        necessary_levels = []
         for id1 in list(extended_mapping.keys()):
             level = levels[id1]
             domain = range(arr[level].lb, arr[level].ub + 1)
-
             for v in domain:
                 if v not in extended_mapping[id1]:
                     extended_mapping[id1][v] = dummy_nodes[level]
+                    if level not in necessary_levels:
+                        necessary_levels.append(level)
                     invalid_edges.add((id1, v))
 
-        for level in range(1, n):
-            dummy = dummy_nodes[level-1]
-            next_dummy = dummy_nodes[level]
-
-            domain = range(arr[level-1].lb, arr[level-1].ub + 1)
-
-            for v in domain:
-                extended_mapping[dummy][v] = next_dummy
-                invalid_edges.add((dummy, v))
+        if necessary_levels:
+            first_needed = min(necessary_levels)
+            for level in range(first_needed + 1, n):
+                dummy = dummy_nodes[level - 1]
+                next_dummy = dummy_nodes[level]
+                domain = range(arr[level].lb, arr[level].ub + 1)
+                for v in domain:
+                    extended_mapping[dummy][v] = next_dummy
+                    invalid_edges.add((dummy, v))
 
         return extended_mapping, invalid_edges, levels
 
@@ -1259,22 +1258,41 @@ class MDD(GlobalConstraint):
         if self.reduce:
             self._reduce()
 
+        node_map: dict[int | str, int] = {node: idx for idx, node in enumerate(self.levels)}
+        mapping: dict[int, dict[int, int]] = defaultdict(dict)
+
+        for src, edges in self.mapping.items():
+            for val, dst in edges.items():
+                mapping[node_map[src]][val] = node_map[dst]
+
+        levels: dict[int, int] = {
+            node_map[node]: lvl for node, lvl in self.levels.items()
+        }
+        sink_node : int = node_map[self.sink_node]
+
+        reveal_type(levels)
+
         if complete:
-        # MDD is extended with invalid edges, which are directed to the sink node
-            mapping, invalid_edges_set, levels = self._get_complete_mdd()
+            complete_mapping, invalid_edges_set, complete_levels = self._get_complete_mdd(
+                mapping, levels, sink_node
+            )
+
+            reveal_type(levels)
+            reveal_type(complete_levels)
+
+            levels = complete_levels
             invalid_edges = frozenset(invalid_edges_set)
+
         else:
-            mapping = self.mapping
-            levels = self.levels
             invalid_edges = frozenset()
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
         # The default is an empty list, representing no ingoing / outgoing flow.
-        flow_in: dict[int | str, list[Expression]] = defaultdict(list)
-        flow_out: dict[int | str, list[Expression]] = defaultdict(list)
-
+        flow_in: dict[int, list[Expression]] = defaultdict(list)
+        flow_out: dict[int, list[Expression]] = defaultdict(list)
+        reveal_type(levels)
         # Used to link edge variables to direct encoding variables in a later step
-        edge_vars = defaultdict(list)
+        edge_vars : dict[tuple[int, int], list[Expression]] = defaultdict(list)
         invalid_edge_vars = []
 
         # Determine flow in and flow out for each node, and make a boolvar for each edge
