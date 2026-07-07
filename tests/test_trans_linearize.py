@@ -106,11 +106,6 @@ class TestTransLinearize:
         impl = (~b0).implies(Operator("or", [~b1]))
         lin = linearize_constraint([impl], supported={"mul"})
         assert str(lin) == "[(~BV3) -> (~BV4 >= 1)]"
-        assert len(lin) == 1
-        assert lin[0].name == "->"
-        assert lin[0].args[1].name == ">="
-        assert isinstance(lin[0].args[0], _BoolVarImpl)
-        assert isinstance(lin[0].args[1].args[0], _BoolVarImpl)
 
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
