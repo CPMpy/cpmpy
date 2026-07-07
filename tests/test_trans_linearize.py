@@ -100,6 +100,19 @@ class TestTransLinearize:
         assert str([Operator("or", [p])]) == str(linearize_constraint([p], supported={"or"}))
         assert str([Operator("or", [~p])]) == str(linearize_constraint([~p], supported={"or"}))
 
+    def test_trivially_false_bool_comparison_not_wrapped_in_or(self):
+        b = cp.boolvar(name="b")
+        rv = cp.boolvar(name="rv")
+        cons = only_implies(only_bv_reifies([((~b) + -7 <= -6) == rv]))
+        lin = linearize_constraint(cons, supported={"or", "->", "sum", "wsum", "and"})
+        assert str(lin) == "[or(rv)]"
+
+    @pytest.mark.requires_solver("pindakaas", "pysat")
+    def test_reified_trivially_false_bool_sum(self, solver):
+        b0, b1 = cp.boolvar(2)
+        assert cp.Model(((~b0) + -7 <= -6) == b1).solve(solver=solver)
+        assert b1.value() is True
+
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
 
