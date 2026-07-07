@@ -151,6 +151,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                             assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
                             lin_lhs, lin_rhs = lin.args
                             if lin_lhs.name not in {"sum", "wsum"}:
+                                if isinstance(lin_lhs, _BoolVarImpl):
+                                    indicator_constraints.append(cond.implies(lin))
+                                    continue
                                 assert lin_lhs.name in supported, f"Unexpected lhs of rhs of implication: {cpm_expr}, it is not supported ({supported})"
                                 indicator_constraints.append(cond.implies(lin))
                                 continue
