@@ -317,16 +317,11 @@ class TestTransfDecomp:
 
     # edge cases find by fuzztesting
     def test_decompose_empty_nested_alldifferent(self):
-        # Fuzz-test regression: a single-variable AllDifferent is vacuously true,
-        # but pairwise decompose() returns no constraints. When such a global is
-        # nested inside another expression (here: or), decompose_in_tree used to
-        # wrap the empty list in Operator("and", []) and crash.
+        # Fuzz-test regression: a single-variable AllDifferent is trivially true.
         x = cp.intvar(0, 10, name="x")
         cons = [cp.any([cp.AllDifferent(x), cp.AllDifferent(x)])]
 
         decomposed = decompose_in_tree(cons)
         assert str(decomposed) == "[(boolval(True)) or (boolval(True))]"
 
-        # ortools: native top-level alldifferent, but empty supported_reified,
-        # so nested instances still go through generic decompose_in_tree
         assert cp.Model(cons).solve(solver="ortools")
