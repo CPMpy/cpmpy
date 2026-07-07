@@ -215,13 +215,13 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
             lhs, rhs = cpm_expr.args
 
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
-                # very special case, avoid writing as sum of 1 argument
+                # very special case, avoid writing as sum of 1 argument, write as disjunction of 1 arg instead
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
                 if isinstance(new_expr[0], BoolVal):
                     if new_expr[0].value() is True:
                         continue # skip or([BoolVal(True)])
-                    newlist.append(new_expr[0])  # post BoolVal(False) directly
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap)  # don't wrap in or(BoolVal(False))
                     continue
                 newlist.append(Operator("or", new_expr))
                 continue

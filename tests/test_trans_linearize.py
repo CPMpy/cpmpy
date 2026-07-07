@@ -108,7 +108,6 @@ class TestTransLinearize:
         # comparison is trivially true for any b0, so only b1 is forced true; b0 is not posted
         assert str(lin) == "[or(b1)]"
 
-    @pytest.mark.requires_solver("pindakaas", "pysat")
     def test_reified_trivially_false_bool_sum(self, solver):
         b0, b1 = cp.boolvar(name="b0"), cp.boolvar(name="b1")
         model = cp.Model(((~b0) + -7 <= -6) == b1)
