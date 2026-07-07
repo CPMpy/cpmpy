@@ -1151,7 +1151,6 @@ class MDD(GlobalConstraint):
         sink_nodes = [node for node, level in self.levels.items() if level == len(array)]
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
-
         # store whether the MDD should be reduced during decomposition
         self.reduce = reduce
 
@@ -1189,28 +1188,55 @@ class MDD(GlobalConstraint):
                     self.mapping.pop(node, None)
                     self.levels.pop(node, None)
 
-
-
-    def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
+    def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]], dict[int|str, int]]:
         """
-        Auxiliary function that extends the MDD with invalid edges, which are directed to the sink node.
+        Auxiliary function that extends the MDD with invalid edges, which are directed to level-specific dummy nodes.
+        Any path reaching a dummy node is directed to the sink node level by level, for all subsequent variable assignments.
 
         Returns:
             tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
-            A tuple containing the extended mapping of the MDD and a set of invalid edges (source node, transition value) that are added to the MDD.
+            A tuple containing the extended mapping of the MDD and a set of invalid edges
+            (source node, transition value) that are added to the MDD.
         """
         arr = self.args[0]
         invalid_edges = set()
         extended_mapping = copy.deepcopy(self.mapping)
-        for id1 in self.mapping.keys():
-            level = self.levels[id1]
+
+        n = len(arr)
+        levels = self.levels.copy()
+
+        all_nodes = set(levels.keys())
+
+        dummy_nodes : list[str|int] = []
+        i = 0
+        while len(dummy_nodes) < n - 1:
+            dummy_nodes += [name] if (name := f"__dummy_{i}__") not in all_nodes else []
+            i += 1
+        dummy_nodes.append(self.sink_node)
+
+        for i, dummy in enumerate(dummy_nodes):
+            levels[dummy] = i + 1
+
+        for id1 in list(extended_mapping.keys()):
+            level = levels[id1]
             domain = range(arr[level].lb, arr[level].ub + 1)
+
             for v in domain:
-                if v not in self.mapping[id1]:
-                    extended_mapping[id1][v] = self.sink_node
+                if v not in extended_mapping[id1]:
+                    extended_mapping[id1][v] = dummy_nodes[level]
                     invalid_edges.add((id1, v))
 
-        return extended_mapping, invalid_edges
+        for level in range(1, n):
+            dummy = dummy_nodes[level-1]
+            next_dummy = dummy_nodes[level]
+
+            domain = range(arr[level-1].lb, arr[level-1].ub + 1)
+
+            for v in domain:
+                extended_mapping[dummy][v] = next_dummy
+                invalid_edges.add((dummy, v))
+
+        return extended_mapping, invalid_edges, levels
 
     def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
         return self.decompose(complete=False)
@@ -1235,10 +1261,11 @@ class MDD(GlobalConstraint):
 
         if complete:
         # MDD is extended with invalid edges, which are directed to the sink node
-            mapping, invalid_edges_set = self._get_complete_mdd()
+            mapping, invalid_edges_set, levels = self._get_complete_mdd()
             invalid_edges = frozenset(invalid_edges_set)
         else:
             mapping = self.mapping
+            levels = self.levels
             invalid_edges = frozenset()
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
@@ -1254,7 +1281,7 @@ class MDD(GlobalConstraint):
         for id1, edges in mapping.items():
             for value, id2 in edges.items():
                 edge_var = cp.boolvar()
-                level = self.levels[id1]
+                level = levels[id1]
                 flow_out[id1].append(edge_var)
                 flow_in[id2].append(edge_var)
                 edge_vars[(level, value)].append(edge_var)
@@ -1262,32 +1289,37 @@ class MDD(GlobalConstraint):
                 if (id1, value) in invalid_edges:
                     invalid_edge_vars.append(edge_var)
 
-        defining = []
-        constraining = []
+        cons = []
+        value_cons = []
 
         # Enforce flow constraints: flow in = flow out, at most one activated in/out edge
-        for node, level in self.levels.items():
+        for node, level in levels.items():
             incoming = flow_in[node]
             outgoing = flow_out[node]
 
             if level == 0:
-                constraining.append(cp.sum(outgoing) == 1) # root
+                value_cons.append(cp.sum(outgoing) == 1) # root
             elif level == len(arr):
-                defining.append(cp.sum(incoming) == 1) # sink
+                cons.append(cp.sum(incoming) == 1) # sink
             else:
-                defining.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
-                defining.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
-                defining.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
+                cons.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
+                cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
+                cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
 
         # Enforce that when arr[i] == v, exactly one of the edges at level i with label v is true, otherwise none can be true
         for (level, value), vars_ in edge_vars.items():
-            defining.append(cp.sum(vars_) == (arr[level] == value))
+            cons.append(cp.sum(vars_) == (arr[level] == value))
 
-        constraining.append(cp.sum(invalid_edge_vars) == 0)
+        value_cons.append(cp.sum(invalid_edge_vars) == 0)
 
-        # When the MDD is extended to a complete MDD by means of invalid edges, there is always a solution to the flow problem.
-        # The only constraining constraints are therefore that the root flow is equal to 1, and that no invalid edge has any flow.
-        return constraining, defining
+        if complete:
+            # When the MDD is extended to a complete MDD by means of invalid edges, there is always a solution to the flow problem.
+            # The only value constraints are therefore that the root flow is equal to 1, and that no invalid edge has any flow.
+            return value_cons, cons
+        else:
+            # The MDD is not complete (i.e. does not admit a solution to the flow problem for all variable assignments).
+            # Therefore, all constraints must be considered value constraints, as they can all be violated by some variable assignment.
+            return value_cons + cons, []
 
 
     def value(self) -> Optional[bool]:
