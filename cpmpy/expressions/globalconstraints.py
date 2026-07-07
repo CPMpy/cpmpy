@@ -138,7 +138,7 @@
 import copy
 import warnings
 from collections import defaultdict
-from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING, reveal_type
+from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
 
 import cpmpy as cp
