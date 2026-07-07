@@ -146,20 +146,14 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                             break # do not need to add other
                         elif "->" in supported and not reified:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
-                        else: # need to linearize the implication constraint itself
-                            # either -> is not supported, or we are in a reified context (nested -> constraints are not linear)
-                            assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
-                            lin_lhs, lin_rhs = lin.args
-                            if lin_lhs.name not in {"sum", "wsum"}:
-                                if isinstance(lin_lhs, _BoolVarImpl):
-                                    indicator_constraints.append(cond.implies(lin))
-                                    continue
-                                assert lin_lhs.name in supported, f"Unexpected lhs of rhs of implication: {cpm_expr}, it is not supported ({supported})"
-                                indicator_constraints.append(cond.implies(lin))
-                                continue
-
+                        elif not isinstance(lin, Comparison):
+                            raise AssertionError(f"Expected a comparison as rhs of implication constraint, got {lin}")
+                        elif isinstance(lin.args[0], _BoolVarImpl):
+                            # e.g. (~BV0) -> (or(~BV1)) linearizes rhs to ~BV1 >= 1
+                            indicator_constraints.append(cond.implies(lin))
+                        elif lin.args[0].name in {"sum", "wsum"}:
                             # need to write as big-M
-                            assert lin_lhs.name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as lhs of rhs of implication constraint, but got {lin_lhs}"
+                            lin_lhs, lin_rhs = lin.args
                             assert is_num(lin_rhs)
                             lb, ub = get_bounds(lin_lhs)
                             if lin.name == "<=":
@@ -176,6 +170,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                                                                               supported=supported, reified=reified, csemap=csemap)
                             else:
                                 raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
+                        elif lin.args[0].name in supported:
+                            indicator_constraints.append(cond.implies(lin))
+                        else:
+                            raise AssertionError(f"Unexpected lhs of rhs of implication: {cpm_expr}, it is not supported ({supported})")
                     newlist+=indicator_constraints
 
                     # ensure no new solutions are created

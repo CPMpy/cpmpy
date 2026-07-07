@@ -102,10 +102,10 @@ class TestTransLinearize:
 
     def test_implication_or_single_literal_with_mul_only(self):
         # Fuzz regression: or([~b]) linearizes to ~b >= 1; bool lhs in implied
-        # comparison must not require the operator name to be in supported.
-        b0, b1 = cp.boolvar(2)
+        b0, b1 = cp.boolvar(shape=2)
         impl = (~b0).implies(Operator("or", [~b1]))
         lin = linearize_constraint([impl], supported={"mul"})
+        assert str(lin) == "[(~BV3) -> (~BV4 >= 1)]"
         assert len(lin) == 1
         assert lin[0].name == "->"
         assert lin[0].args[1].name == ">="
