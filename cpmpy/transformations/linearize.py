@@ -221,7 +221,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 if isinstance(new_expr[0], BoolVal):
                     if new_expr[0].value() is True:
                         continue # skip or([BoolVal(True)])
-                    newlist.append(new_expr[0])  # post BoolVal(False) directly, not or([BoolVal(False)]); parent -> handler folds (~bv -> false)
+                    newlist.append(new_expr[0])  # post BoolVal(False) directly
                     continue
                 newlist.append(Operator("or", new_expr))
                 continue
