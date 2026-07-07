@@ -114,7 +114,6 @@ class TestTransLinearize:
         model = cp.Model(((~b0) + -7 <= -6) == b1)
         assert model.solve(solver=solver)
         assert b1.value() is True
-        # b0 does not appear in SAT linearization; it is not constrained by this constraint
 
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
