@@ -149,7 +149,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                         elif not isinstance(lin, Comparison):
                             raise AssertionError(f"Expected a comparison as rhs of implication constraint, got {lin}")
                         elif isinstance(lin.args[0], _BoolVarImpl):
-                            # e.g. (~BV0) -> (or(~BV1)) linearizes rhs to ~BV1 >= 1
+                            # no sum or wsum just a single boolvar inequality
                             indicator_constraints.append(cond.implies(lin))
                         elif lin.args[0].name in {"sum", "wsum"}:
                             # need to write as big-M
