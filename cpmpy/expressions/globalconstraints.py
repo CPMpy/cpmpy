@@ -1189,7 +1189,7 @@ class MDD(GlobalConstraint):
                     self.levels.pop(node, None)
 
     def _get_complete_mdd(self, mapping : dict[int, dict[int, int]], levels: dict[int, int], sink_node: int
-                          ) -> tuple[dict[int, dict[int, int]], set[tuple[int, int]], dict[int, int]]:
+                          ) -> tuple[dict[int, dict[int, int]], dict[int, int], set[tuple[int, int]]]:
         """
         Auxiliary function that extends the MDD with invalid edges, which are directed to level-specific dummy nodes.
         Any path reaching a dummy node is directed to the sink node level by level, for all subsequent variable assignments.
@@ -1211,9 +1211,6 @@ class MDD(GlobalConstraint):
         dummy_nodes: list[int] = [next_id + i for i in range(n - 1)]
         dummy_nodes.append(sink_node)
 
-        for i, dummy in enumerate(dummy_nodes):
-            levels[dummy] = i + 1
-
         necessary_levels = []
         for id1 in list(extended_mapping.keys()):
             level = levels[id1]
@@ -1229,13 +1226,14 @@ class MDD(GlobalConstraint):
             first_needed = min(necessary_levels)
             for level in range(first_needed + 1, n):
                 dummy = dummy_nodes[level - 1]
+                levels[dummy] = level
                 next_dummy = dummy_nodes[level]
                 domain = range(arr[level].lb, arr[level].ub + 1)
                 for v in domain:
                     extended_mapping[dummy][v] = next_dummy
                     invalid_edges.add((dummy, v))
 
-        return extended_mapping, invalid_edges, levels
+        return extended_mapping, levels, invalid_edges
 
     def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
         return self.decompose(complete=False)
@@ -1261,25 +1259,17 @@ class MDD(GlobalConstraint):
         node_map: dict[int | str, int] = {node: idx for idx, node in enumerate(self.levels)}
         mapping: dict[int, dict[int, int]] = defaultdict(dict)
 
-        for src, edges in self.mapping.items():
-            for val, dst in edges.items():
+        for src, src_edges in self.mapping.items():
+            for val, dst in src_edges.items():
                 mapping[node_map[src]][val] = node_map[dst]
 
-        levels: dict[int, int] = {
-            node_map[node]: lvl for node, lvl in self.levels.items()
-        }
+        levels: dict[int, int] = {node_map[node]: lvl for node, lvl in self.levels.items()}
         sink_node : int = node_map[self.sink_node]
 
-        reveal_type(levels)
-
         if complete:
-            complete_mapping, invalid_edges_set, complete_levels = self._get_complete_mdd(
-                mapping, levels, sink_node
-            )
+            complete_mapping, complete_levels, invalid_edges_set = self._get_complete_mdd(mapping, levels, sink_node)
 
-            reveal_type(levels)
-            reveal_type(complete_levels)
-
+            mapping = complete_mapping
             levels = complete_levels
             invalid_edges = frozenset(invalid_edges_set)
 
@@ -1290,7 +1280,6 @@ class MDD(GlobalConstraint):
         # The default is an empty list, representing no ingoing / outgoing flow.
         flow_in: dict[int, list[Expression]] = defaultdict(list)
         flow_out: dict[int, list[Expression]] = defaultdict(list)
-        reveal_type(levels)
         # Used to link edge variables to direct encoding variables in a later step
         edge_vars : dict[tuple[int, int], list[Expression]] = defaultdict(list)
         invalid_edge_vars = []
