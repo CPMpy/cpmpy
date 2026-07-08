@@ -16,7 +16,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from .negation import recurse_negation
 
 
-def simplify_bool_num_comparison(name: str, lhs: Expression, rhs, *, num_context: bool = False) -> Expression | int | None:
+def simplify_bool_num_comparison(name: str, lhs: Expression, rhs, num_context: bool = False) -> Expression | int | None:
     """
     Simplify ``lhs name rhs`` when ``lhs`` is boolean and ``rhs`` is numeric.
 
