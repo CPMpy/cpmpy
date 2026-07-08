@@ -329,3 +329,14 @@ class TestFlattenExpr:
         assert str(normalized_boolexpr(gc == 7)) == "(boolval(False), [])"
         #simplify output
         assert  str(normalized_boolexpr(Operator('not',[x]) == y)) == "((~BV0) == (BV1), [])"
+
+        # wsum negation shares the vars list; flatten must not corrupt paired coefficients
+        vars_list = [a, Operator('sum', [x, y]), 1]
+        pos_wsum = Operator('wsum', ([1, -2, -1], vars_list))
+        neg_wsum = Operator('wsum', ([-1, 2, 1], vars_list))
+        impl = (pos_wsum < 0).implies(neg_wsum == c)
+        flat = flatten_constraint([impl])
+        for con in flat:
+            if isinstance(con, Operator) and con.name == 'wsum':
+                w, v = con.args
+                assert len(w) == len(v), (w, v)

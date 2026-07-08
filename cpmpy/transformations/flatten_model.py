@@ -555,7 +555,9 @@ def normalized_numexpr(expr, csemap=None):
 
         # wsum needs special handling because expr.args is a tuple of which only 2nd one has exprs
         if expr.name == 'wsum':
-            weights, sub_exprs  = expr.args
+            weights, sub_exprs = expr.args
+            weights = list(weights)
+            sub_exprs = list(sub_exprs)
             # while here, avoid creation of auxiliary variables for compatible operators -/sum/wsum
             i = 0
             while(i < len(sub_exprs)): # can dynamically change
