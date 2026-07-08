@@ -336,8 +336,9 @@ def get_or_make_var(expr, csemap=None):
     """
         Return a flat argument (variable or numeric constant) and auxiliary constraints.
 
-        For non-flat expressions, flattens and introduces an equality to a fresh variable
-        (see docstring: equivalent of ``(var, normalize(expr) == var)``).
+        If ``expr`` is already flat (variable or numeric literal), returns it with no aux constraints.
+        Otherwise flattens ``expr`` and adds a reification constraint linking it to a fresh variable
+        (e.g. ``(alldifferent(...)) == BV``), then returns ``(BV, [that constraint, ...])``.
     """
 
     if __is_flat_var(expr):
