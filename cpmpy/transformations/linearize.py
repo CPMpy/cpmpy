@@ -118,7 +118,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
             # disjunction
             elif cpm_expr.name == "or" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= 1)
+                # Route through comparison linearization so single-literal `or([~bv])`
+                # becomes `sum(~bv) >= 1` (not bare `~bv >= 1`), which big-M can handle.
+                newlist += linearize_constraint([sum(cpm_expr.args) >= 1], supported=supported, reified=reified, csemap=csemap)
 
             # reification
             elif cpm_expr.name == "->":

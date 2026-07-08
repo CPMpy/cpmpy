@@ -136,6 +136,10 @@ def bool_exprs(solver):
         # Negated boolean values
         yield Operator(name, [~ arg for arg in operator_args])
 
+    # Singleton `or([~bv])` is kept by flatten (unlike singleton `and`), which
+    # previously broke HiGHS when reified inside an implication.
+    yield Operator("or", [~BOOL_ARGS[0]])
+
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
 
@@ -317,6 +321,9 @@ def reify_imply_exprs(solver):
         yield comp_expr.implies(BOOL_VAR)
         yield BOOL_VAR.implies(comp_expr)
         yield comp_expr == BOOL_VAR
+
+    # Fuzz regression: (~b0)->(or(~b1)); flatten keeps singleton or on rhs
+    yield (~BOOL_ARGS[0]).implies(Operator("or", [~BOOL_ARGS[1]]))
 
 
 def verify(cons):

@@ -100,12 +100,14 @@ class TestTransLinearize:
         assert str([Operator("or", [p])]) == str(linearize_constraint([p], supported={"or"}))
         assert str([Operator("or", [~p])]) == str(linearize_constraint([~p], supported={"or"}))
 
-    def test_implication_or_single_literal_with_mul_only(self):
-        # Fuzz regression: or([~b]) linearizes to ~b >= 1; bool lhs in implied
-        b0, b1 = cp.boolvar(shape=2)
+    def test_implication_or_single_literal(self):
+        # Fuzz/HiGHS regression: singleton or([~b]) must big-M linearize, not crash or leave indicators
+        b0, b1 = cp.boolvar(name="b0"), cp.boolvar(name="b1")
         impl = (~b0).implies(Operator("or", [~b1]))
-        lin = linearize_constraint([impl], supported={"mul"})
-        assert str(lin) == "[(~BV3) -> (~BV4 >= 1)]"
+        for supported in ({"mul"}, {"sum", "wsum"}):
+            lin = linearize_constraint([impl], supported=supported)
+            assert len(lin) == 1 and lin[0].name == ">="
+        assert cp.Model(impl).solve("highs")
 
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
