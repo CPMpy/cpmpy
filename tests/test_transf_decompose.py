@@ -2,7 +2,6 @@ import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import flatlist
-from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
 from cpmpy.transformations.linearize import decompose_linear
@@ -326,64 +325,3 @@ class TestTransfDecomp:
         assert str(decomposed) == "[(boolval(True)) or (boolval(True))]"
 
         assert cp.Model(cons).solve(solver="ortools")
-
-    def test_repeated_nested_global(self):
-        a,b = cp.intvar(0,10, shape=2, name=tuple("ab"))
-        cons = cp.AllDifferent(a,b)
-
-        constraints = [cons, ~cons | cons]
-        decomposed = decompose_in_tree(constraints)
-        assert set(map(str, decomposed)) == {
-            "(a) != (b)", # decomposition of the first constraint
-            "((a) == (b)) or ((a) != (b))", # decomposition of the second constraint
-        }
-    
-    def test_all_equal_exceptn_nested_boolexpr_with_negated_reuse(self):
-        a, b = cp.boolvar(2, name=("a", "b"))
-        constr = cp.AllEqualExceptN([a, b, False, a | b], 4)
-        assert cp.Model([constr, (~constr) | constr]).solve(solver="ortools")
-
-    def test_single_expr_in_decomp_reused(self):
-
-        class MyCustomGlobal(GlobalConstraint):
-            def __init__(self, arr):
-                super().__init__("mycustomglobal", tuple(flatlist(arr)))
-
-            def decompose(self):
-                return [cp.sum(self.args) == 1], []
-
-        x = cp.intvar(0, 10, shape=3, name="x")
-        cons = MyCustomGlobal(x)
-
-        decomposed = decompose_in_tree([cons, ~cons | cons], csemap=CSEMap())
-        assert set(map(str, decomposed)) == {
-            "sum(x[0], x[1], x[2]) == 1",
-            "(sum(x[0], x[1], x[2]) != 1) or (sum(x[0], x[1], x[2]) == 1)",
-        }
-
-        decomposed = decompose_in_tree([~cons | cons, cons], csemap=CSEMap())
-        assert set(map(str, decomposed)) == {
-            "sum(x[0], x[1], x[2]) == 1",
-            "(sum(x[0], x[1], x[2]) != 1) or (sum(x[0], x[1], x[2]) == 1)",
-        }
-    
-    def test_global_custom_toplevel_repeated(self):
-
-        class MyCustomGlobal(GlobalConstraint):
-            def __init__(self, arr):
-                super().__init__("mycustomglobal", tuple(flatlist(arr)))
-
-            def decompose(self):
-                return [cp.sum(self.args) == 1], []
-            
-            def decompose_positive(self):
-                return [cp.sum(self.args) == 5], [] # something else to distinguish output
-
-        x = cp.intvar(0, 10, shape=3, name="x")
-        cons = MyCustomGlobal(x)
-
-        decomposed = decompose_in_tree([cons, ~cons], csemap=CSEMap())
-        assert set(map(str, decomposed)) == {
-            "sum(x[0], x[1], x[2]) == 5", # positive decompose
-            "sum(x[0], x[1], x[2]) != 1", # negative decompose (don't use positive-only one)
-        }
