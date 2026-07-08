@@ -467,10 +467,15 @@ def normalized_boolexpr(expr, csemap=None):
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
-                if expr.name == '!=' and rvar.is_bool():
-                    # != not needed, negate RHS variable
-                    rvar = ~rvar  # rvar is var, so safe to just negate
-                    exprname = '=='
+                if expr.name == '!=':
+                    if isinstance(rvar, _BoolVarImpl):
+                        # != not needed, negate RHS variable
+                        rvar = ~rvar  # rvar is var, so safe to just negate
+                        exprname = '=='
+                    elif is_num(rvar) and rvar in (0, 1):
+                        # reified boolexpr != 0/1  ->  boolexpr == 1/0
+                        rvar = 1 - rvar
+                        exprname = '=='
             else:
                 # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
