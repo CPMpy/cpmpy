@@ -94,11 +94,11 @@ import builtins
 import cpmpy as cp
 
 from .cse import CSEMap
-from .normalize import toplevel_list, simplify_boolean
-from ..expressions.core import Expression, Comparison, Operator
+from .normalize import toplevel_list, simplify_boolean, simplify_bool_num_comparison
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
-from ..expressions.utils import is_num, is_any_list, is_int, is_star
+from ..expressions.utils import is_num, is_any_list, is_int, is_star, is_true_cst, is_false_cst
 from .negation import recurse_negation
 
 
@@ -463,19 +463,25 @@ def normalized_boolexpr(expr, csemap=None):
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr, csemap=csemap)
 
+            # bool vs numeric constant: same truth table as simplify_boolean
+            if lexpr.is_bool() and is_num(rvar):
+                simplified = simplify_bool_num_comparison(exprname, lexpr, rvar, num_context=False)
+                if simplified is not None:
+                    if is_true_cst(simplified) or is_false_cst(simplified):
+                        return (BoolVal(is_true_cst(simplified)), rcons)
+                    if isinstance(simplified, int):
+                        return (BoolVal(bool(simplified)), rcons)
+                    flat, cons = normalized_boolexpr(simplified, csemap=csemap)
+                    return (flat, cons + rcons)
+
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
-                if expr.name == '!=':
-                    if isinstance(rvar, _BoolVarImpl):
-                        # != not needed, negate RHS variable
-                        rvar = ~rvar  # rvar is var, so safe to just negate
-                        exprname = '=='
-                    elif is_num(rvar) and rvar in (0, 1):
-                        # reified boolexpr != 0/1  ->  boolexpr == 1/0
-                        rvar = 1 - rvar
-                        exprname = '=='
+                if expr.name == '!=' and isinstance(rvar, _BoolVarImpl):
+                    # != not needed, negate RHS variable
+                    rvar = ~rvar  # rvar is var, so safe to just negate
+                    exprname = '=='
             else:
                 # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
