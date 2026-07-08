@@ -324,7 +324,7 @@ class TestFlattenExpr:
         assert  str(normalized_boolexpr(x != (a == 1))) == "((BV12) == (~BV0), [(IV0 == 1) == (BV12)])"
         # reified global != 1 (z3 fuzz): rhs is int literal, not a BoolVar
         gc = cp.AllDifferentExceptN([a, b, c], [0])
-        assert str(normalized_boolexpr(x.implies(gc != 1))) == "((~BV0) or (BV14), [(alldifferent_except_n([IV0, IV1, IV2],[0])) == (BV13), (BV13 == 0) == (BV14)])"
+        assert str(normalized_boolexpr(x.implies(gc != 1))) == "((~BV0) or (BV14), [(alldifferent_except_n([IV0, IV1, IV2],[0])) == (BV13), (BV13 == 0) == (BV14)])" # ideally there is no BV14 and we just have (~BV0) or (~BV13) instead
         #simplify output
         assert  str(normalized_boolexpr(Operator('not',[x]) == y)) == "((~BV0) == (BV1), [])"
 
