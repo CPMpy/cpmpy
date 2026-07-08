@@ -117,7 +117,7 @@ def comp_constraints(solver):
 def bool_exprs(solver):
     """
         Generate all boolean expressions:
-        - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var, ...]), or([Var, ...])  (variadic; 1..len(BOOL_ARGS) args)
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
         - Global constraints
     """
@@ -128,17 +128,16 @@ def bool_exprs(solver):
 
     for name, arity in names:
         if arity != 0:
-            operator_args = BOOL_ARGS[:arity]
+            arg_counts = [arity]
         else:
-            operator_args = BOOL_ARGS
+            # variadic and/or: include singleton through full BOOL_ARGS
+            arg_counts = range(1, len(BOOL_ARGS) + 1)
 
-        yield Operator(name, operator_args)
-        # Negated boolean values
-        yield Operator(name, [~ arg for arg in operator_args])
-
-    # Singleton `or([~bv])` is kept by flatten (unlike singleton `and`), which
-    # previously broke HiGHS when reified inside an implication.
-    yield Operator("or", [~BOOL_ARGS[0]])
+        for n in arg_counts:
+            operator_args = BOOL_ARGS[:n]
+            yield Operator(name, operator_args)
+            # Negated boolean values
+            yield Operator(name, [~ arg for arg in operator_args])
 
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
@@ -321,9 +320,6 @@ def reify_imply_exprs(solver):
         yield comp_expr.implies(BOOL_VAR)
         yield BOOL_VAR.implies(comp_expr)
         yield comp_expr == BOOL_VAR
-
-    # Fuzz regression: (~b0)->(or(~b1)); flatten keeps singleton or on rhs
-    yield (~BOOL_ARGS[0]).implies(Operator("or", [~BOOL_ARGS[1]]))
 
 
 def verify(cons):
