@@ -336,7 +336,7 @@ def get_or_make_var(expr, csemap=None):
     """Return ``(flat_arg, aux_constraints)`` with ``flat_arg`` a var or numeric constant.
 
     Already-flat ``expr`` is returned as ``(expr, [])``. Otherwise flatten ``expr`` and,
-    if needed, introduce ``V`` with ``flattened_expr == V`` added to ``aux_constraints``.
+    if needed, introduce ``BV`` with ``flattened_expr == BV`` added to ``aux_constraints``.
     """
 
     if __is_flat_var(expr):
