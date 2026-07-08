@@ -112,6 +112,7 @@ class TestTransLinearize:
         b0, b1 = cp.boolvar(name="b0"), cp.boolvar(name="b1")
         model = cp.Model(((~b0) + -7 <= -6) == b1)
         assert model.solve(solver=solver)
+        assert b0.value() is not None
         assert b1.value() is True
 
     def test_neq(self):
