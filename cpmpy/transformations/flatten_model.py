@@ -333,20 +333,10 @@ def __is_flat_var_or_list(arg):
            is_star(arg)
 
 def get_or_make_var(expr, csemap=None):
-    """
-        Return ``(flat_arg, aux_constraints)``.
+    """Return ``(flat_arg, aux_constraints)`` with ``flat_arg`` a var or numeric constant.
 
-        ``flat_arg`` is a variable or numeric constant suitable as a flat normal-form argument.
-        ``aux_constraints`` is a (possibly empty) list of constraints produced while flattening.
-
-        If ``expr`` is already flat (``__is_flat_var(expr)``), return ``(expr, [])``.
-
-        Otherwise flatten ``expr`` recursively. When a fresh variable ``V`` is introduced to
-        stand in for the flattened expression, append ``flattened_expr == V`` to
-        ``aux_constraints`` (along with any constraints already produced by flattening).
-
-        Example: for boolean global ``gc = alldifferent([IV0, IV1])``, a typical result is
-        ``(BV0, [alldifferent(IV0, IV1) == BV0])``.
+    Already-flat ``expr`` is returned as ``(expr, [])``. Otherwise flatten ``expr`` and,
+    if needed, introduce ``V`` with ``flattened_expr == V`` added to ``aux_constraints``.
     """
 
     if __is_flat_var(expr):
