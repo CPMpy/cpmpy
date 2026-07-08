@@ -105,7 +105,7 @@ class TestTransLinearize:
         b1 = cp.boolvar(name="b1")  # reifies ((~b0) + -7 <= -6)
         cons = only_implies(only_bv_reifies([((~b0) + -7 <= -6) == b1]))
         lin = linearize_constraint(cons, supported={"or", "->", "sum", "wsum", "and"})
-        # comparison is trivially true for any b0, so only b1 is forced true; b0 is not posted
+        # comparison is trivially true for any b0, so only b1 is forced true
         assert str(lin) == "[or(b1)]"
 
     def test_reified_trivially_false_bool_sum(self, solver):
