@@ -334,9 +334,10 @@ def __is_flat_var_or_list(arg):
 
 def get_or_make_var(expr, csemap=None):
     """
-        Must return a variable, and list of flat normal constraints
-        Determines whether this is a Boolean or Integer variable and returns
-        the equivalent of: (var, normalize(expr) == var)
+        Return a flat argument (variable or numeric constant) and auxiliary constraints.
+
+        For non-flat expressions, flattens and introduces an equality to a fresh variable
+        (see docstring: equivalent of ``(var, normalize(expr) == var)``).
     """
 
     if __is_flat_var(expr):
@@ -450,7 +451,7 @@ def normalized_boolexpr(expr, csemap=None):
         if (expr.name != '!=') and (not expr.has_subexpr()):
             return (expr, [])  # shortcut
         else:
-            # LHS can be boolexpr, RHS has to be variable
+            # LHS can be boolexpr, RHS must become flat (var or constant)
 
             lexpr, rexpr = expr.args
             exprname = expr.name
@@ -460,19 +461,19 @@ def normalized_boolexpr(expr, csemap=None):
                 not __is_flat_var(rexpr) and __is_flat_var(lexpr):
                 lexpr, rexpr = rexpr, lexpr
 
-            # ensure rhs is var
-            (rvar, rcons) = get_or_make_var(rexpr, csemap=csemap)
-
-            # bool vs numeric constant: same truth table as simplify_boolean
-            if lexpr.is_bool() and is_num(rvar):
-                simplified = simplify_bool_num_comparison(exprname, lexpr, rvar, num_context=False)
+            # bool vs numeric constant: fold before reification (same table as simplify_boolean)
+            if lexpr.is_bool() and is_num(rexpr):
+                simplified = simplify_bool_num_comparison(exprname, lexpr, rexpr, num_context=False)
                 if simplified is not None:
                     if is_true_cst(simplified) or is_false_cst(simplified):
-                        return (BoolVal(is_true_cst(simplified)), rcons)
+                        return (BoolVal(is_true_cst(simplified)), [])
                     if isinstance(simplified, int):
-                        return (BoolVal(bool(simplified)), rcons)
+                        return (BoolVal(bool(simplified)), [])
                     flat, cons = normalized_boolexpr(simplified, csemap=csemap)
-                    return (flat, cons + rcons)
+                    return (flat, cons)
+
+            # ensure rhs is flat (var or numeric constant); may still be a literal
+            (rvar, rcons) = get_or_make_var(rexpr, csemap=csemap)
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
