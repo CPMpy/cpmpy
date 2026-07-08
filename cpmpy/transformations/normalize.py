@@ -16,46 +16,6 @@ from ..expressions.globalconstraints import GlobalConstraint
 from .negation import recurse_negation
 
 
-def simplify_bool_num_comparison(name: str, lhs: Expression, rhs, num_context: bool = False) -> Expression | int | None:
-    """
-    Simplify ``lhs name rhs`` when ``lhs`` is boolean and ``rhs`` is numeric.
-
-    Uses the same truth table as :func:`simplify_boolean` (see table in
-    :func:`_simplify_boolean_expr`). Returns ``None`` when the pattern does not apply.
-    """
-    if not (isinstance(lhs, Expression) and lhs.is_bool() and is_num(rhs)):
-        return None
-    if isinstance(rhs, BoolVal):
-        rhs = int(rhs.value())
-    if rhs < 0:
-        return BoolVal(name in {"!=", ">", ">="})
-    if rhs == 0:
-        if name == "!=" or name == ">":
-            return lhs
-        if name == "==" or name == "<=":
-            return recurse_negation(lhs)
-        if name == "<":
-            return 0 if num_context else BoolVal(False)
-        if name == ">=":
-            return 1 if num_context else BoolVal(True)
-    if 0 < rhs < 1:
-        raise ValueError(
-            f"Comparison {lhs} {name} {rhs} is not supported, rhs is a floating point value: {rhs} (type: {type(rhs)})"
-        )
-    if rhs == 1:
-        if name == "==" or name == ">=":
-            return lhs
-        if name == "!=" or name == "<":
-            return recurse_negation(lhs)
-        if name == ">":
-            return 0 if num_context else BoolVal(False)
-        if name == "<=":
-            return 1 if num_context else BoolVal(True)
-    if rhs > 1:
-        return BoolVal(name in {"!=", "<", "<="})
-    return None
-
-
 def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> list[Expression]:
     """
     Unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
@@ -280,9 +240,34 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
         >= |  T  T   x  F
         <= |  F  ~x  T  T
         """
-        simplified = simplify_bool_num_comparison(name, lhs, rhs, num_context=num_context)
-        if simplified is not None:
-            return True, simplified
+        if isinstance(lhs, Expression) and lhs.is_bool() and is_num(rhs):
+            # direct simplification of boolean comparisons
+            if isinstance(rhs, BoolVal):
+                rhs = int(rhs.value())
+            if rhs < 0:
+                return True, BoolVal(name in  {"!=", ">", ">="}) # all other operators evaluate to False
+            elif rhs == 0:
+                if name == "!=" or name == ">":
+                    return True, lhs
+                if name == "==" or name == "<=":
+                    return True, recurse_negation(lhs)
+                if name == "<":
+                    return True, (0 if num_context else BoolVal(False))
+                if name == ">=":
+                    return True, (1 if num_context else BoolVal(True))
+            elif 0 < rhs < 1:
+                raise ValueError(f"Comparison {lhs} {name} {rhs} is not supported, rhs is a floating point value: {rhs} (type: {type(rhs)})")
+            elif rhs == 1:
+                if name == "==" or name == ">=":
+                    return True, lhs
+                if name == "!=" or name == "<":
+                    return True, recurse_negation(lhs)
+                if name == ">":
+                    return True, (0 if num_context else BoolVal(False))
+                if name == "<=":
+                    return True, (1 if num_context else BoolVal(True))
+            elif rhs > 1:
+                return True, BoolVal(name in {"!=", "<", "<="}) # all other operators evaluate to False
 
         # normalize comparison orientation to keep expression on lhs
         if is_num(lhs) and isinstance(rhs, Expression):

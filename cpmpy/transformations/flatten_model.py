@@ -94,11 +94,11 @@ import builtins
 import cpmpy as cp
 
 from .cse import CSEMap
-from .normalize import toplevel_list, simplify_boolean, simplify_bool_num_comparison
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from .normalize import toplevel_list, simplify_boolean
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
-from ..expressions.utils import is_num, is_any_list, is_int, is_star, is_true_cst, is_false_cst
+from ..expressions.utils import is_num, is_any_list, is_int, is_star
 from .negation import recurse_negation
 
 
@@ -333,10 +333,10 @@ def __is_flat_var_or_list(arg):
            is_star(arg)
 
 def get_or_make_var(expr, csemap=None):
-    """Return ``(flat_arg, aux_constraints)`` with ``flat_arg`` a var or numeric constant.
-
-    Already-flat ``expr`` is returned as ``(expr, [])``. Otherwise flatten ``expr`` and,
-    if needed, introduce ``BV`` with ``flattened_expr == BV`` added to ``aux_constraints``.
+    """
+        Must return a variable, and list of flat normal constraints
+        Determines whether this is a Boolean or Integer variable and returns
+        the equivalent of: (var, normalize(expr) == var)
     """
 
     if __is_flat_var(expr):
@@ -450,7 +450,7 @@ def normalized_boolexpr(expr, csemap=None):
         if (expr.name != '!=') and (not expr.has_subexpr()):
             return (expr, [])  # shortcut
         else:
-            # LHS can be boolexpr, RHS must become flat (var or constant)
+            # LHS can be boolexpr, RHS has to be variable
 
             lexpr, rexpr = expr.args
             exprname = expr.name
@@ -460,28 +460,22 @@ def normalized_boolexpr(expr, csemap=None):
                 not __is_flat_var(rexpr) and __is_flat_var(lexpr):
                 lexpr, rexpr = rexpr, lexpr
 
-            # bool vs numeric constant: fold before reification (same table as simplify_boolean)
-            if lexpr.is_bool() and is_num(rexpr):
-                simplified = simplify_bool_num_comparison(exprname, lexpr, rexpr, num_context=False)
-                if simplified is not None:
-                    if is_true_cst(simplified) or is_false_cst(simplified):
-                        return (BoolVal(is_true_cst(simplified)), [])
-                    if isinstance(simplified, int):
-                        return (BoolVal(bool(simplified)), [])
-                    flat, cons = normalized_boolexpr(simplified, csemap=csemap)
-                    return (flat, cons)
-
-            # ensure rhs is flat (var or numeric constant); may still be a literal
+            # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr, csemap=csemap)
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
-                if expr.name == '!=' and isinstance(rvar, _BoolVarImpl):
-                    # != not needed, negate RHS variable
-                    rvar = ~rvar  # rvar is var, so safe to just negate
-                    exprname = '=='
+                if expr.name == '!=':
+                    if isinstance(rvar, _BoolVarImpl):
+                        # != not needed, negate RHS variable
+                        rvar = ~rvar  # rvar is var, so safe to just negate
+                        exprname = '=='
+                    elif is_num(rvar) and rvar in (0, 1):
+                        # reified boolexpr != 0/1  ->  boolexpr == 1/0
+                        rvar = 1 - rvar
+                        exprname = '=='
             else:
                 # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
