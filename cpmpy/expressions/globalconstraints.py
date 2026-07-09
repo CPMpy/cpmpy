@@ -1224,6 +1224,8 @@ class MDD(GlobalConstraint):
 
         if necessary_levels:
             first_needed = min(necessary_levels)
+            # We iterate over all levels starting from the first level that needs a dummy node.
+            # This is done because invalid edges must be introduced layer by layer, so that the complete MDD admits a solution to the flow problem for all variable assignments.
             for level in range(first_needed + 1, n):
                 dummy = dummy_nodes[level - 1]
                 levels[dummy] = level
