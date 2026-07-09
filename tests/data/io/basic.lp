@@ -1,0 +1,19 @@
+\ ----------------------------------------------------------------------------------------------------
+\ File written by CPMpy
+\     Format: 'lp'
+\     CPMpy Version: 0.10.0
+\ ----------------------------------------------------------------------------------------------------
+\ SCIP STATISTICS
+\   Problem name     : CPMpy Model
+\   Variables        : 2 (0 binary, 2 integer, 0 implicit integer, 0 continuous)
+\   Constraints      : 1
+Maximize
+ Obj: +2 y +1 x
+Subject to
+ c1: +1 x +1 y = +5
+Bounds
+ 0 <= y <= 10
+ 0 <= x <= 10
+Generals
+ y x
+End
