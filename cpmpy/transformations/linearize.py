@@ -114,11 +114,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
             if cpm_expr.name == "and" and cpm_expr.name not in supported:
-                newlist += linearize_constraint([sum(cpm_expr.args) >= len(cpm_expr.args)], supported=supported, reified=reified, csemap=csemap)
+                newlist += Operator("sum", [[1]*len(cpm_expr.args), cpm_expr.args]) >= len(cpm_expr.args)
 
             # disjunction
             elif cpm_expr.name == "or" and cpm_expr.name not in supported:
-                newlist += linearize_constraint([sum(cpm_expr.args) >= 1], supported=supported, reified=reified, csemap=csemap)
+                newlist += Operator("sum", [[1]*len(cpm_expr.args), cpm_expr.args]) >= 1
 
             # reification
             elif cpm_expr.name == "->":
