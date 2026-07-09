@@ -279,7 +279,11 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     if len(rec_toplevel) > 0:
                         toplevel.extend(rec_toplevel)
 
-                if len(exprs) == 1:
+                if len(exprs) == 0:
+                    # empty decomposition (e.g. alldifferent over 0/1 elements)
+                    # is a trivially-true conjunction
+                    arg = BoolVal(True)
+                elif len(exprs) == 1:
                     arg = exprs[0]
                 else:
                     # replace arg by conjunction of decompose
