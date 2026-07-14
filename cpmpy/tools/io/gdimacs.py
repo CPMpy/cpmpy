@@ -57,8 +57,8 @@ from cpmpy.tools.io.utils import _handle_loader_input
 
 
 def write_gdimacs(
-        soft: list[cp.Expression],
-        hard: Optional[list[cp.Expression]] = None,
+        soft: list[Expression],
+        hard: Optional[list[Expression]] = None,
         assumptions: Optional[list[cp.BoolVar]] = None,
         path: Optional[Union[str, os.PathLike]] = None,
         encoding: str = "auto",
@@ -166,8 +166,13 @@ def load_gdimacs(
     ):
     """
     Load CPMpy constraints from a GDIMACS (Grouped DIMACS) formatted file
-    (strictly following https://satisfiability.org/competition/2011/rules.pdf,
+    (following https://satisfiability.org/competition/2011/rules.pdf,
     except that groups are allowed to have disjoint sets of clauses).
+
+    .. note::
+
+        The p-line is optional; when present, it has to denote the correct
+        number of variables and clauses, otherwise these are inferred.
 
     Arguments:
         gdimacs (str or os.PathLike or TextIO):
@@ -188,8 +193,10 @@ def load_gdimacs(
     """
     with _handle_loader_input(gdimacs, open=open) as f:
 
-        nr_vars = None
-        nr_cls = None
+        # GCNF parse (strict with p-line counts when present, inferred otherwise)
+        nr_vars_declared = None
+        nr_cls_declared = None
+        max_var = 0  # keep running max literal ID, to infer nr_vars when no p-line is given
         clauses: list[list[int]] = []  # parsed clauses, as lists of literal ints
         cls_groups: list[int] = []  # group index of each parsed clause
 
@@ -203,11 +210,10 @@ def load_gdimacs(
                 _, typ, nr_vars_text, nr_cls_text, _ = params
                 if typ != "gcnf":
                     raise ValueError(f"Expected `gcnf` (i.e. GDIMACS) as file format, but got {typ} which is not supported.")
-                nr_vars = int(nr_vars_text)
-                nr_cls = int(nr_cls_text)
+                nr_vars_declared = int(nr_vars_text)
+                nr_cls_declared = int(nr_cls_text)
                 continue
 
-            assert nr_vars is not None and nr_cls is not None, "Expected p-line before first clause"
             group_text, *tokens = line.split()  # e.g. {1} 1 -2 3 0
             assert group_text.startswith("{") and group_text.endswith("}"), \
                 f"Expected clause to be prefixed with its group, e.g. `{{1}} 1 -2 3 0`, but got {line}"
@@ -218,17 +224,20 @@ def load_gdimacs(
             for token in tokens:
                 i = int(token)
                 if i == 0:  # end of clause
-                    assert len(clauses) < nr_cls, "Too many clauses"
+                    assert nr_cls_declared is None or len(clauses) < nr_cls_declared, "Too many clauses"
                     clauses.append(clause)
                     cls_groups.append(group)
                     clause = []
                 else:
-                    assert abs(i) <= nr_vars, f"Expected at most {nr_vars} variables (from p-line) but found literal {i} in clause {line}"
+                    max_var = max(max_var, abs(i))
                     clause.append(i)
             assert len(clause) == 0, "Expected clause to be terminated by 0"
 
-        assert nr_vars is not None and nr_cls is not None, "Expected p-line in file"
-        assert len(clauses) == nr_cls, "Number of clauses did not match the p-line"
+        nr_vars = nr_vars_declared if nr_vars_declared is not None else max_var
+        if nr_vars_declared is not None:
+            assert max_var <= nr_vars_declared, f"Expected at most {nr_vars_declared} variables (from p-line) but found literal index {max_var}"
+        if nr_cls_declared is not None:
+            assert len(clauses) == nr_cls_declared, "Number of clauses did not match the p-line"
 
         bvs = cp.boolvar(shape=(nr_vars,), name=var_name)
 

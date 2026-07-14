@@ -61,6 +61,22 @@ class TestLoadGCNF:
         assert {"x[0]", "x[1]", "x[2]"} <= names
         assert [str(a) for a in assumptions] == ["a[0]", "a[1]"]
 
+    def test_headerless(self):
+        """The p-line is optional; variable and clause counts are inferred"""
+        headerless = "\n".join(BASIC_GCNF.splitlines()[1:]) + "\n"
+        model, soft, hard, assumptions = load_gdimacs(headerless)
+
+        assert len(soft) == 2
+        assert len(hard) == 1
+        assert len(get_variables_model(model)) == 3 + len(assumptions)
+
+    def test_headerless_var_inference(self):
+        model, soft, hard, assumptions = load_gdimacs("{0} 1 0\n{0} -5 0\n", var_name="x")
+
+        # highest literal index determines the number of variables
+        names = {str(v) for v in get_variables_model(model)}
+        assert {"x[0]", "x[4]"} <= names
+
     def test_with_comments(self):
         model, soft, hard, assumptions = load_gdimacs(
             "c starting comment\nc\n\n"
@@ -146,9 +162,9 @@ class TestLoadGCNF:
 
 class TestLoadGCNFErrors:
 
-    def test_missing_p_line(self):
-        with pytest.raises(AssertionError, match="Expected p-line before first clause"):
-            load_gdimacs("{0} 1 2 0\n")
+    def test_clause_count_mismatch_with_late_p_line(self):
+        with pytest.raises(AssertionError, match="Number of clauses did not match"):
+            load_gdimacs("{0} 1 2 0\np gcnf 2 2 0\n")
 
     def test_cnf_p_line(self):
         with pytest.raises(AssertionError):
