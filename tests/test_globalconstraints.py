@@ -23,6 +23,16 @@ class TestGlobal:
         _BoolVarImpl.counter = 0
         _IntVarImpl.counter = 0
 
+    def test_globalconstraint_value_not_implemented(self):
+        """Subclasses must override value(); the base class raises NotImplementedError."""
+
+        class BareGlobal(GlobalConstraint):
+            def decompose(self):
+                return [], []
+
+        with pytest.raises(NotImplementedError, match="`value` is not implemented"):
+            BareGlobal("bare", ()).value()
+
     def test_alldifferent(self):
         """Test all different constraint with a set of
         unit cases.
