@@ -185,95 +185,57 @@ def load_gdimacs(
             - assumptions: assumption variables for each soft constraint group
     """
     with _handle_loader_input(gdimacs, open=open) as f:
-        return _GDimacsReader(var_name=var_name, assumption_name=assumption_name).read(f)
 
+        nr_vars = None
+        nr_cls = None
+        clauses = []  # parsed clauses, as lists of literal ints
+        cls_groups = []  # group index of each parsed clause
 
-class _DimacsReader:
-    """Line-based reader for DIMACS CNF content, base class for :class:`_GDimacsReader`."""
+        for raw in f:
+            line = raw.strip()
+            if line == "" or line.startswith("c"):
+                continue  # skip empty and comment lines
+            if line.startswith("p"):
+                params = line.split()
+                assert len(params) == 5, f"Expected p-header to be formed `p gcnf nr_vars nr_cls nr_groups` but got {line}"
+                _, typ, nr_vars_text, nr_cls_text, _ = params
+                if typ != "gcnf":
+                    raise ValueError(f"Expected `gcnf` (i.e. GDIMACS) as file format, but got {typ} which is not supported.")
+                nr_vars = int(nr_vars_text)
+                nr_cls = int(nr_cls_text)
+                continue
 
-    def __init__(self, var_name=None):
-        self.clauses = None
-        self.clause_idx = 0
-        self.bvs = None
-        self.var_name = var_name
+            assert nr_vars is not None, "Expected p-line before first clause"
+            group_text, *tokens = line.split()  # e.g. {1} 1 -2 3 0
+            assert group_text.startswith("{") and group_text.endswith("}"), \
+                f"Expected clause to be prefixed with its group, e.g. `{{1}} 1 -2 3 0`, but got {line}"
+            group = int(group_text[1:-1])
+            assert group >= 0, f"Group number must be non-negative, but got {group}"
 
-    def n_vars(self):
-        return len(self.bvs)
+            clause = []
+            for token in tokens:
+                i = int(token)
+                if i == 0:  # end of clause
+                    assert len(clauses) < nr_cls, "Too many clauses"
+                    clauses.append(clause)
+                    cls_groups.append(group)
+                    clause = []
+                else:
+                    assert abs(i) <= nr_vars, f"Expected at most {nr_vars} variables (from p-line) but found literal {i} in clause {line}"
+                    clause.append(i)
+            assert len(clause) == 0, "Expected clause to be terminated by 0"
 
-    def n_clauses(self):
-        return len(self.clauses)
+        assert len(clauses) == nr_cls, "Number of clauses did not match the p-line"
 
-    def read(self, f: TextIO):
-        for line in f.readlines():
-            self.read_tokens(line.strip().split(" "))
-        assert self.clause_idx == self.n_clauses(), "Number of clauses did not match the p-line"
-        return self.to_model()
+        bvs = cp.boolvar(shape=(nr_vars,), name=var_name)
 
-    def initialize(self, n_vars, n_clauses):
-        # note: do not use [[]] * n_clauses, it will have n_clauses references to the same list
-        self.clauses = [[] for _ in range(n_clauses)]
-        self.bvs = cp.boolvar(shape=(n_vars,), name=self.var_name)
-
-    def read_tokens(self, tokens):
-        match tokens:
-            case [] | ["c", *_]:
-                pass  # skip empty/comment lines
-            case ["p", "cnf", *params]:
-                n_vars, n_clauses = [int(p) for p in params]
-                self.initialize(n_vars, n_clauses)
-            case clause:
-                assert self.clauses is not None
-                self.read_clause(clause)
-
-    def to_model(self):
-        return cp.Model([cp.any(clause) for clause in self.clauses])
-
-    def read_clause(self, tokens):
-        for lit in tokens:
-            lit = int(lit.strip())
-            if lit == 0:
-                self.clause_idx += 1
-            else:
-                assert self.clause_idx < self.n_clauses(), "Too many clauses"
-
-                var = abs(lit) - 1
-                assert var < self.n_vars(), (
-                    f"Expected at most {self.n_vars()} variables (from p-line) but found literal {lit} in clause {' '.join(tokens)}"
-                )
-                bv = self.bvs[var]
-                self.clauses[self.clause_idx].append(bv if lit > 0 else ~bv)
-
-
-class _GDimacsReader(_DimacsReader):
-    """Line-based reader for GDIMACS (grouped CNF) content."""
-
-    def __init__(self, var_name=None, assumption_name=None):
-        super().__init__(var_name=var_name)
-        self.groups = None
-        self.assumption_name = assumption_name
-
-    def read_tokens(self, tokens):
-        match tokens:
-            case [] | ["c", *_]:
-                pass  # skip empty/comment lines
-            case ["p", "gcnf", *params]:
-                n_vars, n_clauses, n_groups = [int(p) for p in params]
-                self.initialize(n_vars, n_clauses)
-                self.groups = [None] * self.n_clauses()
-            case [group, *clause] if group.startswith("{"):
-                group_num = int(tokens[0][1:-1])  # e.g. {1} 1 -2 3 0
-                assert group_num >= 0, f"Group number must be non-negative, but got {group_num}"
-                self.groups[self.clause_idx] = group_num
-                self.read_clause(clause)
-
-    def to_model(self):
+        # each consecutive run of clauses with the same group index forms one constraint;
+        # group 0 is hard, every other group becomes one soft constraint
         soft = []
         hard = []
-        for k, clauses in itertools.groupby(
-            enumerate(self.clauses), key=lambda clause: self.groups[clause[0]]
-        ):
-            cnf = cp.all(cp.any(clause) for i, clause in clauses)
-            (hard if k == 0 else soft).append(cnf)
+        for group, members in itertools.groupby(zip(cls_groups, clauses), key=lambda gc: gc[0]):
+            cnf = cp.all(cp.any([bvs[abs(i)-1] if i > 0 else ~bvs[abs(i)-1] for i in cl]) for _, cl in members)
+            (hard if group == 0 else soft).append(cnf)
 
-        model, soft, assumptions = make_assump_model(soft, hard=hard, name=self.assumption_name)
+        model, soft, assumptions = make_assump_model(soft, hard=hard, name=assumption_name)
         return model, soft, hard, assumptions
