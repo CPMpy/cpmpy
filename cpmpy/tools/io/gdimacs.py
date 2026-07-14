@@ -70,7 +70,9 @@ def write_gdimacs(
     Uses the :func:`~cpmpy.transformations.to_gcnf.to_gcnf` transformation to convert
     soft and hard constraints into grouped CNF.
 
-    Each soft constraint is assigned to a separate group. Hard constraints are placed in group ``{0}``.
+    Each soft constraint is assigned to a separate group (after transformation to CNF, 
+    the resulting clauses are grouped by the soft constraint that they belong to).
+    Hard constraints are placed in group ``{0}``.
 
     Arguments:
         soft: list of CPMpy constraints that can be violated (soft constraints)
@@ -89,21 +91,11 @@ def write_gdimacs(
         GDIMACS formatted string
     """
     _, soft, hard, assumptions = to_gcnf(soft, hard, encoding=encoding, disjoint=disjoint)
-    return _write_clauses(hard, groups=zip(assumptions, soft), path=path, canonical=canonical, open=open)
 
+    constraints = hard
+    groups = list(zip(assumptions, soft)) if assumptions is not None else None
 
-def _write_clauses(constraints, groups=None, path=None, canonical=False, open=partial(builtins.open, mode="w")) -> str:
-    """
-    Helper function: constraints are assumed to be CNF (i.e. a list of conjunctions of hard clauses),
-    groups are a list of tuples of (assumption variable, soft clauses).
-
-    Check explicitly for ``groups=None``: ``groups=[]`` is a GCNF with only hard constraints
-    (the ``{0}`` group), while ``groups=None`` is a plain CNF.
-    """
     is_gcnf = groups is not None
-
-    groups = list(groups) if groups is not None else []
-
     vars = get_variables([constraints] + [con for _, con in groups])
 
     if canonical:

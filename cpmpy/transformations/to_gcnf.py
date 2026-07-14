@@ -3,15 +3,42 @@ Transform soft and hard constraints to **Grouped Conjunctive Normal Form** (GCNF
 constraint becomes a group of clauses guarded by an assumption variable, for use by MUS solvers.
 """
 
+from typing import Optional
+
 import cpmpy as cp
-from ..expressions.variables import _BoolVarImpl
-from ..expressions.core import Operator
-from .to_cnf import to_cnf
+from cpmpy.expressions.variables import _BoolVarImpl
+from cpmpy.expressions.core import Expression, Operator
+from cpmpy.transformations.cse import CSEMap
+from cpmpy.transformations.int2bool import IntVarEnc
+from cpmpy.transformations.to_cnf import to_cnf
 
 
-def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="auto", disjoint=True):
+def to_gcnf(
+        soft: list[Expression], 
+        hard: Optional[list[Expression]] = None, 
+        name: Optional[str] = None, 
+        csemap: Optional[CSEMap] = None, 
+        ivarmap: Optional[dict[str, IntVarEnc]] = None, 
+        encoding: str = "auto", 
+        disjoint: bool = True
+    ) -> tuple[cp.Model, list[Expression], list[Expression], list[cp.BoolVar]]:
     """
-    Similar to `make_assump_model`, but the returned model is in (grouped) CNF. Separately the soft clauses, hard clauses, and assumption variables. Follows https://satisfiability.org/competition/2011/rules.pdf, however, there is no guarantee that the groups are disjoint.
+    Similar to `make_assump_model`, but the returned model is in (grouped) CNF. 
+
+    Follows https://satisfiability.org/competition/2011/rules.pdf, however, 
+    there is no guarantee that the groups are disjoint.
+
+    Arguments:
+        soft (list[Expression]): list of CPMpy constraints that can be violated (soft constraints)
+        hard (list[Expression], optional): list of CPMpy constraints that must be satisfied (hard constraints), optional
+        name (str, optional): name of the model
+        csemap (CSEMap, optional): CSE map
+        ivarmap (dict[str, IntVarEnc], optional): IVAR map
+        encoding (str): encoding of the model
+        disjoint (bool): whether to make the groups disjoint
+
+    Returns:
+        tuple[cp.Model, list[Expression], list[Expression], list[cp.BoolVar]]: tuple containing the model, the soft constraints, the hard constraints, and the assumption variables
     """
     # deferred import: cpmpy.tools imports this module at package-import time
     from cpmpy.tools.explain.utils import make_assump_model
@@ -59,8 +86,16 @@ def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="aut
     return (model, soft, hard, assump)
 
 
-def _to_clauses(cons):
-    """Takes some CPMpy constraints in CNF + half-reifications and returns clauses as list of sets of literals"""
+def _to_clauses(cons: Expression) -> list[frozenset[cp.BoolVar]]:
+    """
+    Takes some CPMpy constraints in CNF + half-reifications and returns clauses as list of sets of literals
+
+    Arguments:
+        cons (Expression): CPMpy constraint
+
+    Returns:
+        list[frozenset[cp.BoolVar]]: list of clauses
+    """
     if isinstance(cons, _BoolVarImpl):
         return [frozenset([cons])]
     elif isinstance(cons, Operator):
