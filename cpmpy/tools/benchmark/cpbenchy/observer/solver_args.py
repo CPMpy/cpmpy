@@ -72,16 +72,21 @@ class SolverArgsObserver(Observer):
         # https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
         res = dict()
 
-        # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
-        res |= {
-            "interleave_search": True,
-            "use_rins_lns": False,
-        }
-        if not model.has_objective():
-            res |= {"num_violation_ls": 1}
+        if cores == 1:
+            # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+            res |= {
+                "interleave_search": True,
+                "use_rins_lns": False,
+            }
+            if not model.has_objective():
+                res |= {"num_violation_ls": 1}
 
         if cores is not None:
-            res |= {"num_search_workers": cores}
+            if cores > 1 and cores < 8:
+                # Bump up to 8 workers
+                res |= {"num_search_workers": 8}
+            else:
+                res |= {"num_search_workers": cores}
         if seed is not None:
             res |= {"random_seed": seed}
 
@@ -117,12 +122,13 @@ class SolverArgsObserver(Observer):
             res |= {"solution_callback": OrtSolutionCallback()}
 
         def internal_options(solver: "CPM_ortools"):
-            # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
-            solver.ort_solver.parameters.subsolvers.extend(["default_lp", "max_lp", "quick_restart"])
-            if not model.has_objective():
-                solver.ort_solver.parameters.subsolvers.append("core_or_no_lp")
-            if len(solver.ort_model.proto.search_strategy) != 0:
-                solver.ort_solver.parameters.subsolvers.append("fixed")
+            if cores == 1:
+                # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+                solver.ort_solver.parameters.subsolvers.extend(["default_lp", "max_lp", "quick_restart"])
+                if not model.has_objective():
+                    solver.ort_solver.parameters.subsolvers.append("core_or_no_lp")
+                if len(solver.ort_model.proto.search_strategy) != 0:
+                    solver.ort_solver.parameters.subsolvers.append("fixed")
 
         return res, internal_options
 
