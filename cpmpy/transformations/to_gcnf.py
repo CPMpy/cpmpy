@@ -3,7 +3,7 @@ Transform soft and hard constraints to **Grouped Conjunctive Normal Form** (GCNF
 constraint becomes a group of clauses guarded by an assumption variable, for use by MUS solvers.
 """
 
-from typing import Optional
+from typing import Optional, cast
 
 import cpmpy as cp
 from cpmpy.expressions.variables import _BoolVarImpl
@@ -21,7 +21,7 @@ def to_gcnf(
         ivarmap: Optional[dict[str, IntVarEnc]] = None, 
         encoding: str = "auto", 
         disjoint: bool = True
-    ) -> tuple[cp.Model, list[Expression], list[Expression], list[cp.BoolVar]]:
+    ) -> tuple[cp.Model, list[Expression], list[Expression], list[_BoolVarImpl]]:
     """
     Similar to `make_assump_model`, but the returned model is in (grouped) CNF. 
 
@@ -38,7 +38,7 @@ def to_gcnf(
         disjoint (bool): whether to make the groups disjoint
 
     Returns:
-        tuple[cp.Model, list[Expression], list[Expression], list[cp.BoolVar]]: tuple containing the model, the soft constraints, the hard constraints, and the assumption variables
+        tuple[cp.Model, list[Expression], list[Expression], list[_BoolVarImpl]]: tuple containing the model, the soft constraints, the hard constraints, and the assumption variables
     """
     # deferred import: cpmpy.tools imports this module at package-import time
     from cpmpy.tools.explain.utils import make_assump_model
@@ -47,7 +47,7 @@ def to_gcnf(
 
     cnf = to_cnf(model.constraints, encoding=encoding, csemap=csemap, ivarmap=ivarmap)
 
-    groups = {
+    groups: dict[_BoolVarImpl | bool, list[frozenset[_BoolVarImpl] | list[_BoolVarImpl]]] = {
         True: [],  # hard clauses
         **{a: [] for a in assump},  # assumption mapped to its soft clauses
     }
@@ -63,21 +63,24 @@ def to_gcnf(
                 groups[True].append(clause)
             else:
                 # soft clause without assumption
-                groups[~assumption].append(clause - {assumption})
+                assump_var = cast(_BoolVarImpl, ~assumption)
+                groups[assump_var].append(clause - {assumption})
 
     if disjoint:
-        cl_db = set()
+        cl_db: set[frozenset[_BoolVarImpl]] = set()
         # to make groups disjoint..
-        for clauses in groups.values():
-            for i, clause in enumerate(clauses):
-                if clause in cl_db:
+        for group_clauses in groups.values():
+            for i, clause_entry in enumerate(group_clauses):
+                if not isinstance(clause_entry, frozenset):
+                    continue
+                if clause_entry in cl_db:
                     # replace duplicate clause `C` by new variable `f` and add `f -> C` to hard clauses
                     f = cp.boolvar()
-                    clauses[i] = [f]
-                    new_clause = frozenset([~f]) | clause
+                    group_clauses[i] = [f]
+                    new_clause = frozenset([cast(_BoolVarImpl, ~f)]) | clause_entry
                     groups[True].append(new_clause)
                 else:
-                    cl_db.add(clause)
+                    cl_db.add(clause_entry)
 
     model = cp.Model(cnf)
     soft = [cp.all(cp.any(c) for c in groups[a]) for a in assump]
@@ -86,7 +89,7 @@ def to_gcnf(
     return (model, soft, hard, assump)
 
 
-def _to_clauses(cons: Expression) -> list[frozenset[cp.BoolVar]]:
+def _to_clauses(cons: Expression) -> list[frozenset[_BoolVarImpl]]:
     """
     Takes some CPMpy constraints in CNF + half-reifications and returns clauses as list of sets of literals
 
@@ -94,7 +97,7 @@ def _to_clauses(cons: Expression) -> list[frozenset[cp.BoolVar]]:
         cons (Expression): CPMpy constraint
 
     Returns:
-        list[frozenset[cp.BoolVar]]: list of clauses
+        list[frozenset[_BoolVarImpl]]: list of clauses
     """
     if isinstance(cons, _BoolVarImpl):
         return [frozenset([cons])]

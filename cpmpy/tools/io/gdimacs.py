@@ -48,6 +48,7 @@ from typing import Callable, Optional, TextIO, Union
 
 import cpmpy as cp
 
+from cpmpy.expressions.core import Expression
 from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
 from cpmpy.transformations.to_gcnf import to_gcnf, _to_clauses
 from cpmpy.transformations.get_variables import get_variables
@@ -115,13 +116,13 @@ def write_gdimacs(
         n_clauses += len(clauses)
         for clause in clauses:
             # write clause to cnf format
-            lits = []
+            skip_clause = False
+            lits: list[int] = []
             for v in clause:
                 if v is True:
-                    lits = None
+                    skip_clause = True
                     break
                 elif v is False:
-                    lits = []
                     break
                 elif isinstance(v, NegBoolView):
                     lits.append(-mapping[v._bv])
@@ -132,7 +133,7 @@ def write_gdimacs(
                         f"Expected Boolean variable in clause, but got {v} which is of type {type(v)}"
                     )
 
-            if lits is None:
+            if skip_clause:
                 continue
 
             if canonical:
@@ -188,8 +189,8 @@ def load_gdimacs(
 
         nr_vars = None
         nr_cls = None
-        clauses = []  # parsed clauses, as lists of literal ints
-        cls_groups = []  # group index of each parsed clause
+        clauses: list[list[int]] = []  # parsed clauses, as lists of literal ints
+        cls_groups: list[int] = []  # group index of each parsed clause
 
         for raw in f:
             line = raw.strip()
@@ -205,14 +206,14 @@ def load_gdimacs(
                 nr_cls = int(nr_cls_text)
                 continue
 
-            assert nr_vars is not None, "Expected p-line before first clause"
+            assert nr_vars is not None and nr_cls is not None, "Expected p-line before first clause"
             group_text, *tokens = line.split()  # e.g. {1} 1 -2 3 0
             assert group_text.startswith("{") and group_text.endswith("}"), \
                 f"Expected clause to be prefixed with its group, e.g. `{{1}} 1 -2 3 0`, but got {line}"
             group = int(group_text[1:-1])
             assert group >= 0, f"Group number must be non-negative, but got {group}"
 
-            clause = []
+            clause: list[int] = []
             for token in tokens:
                 i = int(token)
                 if i == 0:  # end of clause
@@ -225,14 +226,15 @@ def load_gdimacs(
                     clause.append(i)
             assert len(clause) == 0, "Expected clause to be terminated by 0"
 
+        assert nr_vars is not None and nr_cls is not None, "Expected p-line in file"
         assert len(clauses) == nr_cls, "Number of clauses did not match the p-line"
 
         bvs = cp.boolvar(shape=(nr_vars,), name=var_name)
 
         # each consecutive run of clauses with the same group index forms one constraint;
         # group 0 is hard, every other group becomes one soft constraint
-        soft = []
-        hard = []
+        soft: list[Expression] = []
+        hard: list[Expression] = []
         for group, members in itertools.groupby(zip(cls_groups, clauses), key=lambda gc: gc[0]):
             cnf = cp.all(cp.any([bvs[abs(i)-1] if i > 0 else ~bvs[abs(i)-1] for i in cl]) for _, cl in members)
             (hard if group == 0 else soft).append(cnf)
