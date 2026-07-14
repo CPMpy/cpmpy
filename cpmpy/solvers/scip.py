@@ -94,13 +94,14 @@ class CPM_scip(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, incremental=True):
         if not self.supported():
             raise ModuleNotFoundError(
                 "CPM_scip: Install SCIPOptSuite and the python package 'pyscipopt' to use this solver interface.")
         assert subsolver is None, "SCIP does not support subsolvers"
         import pyscipopt as scip
 
+        self.incremental = incremental
         self.scip_model = scip.Model()
         self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
         self.objective_ = None
@@ -195,7 +196,8 @@ class CPM_scip(SolverInterface):
         # transformed space, and just leave the original model. All solutions are kept, 
         # and the user can now change the model as they will. The downside is that potentially 
         # useful information for speeding up the next optimisation call is thrown out.
-        self.scip_model.freeTransform()
+        if self.incremental:
+            self.scip_model.freeTransform()
 
         return has_sol
 
