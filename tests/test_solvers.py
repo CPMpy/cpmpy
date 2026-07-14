@@ -727,6 +727,12 @@ class TestSolvers:
         s = cp.SolverLookup.get("cplex", m)
         assert s.solve()
 
+        x, y = cp.intvar(0, 10, shape=2)
+        m = cp.Model(x * y == 1)
+        s = cp.SolverLookup.get("cplex", m)
+        assert s.solve()
+        assert x.value() * y.value() == 1
+
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
