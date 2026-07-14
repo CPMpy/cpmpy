@@ -551,7 +551,7 @@ class TestGlobal:
         # unconstrained
         true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
         assert cp.Model(true_cons).solve(solver=solver)
-        #assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
+        assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
         constraining, defining = true_cons.decompose() # should be True, []
         assert constraining[0]
 
