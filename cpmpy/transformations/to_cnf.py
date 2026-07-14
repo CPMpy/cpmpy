@@ -15,7 +15,7 @@ from cpmpy.transformations.int2bool import _encode_lin_expr
 from cpmpy.transformations.cse import CSEMap
 
 
-def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto", name=None):
+def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     """
     Converts all constraints into **Conjunctive Normal Form**
 
@@ -59,7 +59,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto", name=None):
         for lit in clause:
             x = str(lit.var())
             if x not in cpmpy_vars:
-                cpmpy_vars[x] = cp.boolvar(name=None if name is None else f"{name}[{x}]")
+                cpmpy_vars[x] = cp.boolvar()
             elif cpmpy_vars[x] in free_vars:  # cpmpy_vars[x] is only in free_vars if it existed before
                 free_vars.remove(cpmpy_vars[x])
             yield ~cpmpy_vars[x] if lit.is_negated() else cpmpy_vars[x]
