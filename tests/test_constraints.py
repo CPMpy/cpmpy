@@ -23,39 +23,37 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
     "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
-    "Table", 'NegativeTable', "ShortTable", "Regular",
+    "Table", 'NegativeTable', "ShortTable", "Regular", "MDD",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
-    "Precedence", "Cumulative", "NoOverlap",
+    "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
+    "Abs", "Element", "NDElement", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
 SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
-                  "rc2": {"Division", "Modulo", "Power"},
+EXCLUDE_GLOBAL = {
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "pindakaas": {"Division", "Modulo", "Power"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "cplex": {"Division", "Modulo", "Power"}
+                  
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
-                     "rc2": {"mul-int"},
-                     "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
-                     "pindakaas": {"mul-int"},
-                     "cplex": {"mul-int", "div"},
+EXCLUDE_OPERATORS = {"pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
                      }
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [cp.intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
+NUM_ARGS_2D = cp.intvar(-3, 5, shape=(5,5), name="MD") # 2D numerical variables
+SMALL_NUM_ARG = [cp.intvar(-2, 2, name=n) for n in "w"]   # Small domain numerical vars
 NN_VAR = cp.intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
 POS_VAR = cp.intvar(1,10, name="s_pos")                # A strictly positive variable
 NUM_VAR = cp.intvar(0, 10, name="l")                   # A numerical variable
+INDEX_VAR = cp.intvar(0, 4, name="i")
+INDEX_VAR2 = cp.intvar(0, 4, name="j")
 
 BOOL_ARGS = [cp.boolvar(name=n) for n in "abc"]        # Boolean variables
 BOOL_VAR = cp.boolvar(name="p")                        # A boolean variable
@@ -77,20 +75,10 @@ def numexprs(solver):
             yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
-        elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
-            yield Operator(name, [3, NUM_ARGS[0]])
-            yield Operator(name, NUM_ARGS[:arity])
-            yield Operator(name, NUM_ARGS[:2])
-            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
-                yield Operator(name, [3, BOOL_ARGS[0]])
-
-        elif name == "mul" and "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
-            yield Operator(name, BOOL_ARGS[:arity])
         elif arity != 0:
             yield Operator(name, NUM_ARGS[:arity])
         else:
             yield Operator(name, NUM_ARGS)
-
 
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
@@ -129,7 +117,7 @@ def comp_constraints(solver):
 def bool_exprs(solver):
     """
         Generate all boolean expressions:
-        - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var, ...]), or([Var, ...])    (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
         - Global constraints
     """
@@ -140,13 +128,15 @@ def bool_exprs(solver):
 
     for name, arity in names:
         if arity != 0:
-            operator_args = BOOL_ARGS[:arity]
+            arg_counts = [arity]
         else:
-            operator_args = BOOL_ARGS
+            arg_counts = [1, len(BOOL_ARGS)] # singleton and full
 
-        yield Operator(name, operator_args)
-        # Negated boolean values
-        yield Operator(name, [~ arg for arg in operator_args])
+        for n in arg_counts:
+            operator_args = BOOL_ARGS[:n]
+            yield Operator(name, operator_args)
+            # Negated boolean values
+            yield Operator(name, [~ arg for arg in operator_args])
 
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
@@ -177,12 +167,21 @@ def global_constraints(solver):
         elif name == "Table":
             yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
             yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
+            # different domain sizes for variables (test ordering in linear decomposition)
+            yield cp.Table([cp.intvar(lb=1, ub=5), cp.intvar(lb=1, ub=2), cp.intvar(lb=1, ub=3)], [[1,1,3], [2,1,3], [3,2,3]])
         elif name == "Regular":
             yield cp.Regular(cp.intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
             yield cp.NegativeTable(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
             yield cp.ShortTable(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+        elif name == "MDD":
+            yield cp.MDD(cp.intvar(lb=0, ub=1, shape=3, name="x"), [("r", 0, "n1"), ("n1", 0, "n2"), ("n2", 0, "t")])
+            yield cp.MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+            ("n4", 0, "t"), ("n5", 1, "t")])
+            yield cp.MDD(NUM_ARGS, [("src", 2, "2"), ("src", 1, "1"), ("src", 4, "4"), ("src", 3, "3"),
+                          ("2", 1, "2,1"), ("1", 2, "1,2"), ("4", 3, "1,2"), ("3", 2, "3,2"),
+                          ("2,1", 1, "snk"), ("2,1", 2, "snk"), ("1,2", 3, "snk"), ("3,2", 2, "snk")])
         elif name == "IfThenElse":
             yield cp.IfThenElse(*BOOL_ARGS)
         elif name == "InDomain":
@@ -200,18 +199,27 @@ def global_constraints(solver):
             yield cp.Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
             if solver != "pumpkin": # only supports with fixed durations
                 yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
-                if solver not in ("pysat", "pindakaas"): # results in unsupported int2bool integer multiplication
-                    yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+                yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
             continue
 
+        elif name == "CumulativeOptional":
+            s = cp.intvar(0, 10, shape=4, name="start")
+            e = cp.intvar(0, 10, shape=4, name="end")
+            dur = [1, 4, 3, 2]
+            demand = [11, 4, 8, 7]
+            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            cap = 10
+            yield cls(s, dur, e, demand, cap, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
             yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "AllDifferentExceptN":
-            yield cp.AllDifferentExceptN(NUM_ARGS, NUM_VAR)
+            vals = [1, 2, 3]
+            yield cp.AllDifferentExceptN(NUM_ARGS, vals)
         elif name == "AllEqualExceptN":
-            yield cp.AllEqualExceptN(NUM_ARGS, NUM_VAR)
+            vals = [1, 2, 3]
+            yield cp.AllEqualExceptN(NUM_ARGS, vals)
         elif name == "Precedence":
             x = cp.intvar(0,5, shape=3, name="x")
             yield cp.Precedence(x, [3,1,0])
@@ -224,6 +232,12 @@ def global_constraints(solver):
             if solver != "pumpkin": # only supports with fixed durations
                 yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
             continue
+        elif name == "NoOverlapOptional":
+            s = cp.intvar(0, 10, shape=4, name="start")
+            e = cp.intvar(0, 10, shape=4, name="end")
+            dur = [1, 4, 3, 2]
+            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            yield cls(s, dur, e, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
@@ -265,6 +279,8 @@ def global_functions(solver):
             yield cp.Count(NUM_ARGS, NUM_VAR)
         elif name == "Element":
             yield cp.Element(NUM_ARGS, POS_VAR)
+        elif name == "NDElement":
+            yield cp.NDElement(NUM_ARGS_2D, [NUM_VAR, POS_VAR])
         elif name == "NValueExcept":
             yield cp.NValueExcept(NUM_ARGS, 3)
         elif name == "Among":
@@ -274,7 +290,15 @@ def global_functions(solver):
         elif name == "Modulo":
             yield cp.Modulo(NUM_ARGS[0], NUM_ARGS[1])
         elif name == "Power":
-            yield cp.Power(NUM_ARGS[0], 3)
+            yield cp.Power(SMALL_NUM_ARG[0], 3)
+        elif name == "Multiplication":
+            yield cp.Multiplication(NUM_ARGS[0], NUM_ARGS[1])
+            yield cp.Multiplication(BOOL_ARGS[0], BOOL_ARGS[1])
+            yield cp.Multiplication(3, BOOL_ARGS[0])
+            yield cp.Multiplication(3, NUM_ARGS[0])
+
+            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
+                yield cp.Multiplication(3, BOOL_ARGS[0])
         else:
             yield cls(NUM_ARGS)
 

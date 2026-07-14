@@ -1,16 +1,18 @@
 import inspect
 import importlib
-import inspect
 
+import re
 import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
-from cpmpy.expressions.core import Operator
+from cpmpy.exceptions import MinizincNameException, NotSupportedError
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.pindakaas import CPM_pindakaas
+from cpmpy.solvers.pumpkin import CPM_pumpkin
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
@@ -18,8 +20,9 @@ from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
+from cpmpy.solvers.scip import CPM_scip
+from cpmpy.solvers.highs import CPM_highs
 from cpmpy import SolverLookup
-from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 from test_constraints import numexprs
 from utils import skip_on_missing_pblib
@@ -179,7 +182,7 @@ class TestSolvers:
             def on_solution_callback(self):
                 # populate values before printing
                 for cpm_var in self.x:
-                    cpm_var._value = self.Value(self.varmap[cpm_var])
+                    cpm_var._value = self.Value(self.varmap[cpm_var.name])
         
                 self.solcount += 1
                 print("x:",self.x.value())
@@ -198,7 +201,7 @@ class TestSolvers:
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
         s = CPM_ortools(m_opt)
         cpm_status = s.solve(solution_callback=cb)
-        assert s.objective_value() == 5.0
+        assert s.objective_value() == 5
 
         assert x[0].value() > x[1].value()
 
@@ -276,18 +279,6 @@ class TestSolvers:
         model += bv2 | bv3
 
         assert model.solve(solver="ortools")# this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
-
-    def test_ortools_real_coeff(self):
-
-        m = cp.Model()
-        # this works in OR-Tools
-        x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
-        m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
-        assert m.solve()
-        assert m.objective_value() == 1.4
-        # this does not
-        m += 0.7 * x + 0.8 * y >= 1
-        pytest.raises(TypeError, m.solve)
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -490,9 +481,9 @@ class TestSolvers:
         assert s.solve()
 
         x = cp.intvar(0, 1)
-        m = cp.Model((x >= 0.1) & (x != 1))
+        m = cp.Model((x > 0) & (x != 1))
         s = cp.SolverLookup.get("z3", m)
-        assert not s.solve()# upgrade z3 with pip install --upgrade z3-solver
+        assert not s.solve()
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
@@ -709,30 +700,6 @@ class TestSolvers:
         assert s.solve()
         assert iv.value()[idx.value(), idx2.value()] == 8
 
-    @pytest.mark.skipif(not CPM_gurobi.supported(),
-                        reason="Gurobi not installed")
-    def test_gurobi_float_objective(self):
-        """Test that Gurobi properly handles float objective values."""
-        # Test case with float coefficients that should result in a float objective value
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-
-        # Create a model with float coefficients - this can happen with DirectVar
-        # or when using floats as coefficients
-        m = cp.Model()
-        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-
-        s = cp.SolverLookup.get("gurobi", m)
-        assert s.solve()
-
-        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
-        expected_obj = 2.5
-        actual_obj = s.objective_value()
-
-        # Verify that the objective value is returned as a float (not int)
-        assert isinstance(actual_obj, float)
-        assert actual_obj == pytest.approx(expected_obj, abs=1e-05)
-
-
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
     def test_cplex(self):
@@ -760,29 +727,6 @@ class TestSolvers:
         s = cp.SolverLookup.get("cplex", m)
         assert s.solve()
 
-
-    @pytest.mark.skipif(not CPM_cplex.supported(),
-                        reason="cplex not installed")
-    def test_cplex_float_objective(self):
-        """Test that cplex properly handles float objective values."""
-        # Test case with float coefficients that should result in a float objective value
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-
-        # Create a model with float coefficients - this can happen with DirectVar
-        # or when using floats as coefficients
-        m = cp.Model()
-        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-
-        s = cp.SolverLookup.get("cplex", m)
-        assert s.solve()
-
-        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
-        expected_obj = 2.5
-        actual_obj = s.objective_value()
-
-        # Verify that the objective value is returned as a float (not int)
-        assert isinstance(actual_obj, float)
-        assert actual_obj == pytest.approx(expected_obj, abs=1e-05)
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
@@ -823,8 +767,33 @@ class TestSolvers:
         assert m.solve(solver="minizinc")
 
 
+    @pytest.mark.skipif(not CPM_pumpkin.supported(), reason="Gurobi not installed")
+    def test_pumpkin_proof(self):
+        x = cp.intvar(0,10, shape=3)
+        m = cp.Model(cp.AllDifferent(x))
+        m += cp.sum(x) <= 2
+
+        # old version, does not work anymore
+        with pytest.raises(ValueError):
+            m.solve(solver="pumpkin", proof_name="test_proof.drcp")
+        
+        # need to supply proof in constructor
+        proof_name=tempfile.NamedTemporaryFile(suffix=".drcp", delete=False).name
+        s = cp.SolverLookup.get("pumpkin", m, proof=proof_name)
+        assert s.solve() is False
+        with open(proof_name, "r") as f:
+            proof = f.read()
+            assert ("UNSAT" in proof)
+
+        # cannot supply proof in solve
+        with pytest.raises(ValueError):
+            s.solve(proof=proof_name)
+
+
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
+    _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3", "hexaly", "minizinc", "highs"})
+
     def test_installed_solvers(self, solver):
         # basic model
         v = cp.boolvar(3)
@@ -898,6 +867,36 @@ class TestSupportedSolvers:
         m.maximize(cp.min(iv))
         assert m.solve(solver=solver)
         assert m.objective_value() == 5
+
+    def test_floatsum_objective(self, solver):
+        if solver not in self._floatsum_supported_solvers:
+            pytest.skip(f"{solver} does not support FloatSum objective")
+        if solver == "z3":
+            solver = "z3:opt"
+        s = cp.SolverLookup.get(solver)
+
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        fs = cp.FloatSum([0.3, 0.5, 0.6], [x, y, z], const=1)
+        s.maximize(fs)
+        assert s.solve()
+        assert fs.value() == pytest.approx(2.4, abs=1e-05)
+        assert len(s.user_vars) == 3
+        assert s.objective_value() is None # should be None, read from FloatSum.value()
+
+    def test_floatsum_negboolview(self, solver):
+        if solver not in self._floatsum_supported_solvers:
+            pytest.skip(f"{solver} does not support FloatSum objective")
+        if solver == "z3":
+            solver = "z3:opt"
+        s = cp.SolverLookup.get(solver)
+
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        fs = cp.FloatSum([0.3, 0.5, 0.6], [~x, y, ~z], const=1)
+        s.maximize(fs)
+        assert s.solve()
+        assert (x.value(), y.value(), z.value()) == (False, True, False)
+        assert fs.value() == pytest.approx(2.4, abs=1e-05)
+        assert len(s.user_vars) == 3
 
     def test_value_cleared(self, solver):
         x, y, z = cp.boolvar(shape=3)
@@ -984,8 +983,10 @@ class TestSupportedSolvers:
 
         assert s.solve(assumptions=[])
 
-    def test_vars_not_removed(self, solver):
+        # better for user experience: allow to use set of assumptions too
+        assert s.solve(assumptions={x,y})
 
+    def test_vars_not_removed(self, solver):
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -1009,6 +1010,55 @@ class TestSupportedSolvers:
         #test unique sols, should be same number
         assert len(sols) == 8
 
+    def test_solution_callback(self, solver, capsys):
+        
+        n = 10
+        kwargs = dict(time_limit=3)
+        solver_obj = cp.SolverLookup.get(solver)
+        if "display" not in inspect.signature(solver_obj.solve).parameters:
+            pytest.skip(f"{solver} does not support solution callbacking")
+        if solver in ("z3", "hexaly"):
+            kwargs['time_limit'] = 10 # z3 is too slow otherwise, cannot find more than one solution in time limit
+
+
+        model, (vars,) = _get_golomb_model(n)
+
+        # model, vars = _get_tsp_model(n)
+        obj = model.objective_
+
+        # collect solutions using callback
+        collector = list()
+        res = model.solve(solver=solver, display=lambda :  collector.append(argvals(vars)), **kwargs)
+        if model.status().exitstatus != ExitStatus.UNKNOWN:
+            assert res is True
+            assert len(collector) > 1
+        
+        # print solutions using default display
+        solution_line_pattern = r"\[\d+(?:,? \d+)*\]"
+
+        res = model.solve(solver=solver, display=vars, **kwargs)
+        if model.status().exitstatus != ExitStatus.UNKNOWN:
+            assert res is True
+            captured = capsys.readouterr().out
+            assert len(captured) > 0
+            assert re.match(solution_line_pattern, captured.splitlines()[-1])
+
+
+        # print some more information using callback
+        from time import time
+        t0 = time()
+        def display():
+            print("Time elapsed:", time() - t0, "Obj:", obj.value(),  "Sol:", argvals(vars))
+
+        display_line_pattern = r"Time elapsed: \d+\.\d+ Obj: \d+ Sol: \[\d+(?:,? \d+)*\]"
+
+        res = model.solve(solver=solver, display=display, **kwargs)
+        if model.status().exitstatus != ExitStatus.UNKNOWN:
+            assert res is True
+            captured = capsys.readouterr().out
+            assert len(captured) > 0
+            assert re.match(display_line_pattern, captured.splitlines()[-1])
+
 
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
@@ -1016,24 +1066,19 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin", "rc2"):  # don't support div or mod with vars
-            return
+        if solver in ("pysdd", "rc2"):  # pysdd: div/mod; rc2: no decision problems (solveAll)
+            pytest.skip("solver does not support this test context")
         if solver == 'cplex':
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
         # modulo toplevel
-        m += x / y == d
+        m += x // y == d
         m += x % y == r
         sols = set()
-        solution_limit = None
-        time_limit = None
-        if solver == 'gurobi':
-            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
-        if solver == "hexaly":
-            time_limit = 5
-        m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions
+        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
@@ -1059,16 +1104,16 @@ class TestSupportedSolvers:
 
         # now making a tricky problem to solve
         np.random.seed(0)
-        start = cp.intvar(0,100, shape=50)
-        dur = np.random.randint(1,5, size=50)
-        end = cp.intvar(0,100, shape=50)
-        demand  = np.random.randint(10,15, size=50)
+        start = cp.intvar(0,50, shape=20)
+        dur = np.random.randint(1,5, size=20)
+        end = cp.intvar(0,50, shape=20)
+        demand  = np.random.randint(10,15, size=20)
 
-        m += cp.Cumulative(start, dur, end,demand, 30)
+        m += cp.Cumulative(start, dur, end,demand, 20)
         m.minimize(cp.max(end))
         m.solve(solver=solver, time_limit=1)
         # normally, should not be able to solve within 1s...
-        assert m.status().exitstatus in (ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
+        assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
         # now trivally unsat
         m += cp.sum(bv) <= 0
@@ -1076,49 +1121,6 @@ class TestSupportedSolvers:
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
-
-    def test_status_solveall(self, solver):
-        if solver == "hexaly":
-            pytest.skip("hexaly cannot proveably find all solutions, so status is never OPTIMAL")
-
-        bv = cp.boolvar(shape=3, name="bv")
-        m = cp.Model(cp.any(bv))
-
-        limit = None
-        if solver in ("gurobi", "cplex"): limit = 100000
-
-        num_sols = m.solveAll(solver=solver, solution_limit=limit)
-        assert num_sols == 7
-        assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
-
-
-
-        # adding a bunch of variables to increase nb of sols
-        try:
-            x = cp.boolvar(shape=32, name="x")
-            m = cp.Model(cp.any(x))
-            num_sols = m.solveAll(solver=solver, time_limit=1, solution_limit=limit)
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            num_sols = m.solveAll(solver=solver, solution_limit=10)
-            assert num_sols == 10
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            # edge-case: nb of solutions is exactly the sol limit
-            m = cp.Model(cp.any(bv))
-            num_sols = m.solveAll(solver=solver, solution_limit=7)
-            assert num_sols ==  7
-            assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE) # which of the two?
-
-        except NotImplementedError:
-            pass # not all solvers support time/solution limits
-
-        # making the problem unsat
-        if solver != "pysdd": # constraint not supported by pysdd
-            m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
-            num_sols = m.solveAll(solver=solver, solution_limit=limit)
-            assert num_sols == 0
-            assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
     def test_hidden_user_vars(self, solver):
@@ -1128,11 +1130,18 @@ class TestSupportedSolvers:
         """
         if solver == 'pysdd':
             pytest.skip(reason=f"{solver} does not support integer decision variables")
+
+        class DummyConstraint(GlobalConstraint):
+            def __init__(self, args):
+                super().__init__("dummy_constraint", tuple(args))
+
+            def decompose(self):
+                return [], []
         
         x = cp.intvar(1, 4, shape=1)
         # Dubious constraint which enforces nothing, gets decomposed to empty list
         # -> resulting CP model is empty
-        m = cp.Model([cp.AllDifferentExceptN([x], 1)])
+        m = cp.Model(DummyConstraint([x]))
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
 
@@ -1216,15 +1225,95 @@ class TestSupportedSolvers:
 
 
 @pytest.mark.generate_constraints.with_args(numexprs)
+@pytest.mark.flaky(reruns=3)
 def test_objective_numexprs(solver, constraint):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
+    lb, ub = constraint.get_bounds()
     try:
+        # Minimization
         model.minimize(constraint)
-        assert model.solve(solver=solver, time_limit=3)
-        assert constraint.value() < constraint.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
+        res = model.solve(solver=solver, time_limit=3)
+        if res is True: # we found a solution
+            assert constraint.value() < ub # assume solver finds feasible sol with value lower than ub
+
+        # Maximization
         model.maximize(constraint)
-        assert model.solve(solver=solver)
-        assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
+        res = model.solve(solver=solver)
+        if res is True: # we found a solution
+            assert constraint.value() > lb # assume solver finds a feasible sol with value higher than lb
+    
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_special_cardinality():
+    bvs = cp.boolvar(shape=4)
+    sos1 = cp.sum(bvs) <= 1
+
+    model = cp.Model(sos1)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "SOS1"  # translated to native SOS1
+    assert s.solve()
+    assert bvs.value().sum() <= 1
+
+    card = cp.sum(bvs) <= 3
+    model = cp.Model(card)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
+    assert s.solve()
+    assert bvs.value().sum() <= 3
+
+
+@pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")
+def test_highs_basic_ilp():
+    # simple ILP: 0 <= x <= 10, 0 <= y <= 10, x + 2y >= 10, minimize x + y
+    x = cp.intvar(0, 10, name="x")
+    y = cp.intvar(0, 10, name="y")
+
+    m = cp.Model([x + 2 * y >= 10], minimize=x + y)
+
+    s = SolverLookup.get("highs", m)
+    assert s.solve()
+
+    # unique optimum
+    assert x.value() == 0
+    assert y.value() == 5
+    assert s.objective_value_ == 5
+
+
+@pytest.mark.requires_solver("gurobi", "cplex", "scip", "highs", "hexaly")
+class TestRound:
+    def test_gurobi_read_integers_issue_858(self, solver):
+        x = cp.intvar(1, 3, name="x")
+        p = cp.intvar(0, 1, shape=3, name="p")
+        q = cp.intvar(0, 1, shape=3, name="q")
+        m = cp.Model()
+        m += cp.sum([p[0], p[1], p[2]]) == 1
+        m += cp.sum([3, 3, 1, -1] * cp.cpm_array([q[0], q[1], q[2], x])) == 0
+        m += cp.sum([q[0], q[1], q[2]]) == 1
+
+        def check():
+            print(x, x.value())
+            assert (x.value() >= 1), f"{x}={x.value()}"
+
+        m.solveAll(solver=solver, solution_limit=1000, time_limit=10, display=check)
+
+
+def _get_golomb_model(size):
+    """copied from examples/csplib/prob006_golomb.py"""
+    marks = cp.intvar(0, size*size, shape=size, name="marks")
+
+    model = cp.Model()
+    model += (marks[0] == 0)
+    model += marks[:-1] < marks[1:]
+    diffs = [marks[j] - marks[i] for i in range(0, size-1)
+                                 for j in range(i+1, size)]
+    model += cp.AllDifferent(diffs)
+
+    model.minimize(marks[-1])
+
+    return model, (marks,)

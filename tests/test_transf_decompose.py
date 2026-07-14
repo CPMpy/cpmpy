@@ -1,10 +1,11 @@
-import unittest
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import flatlist
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
+from cpmpy.transformations.linearize import decompose_linear
 
 
 class TestTransfDecomp:
@@ -18,37 +19,37 @@ class TestTransfDecomp:
         bv = cp.boolvar(name="bv")
 
         cons = [cp.AllDifferent(ivs)]
-        assert str(decompose_in_tree(cons)) == "[and([(x) != (y), (x) != (z), (y) != (z)])]"
+        assert str(decompose_in_tree(cons)) == "[(x) != (y), (x) != (z), (y) != (z)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == str(cons)
 
         # reified
         cons = [bv.implies(cp.AllDifferent(ivs))]
         assert str(decompose_in_tree(cons)) == \
-                         "[(bv) -> (and([(x) != (y), (x) != (z), (y) != (z)]))]"
+                         "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
-                         "[(bv) -> (and([(x) != (y), (x) != (z), (y) != (z)]))]"
+                         "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"}, supported_reified={"alldifferent"})) ==str(cons)
 
         cons = [cp.AllDifferent(ivs).implies(bv)]
         assert str(decompose_in_tree(cons)) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) -> (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) -> (bv)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) -> (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) -> (bv)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"}, supported_reified={"alldifferent"})) == \
                          str(cons)
 
         cons = [cp.AllDifferent(ivs) == (bv)]
         assert str(decompose_in_tree(cons)) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) == (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) == (bv)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) == (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) == (bv)]"
         assert str(decompose_in_tree(cons, supported_reified={"alldifferent"})) == \
                          str(cons)
 
         # tricky one
         cons = [cp.AllDifferent(ivs) < (bv)]
         assert str(decompose_in_tree(cons)) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) < (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) < (bv)]"
 
     def test_decompose_num(self):
 
@@ -80,20 +81,23 @@ class TestTransfDecomp:
         ivs = [cp.intvar(1,9,name=n) for n in "xyz"]
 
         cons = [cp.AllDifferent(ivs) == 0]
-        assert set(map(str,decompose_in_tree(cons))) == {"not([and([(x) != (y), (x) != (z), (y) != (z)])])"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [0 == cp.AllDifferent(ivs)]
-        assert set(map(str,decompose_in_tree(cons))) == {"not([and([(x) != (y), (x) != (z), (y) != (z)])])"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [cp.AllDifferent(ivs) == cp.AllEqual(ivs[:-1])]
-        assert set(map(str,decompose_in_tree(cons))) == {"(and([(x) != (y), (x) != (z), (y) != (z)])) == ((x) == (y))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"(and((x) != (y), (x) != (z), (y) != (z))) == ((x) == (y))"}
+
+        cons = [(ivs[0] == 0) | ~cp.AllDifferent(ivs)]
+        assert set(map(str,decompose_in_tree(cons))) == {"(x == 0) or (or((x) == (y), (x) == (z), (y) == (z)))"}
 
         cons = [cp.min(ivs) == cp.max(ivs)]
         assert set(map(str,decompose_in_tree(cons, supported={"min"}))) == \
-                            {"(min(x,y,z)) == (IV0)", "or([(IV0) <= (x), (IV0) <= (y), (IV0) <= (z)])", "(IV0) >= (x)", "(IV0) >= (y)", "(IV0) >= (z)"}
+                         {"(min(x,y,z)) == (IV0)", "or((IV0) <= (x), (IV0) <= (y), (IV0) <= (z))", "(IV0) >= (x)", "(IV0) >= (y)", "(IV0) >= (z)"}
 
         assert set(map(str,decompose_in_tree(cons, supported={"max"}))) == \
-                         {"(IV1) == (max(x,y,z))", "or([(IV1) >= (x), (IV1) >= (y), (IV1) >= (z)])", "(IV1) <= (x)", "(IV1) <= (y)", "(IV1) <= (z)"}
+                         {"(IV1) == (max(x,y,z))", "or((IV1) >= (x), (IV1) >= (y), (IV1) >= (z))", "(IV1) <= (x)", "(IV1) <= (y)", "(IV1) <= (z)"}
 
         # numerical in non-comparison context
         cons = [cp.AllEqual([cp.min(ivs[:-1]),ivs[-1]])]
@@ -103,13 +107,22 @@ class TestTransfDecomp:
         assert str(decompose_in_tree(cons, supported={"min"})) == \
                          "[(min(x,y)) == (z)]"
 
+    def test_decompose_allequal_reified(self):
+        # nested AllEqual decomposition can leave not(...) (e.g. False == (a|b)); must be pushed down
+        a, b = cp.boolvar(2, name=("a", "b"))
+        bv = cp.boolvar(name="bv")
+
+        cons = [bv.implies(cp.AllEqual(a, b, False, a | b))]
+        assert str(decompose_in_tree(cons)) == \
+            "[(bv) -> (and((a) == (b), ~b, (~a) and (~b)))]"
+
 
     def test_globals_in_decomp(self):
 
         class MyGlobal1(GlobalConstraint):
 
             def __init__(self, arr):
-                super().__init__("myglobal1", flatlist(arr))
+                super().__init__("myglobal1", tuple(flatlist(arr)))
 
             def decompose(self):
                 return ([MyGlobalFunc(self.args)+5 <= 0, cp.max(self.args) == 1],
@@ -118,7 +131,7 @@ class TestTransfDecomp:
         class MyGlobalFunc(GlobalFunction):
 
             def __init__(self, arr):
-                super().__init__("myglobalfunc", flatlist(arr))
+                super().__init__("myglobalfunc", tuple(flatlist(arr)))
 
             def decompose(self):
                 return cp.sum(self.args), [self.args[0] != 0]
@@ -126,7 +139,7 @@ class TestTransfDecomp:
         class MyGlobal2(GlobalConstraint):
 
             def __init__(self, arr):
-                super().__init__("myglobal2", flatlist(arr))
+                super().__init__("myglobal2", tuple(flatlist(arr)))
             def decompose(self):
                 return [cp.sum(self.args) >= 3], []
 
@@ -136,13 +149,16 @@ class TestTransfDecomp:
 
         cons = MyGlobal1([x])
         assert set(map(str,decompose_in_tree([cons], supported={"myglobalfunc","max"}))) == \
-                            {'((myglobalfunc(x[0],x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
+                            {'(myglobalfunc(x[0],x[1])) + 5 <= 0',
+                             'max(x[0],x[1]) == 1',
                              '(x[0]) + (x[1]) >= 3'}
 
         # decompose all
         assert set(map(str, decompose_in_tree([cons], supported={"max"}))) == \
-                            {'(((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
-                             '(x[0]) + (x[1]) >= 3','x[0] != 0'}
+                            {'((x[0]) + (x[1])) + 5 <= 0',
+                             'max(x[0],x[1]) == 1',
+                             '(x[0]) + (x[1]) >= 3',
+                             'x[0] != 0'}
 
         # nested case
         bv = cp.boolvar(name="bv")
@@ -154,6 +170,220 @@ class TestTransfDecomp:
 
         assert set(map(str, decompose_in_tree([cons], supported={"max"}))) == \
                             {'(bv) == ((((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1))',
-                             '(x[0]) + (x[1]) >= 3', 'x[0] != 0'}
+                             '(x[0]) + (x[1]) >= 3',
+                             'x[0] != 0'}
 
 
+    def test_decompose_linear(self):
+
+        x = cp.intvar(1,3, shape=2, name=("a","b"))
+        bv = cp.boolvar(name="bv")
+
+        cons = cp.AllDifferent(x)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'(a == 1) + (b == 1) <= 1',
+                             '(a == 2) + (b == 2) <= 1',
+                             '(a == 3) + (b == 3) <= 1'}
+        # second call gives same result (no ivarmap state)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'(a == 1) + (b == 1) <= 1',
+                             '(a == 2) + (b == 2) <= 1',
+                             '(a == 3) + (b == 3) <= 1'}
+
+        # nested
+        cons = bv == cp.AllDifferent(x)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"(bv) == (and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1))"}
+
+        # test nvalue
+        cons = cp.NValue(x) == 8
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"sum((a == 1) or (b == 1), (a == 2) or (b == 2), (a == 3) or (b == 3)) == 8"}
+
+        # test element
+        cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3)
+
+        # supported="mdd", to avoid recursive decomposition
+        cons = cp.Table(x, [[1, 1], [2, 3]])
+        my_mdd = cp.MDD(x, [(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)]) # ground truth MDD to which the table should be decomposed
+        decomp = decompose_linear([cons], supported={"mdd"})
+
+        assert len(decomp) == 1
+        assert isinstance(decomp[0], cp.MDD)
+        # need more thorough test, order of transitions is not fixed
+        arr = decomp[0].args[0]
+        decomp_transitions = [(id1, v, id2) for id1, tf in decomp[0].mapping.items() for v, id2 in tf.items()]
+        my_transitions = [(id1, v, id2) for id1, tf in my_mdd.mapping.items() for v, id2 in tf.items()]
+        assert str(arr) == str(my_mdd.args[0])
+        assert set(decomp_transitions) == set(my_transitions)
+
+        # test count
+        cons = cp.Count(x, 2) >= 1
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'(a == 2) + (b == 2) >= 1'}
+
+    def test_decompose_positive(self):
+
+        # make a custom global constraint to test specialized decompose
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+            
+            def decompose(self):
+                return [cp.sum(self.args) == 1], [self.args[0] == 1] # some random defining constraint
+            def decompose_positive(self):
+                return [cp.sum(self.args) >= 1], [self.args[0] == 1] # some random defining constraint
+
+        a,b,c = cp.intvar(0,10,shape=3, name=("a","b","c"))
+        bv = cp.boolvar(name="bv")
+        cons = MyCustomGlobal([a,b,c])
+
+        assert set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) >= 1", "a == 1"} # decomposed at toplevel
+        assert set(map(str, decompose_in_tree([~cons]))) == {"sum(a, b, c) != 1", "a == 1"} # pushed down negation into standard decomp
+        assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c) >= 1)", "a == 1"} # decompose positive
+        assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
+        assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
+
+
+
+
+    def test_decompose_custom(self):
+
+        # make a custom global constraint to test custom decompose
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+
+            def decompose(self):
+                return [cp.sum(self.args) == 1], []
+
+        a, b, c = cp.intvar(0, 10, shape=3, name=("a", "b", "c"))
+        bv = cp.boolvar(name="bv")
+        cons = MyCustomGlobal([a, b, c])
+
+        decompose_custom_positive = {"mycustomglobal": lambda x: ([cp.sum(x.args) == 5], [])}
+        decompose_custom = {"mycustomglobal": lambda x: ([cp.sum(x.args) == 3], [])}
+        # In positive context, custom positive decompose takes precedence over both custom decompose and standard decompose
+        assert (set(map(str, decompose_in_tree([cons],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"sum(a, b, c) == 5"})
+        assert (set(map(str, decompose_in_tree([bv.implies(cons)],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) -> (sum(a, b, c) == 5)"})
+        # In positive context, custom decompose takes precedence over standard decompose if no custom positive decomposition is provided
+        assert (set(map(str, decompose_in_tree([cons],
+                                               decompose_custom=decompose_custom)))
+                == {"sum(a, b, c) == 3"})
+        assert (set(map(str, decompose_in_tree([bv.implies(cons)],
+                                               decompose_custom=decompose_custom)))
+                == {"(bv) -> (sum(a, b, c) == 3)"})
+
+        # In non-positive context, custom positive decompose is disregarded
+        assert (set(map(str, decompose_in_tree([bv == cons],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) == (sum(a, b, c) == 3)"})
+        assert (set(map(str, decompose_in_tree([bv == cons],
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) == (sum(a, b, c) == 1)"})
+
+        # Standard decomposition is called if no custom decomposition is provided
+        assert (set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) == 1"})
+
+
+    def test_issue_546(self):
+        # https://github.com/CPMpy/cpmpy/issues/546
+        x = cp.intvar(1,3,shape=2, name=tuple("ab"))
+        arr = x.tolist() + [2]
+
+        cons = cp.AllDifferent(arr)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'sum(a == 1, b == 1, False) <= 1',
+                             'sum(a == 2, b == 2, True) <= 1',
+                             'sum(a == 3, b == 3, False) <= 1'}
+
+        # also test full transformation stack
+        if "gurobi" in cp.SolverLookup.solvernames():  # otherwise, not supported
+            model = cp.Model(cons)
+            model.solve(solver="gurobi")
+
+        if "exact" in cp.SolverLookup.solvernames():  # otherwise, not supported
+            model = cp.Model(cons)
+            model.solve(solver="exact")
+
+
+    # edge cases find by fuzztesting
+    def test_repeated_nested_global(self):
+        a,b = cp.intvar(0,10, shape=2, name=tuple("ab"))
+        cons = cp.AllDifferent(a,b)
+
+        constraints = [cons, ~cons | cons]
+        decomposed = decompose_in_tree(constraints)
+        assert set(map(str, decomposed)) == {
+            "(a) != (b)", # decomposition of the first constraint
+            "((a) == (b)) or ((a) != (b))", # decomposition of the second constraint
+        }
+    
+    def test_all_equal_exceptn_nested_boolexpr_with_negated_reuse(self):
+        a, b = cp.boolvar(2, name=("a", "b"))
+        constr = cp.AllEqualExceptN([a, b, False, a | b], 4)
+        assert cp.Model([constr, (~constr) | constr]).solve(solver="ortools")
+
+    def test_single_expr_in_decomp_reused(self):
+
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+
+            def decompose(self):
+                return [cp.sum(self.args) == 1], []
+
+        x = cp.intvar(0, 10, shape=3, name="x")
+        cons = MyCustomGlobal(x)
+
+        decomposed = decompose_in_tree([cons, ~cons | cons], csemap=CSEMap())
+        assert set(map(str, decomposed)) == {
+            "sum(x[0], x[1], x[2]) == 1",
+            "(sum(x[0], x[1], x[2]) != 1) or (sum(x[0], x[1], x[2]) == 1)",
+        }
+
+        decomposed = decompose_in_tree([~cons | cons, cons], csemap=CSEMap())
+        assert set(map(str, decomposed)) == {
+            "sum(x[0], x[1], x[2]) == 1",
+            "(sum(x[0], x[1], x[2]) != 1) or (sum(x[0], x[1], x[2]) == 1)",
+        }
+    
+    def test_global_custom_toplevel_repeated(self):
+
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+
+            def decompose(self):
+                return [cp.sum(self.args) == 1], []
+            
+            def decompose_positive(self):
+                return [cp.sum(self.args) == 5], [] # something else to distinguish output
+
+        x = cp.intvar(0, 10, shape=3, name="x")
+        cons = MyCustomGlobal(x)
+
+        decomposed = decompose_in_tree([cons, ~cons], csemap=CSEMap())
+        assert set(map(str, decomposed)) == {
+            "sum(x[0], x[1], x[2]) == 5", # positive decompose
+            "sum(x[0], x[1], x[2]) != 1", # negative decompose (don't use positive-only one)
+        }
+    
+    def test_decompose_empty_nested_alldifferent(self):
+        # Fuzz-test regression: a single-variable AllDifferent is trivially true.
+        x = cp.intvar(0, 10, name="x")
+        cons = [cp.any([cp.AllDifferent(x), cp.AllDifferent(x)])]
+
+        decomposed = decompose_in_tree(cons)
+        assert str(decomposed) == "[(boolval(True)) or (boolval(True))]"
+
+        assert cp.Model(cons).solve(solver="ortools")

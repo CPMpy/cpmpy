@@ -8,7 +8,7 @@
 
     .. note::
         [GUIDELINE] Replace <TEMPLATE> by the solver's name, and implement the missing pieces
-        The functions are ordered in a way that could be convenient to 
+        The functions are ordered in a way that could be convenient to
         start from the top and continue in that order.
 
     .. note::
@@ -30,7 +30,7 @@
     Requires that the 'TEMPLATEpy' python package is installed:
 
     .. code-block:: console
-    
+
         $ pip install TEMPLATEpy
 
     See detailed installation instructions at:
@@ -50,12 +50,13 @@
 
 from typing import Optional
 import warnings
+
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, is_boolexpr
+from ..expressions.utils import is_num, is_int, is_any_list, is_boolexpr, argvals
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
@@ -64,6 +65,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.safening import safen_objective
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 
 
 class CPM_template(SolverInterface):
@@ -79,7 +81,7 @@ class CPM_template(SolverInterface):
 
     # [GUIDELINE] list all supported global constraints and global functions
     #           (e.g., 'alldifferent', 'max', 'element', ...)
-    supported_global_constraints = frozenset({'alldifferent', 'max', 'element'})
+    supported_global_constraints = frozenset({'alldifferent', 'max', 'element', 'div'})
     # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
     #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
@@ -98,8 +100,6 @@ class CPM_template(SolverInterface):
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
             return False
-        except Exception as e:
-            raise e
 
     @classmethod
     def version(cls) -> Optional[str]:
@@ -111,7 +111,7 @@ class CPM_template(SolverInterface):
             return version('TEMPLATEpy')
         except PackageNotFoundError:
             return None
-        
+
     # [GUIDELINE] If your solver supports different subsolvers, implement below method to return a list of subsolver names
     @staticmethod
     def solvernames(installed:bool=True):
@@ -120,7 +120,7 @@ class CPM_template(SolverInterface):
 
             Arguments:
                 installed (boolean): whether to filter the solvernames to those installed on your system (default True)
-               
+
             Returns:
                 list of solver names
         """
@@ -144,7 +144,7 @@ class CPM_template(SolverInterface):
             subsolver (str): name of the subsolver
 
         Returns:
-            Version number of the subsolver if installed, else None 
+            Version number of the subsolver if installed, else None
         """
         # return version of requested subsolver (if installed)
         # if requested subsolver does not exist, raise ValueError
@@ -159,7 +159,7 @@ class CPM_template(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'cpmpy[TEMPLATE]' to use this solver interface.")   
+            raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'cpmpy[TEMPLATE]' to use this solver interface.")
 
         import TEMPLATEpy
 
@@ -184,12 +184,16 @@ class CPM_template(SolverInterface):
         """
         return self.TPL_model
 
-    def solve(self, time_limit:Optional[float]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the TEMPLATE solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - display:     generic solution callback for use during optimization.
+                           either a list of CPMpy expressions, OR a callback function which
+                           gets called after the variable-value mapping of the intermediate solution.
+                           default/None: nothing is displayed
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -207,6 +211,20 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
         #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
         #       then translate assumptions here; assumptions are a list of Boolean variables or NegBoolViews
+
+        # [GUIDELINE] if your solver supports callbacks when a solution is found (during optimization), convert callback here
+        if display is not None:
+            _cpm_vars = get_variables(display) if isinstance(display, Expression) or is_any_list(display) else list(self.user_vars)
+            _tpl_vars = self.solver_vars(_cpm_vars)
+
+            def callback():
+                # first update values of current solution
+                for cpm_var, tpl_var in zip(_cpm_vars, _tpl_vars):
+                    cpm_var._value = self.TPL_solver.value(tpl_var)
+                    raise NotImplementedError("TEMPLATE: back-translating the solution values")
+                self.print_display(display)
+
+            self.TPL_solver.set_solution_callback(callback)
 
         # call the solver, with parameters
         my_status = self.TPL_solver.solve(**kwargs)
@@ -247,6 +265,7 @@ class CPM_template(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
+                # [GUIDELINE] for ILP-solvers, ensure the value is integer and use `round()`
                 cpm_var._value = self.TPL_solver.value(sol_var)
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
@@ -265,30 +284,31 @@ class CPM_template(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    revar = TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
+                else:
+                    revar = TEMPLATEpy.NewBoolVar(name)
+            else:
+                revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, name)
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # [GUIDELINE] some solver interfaces explicitely create variables on a solver object
-        #       then use self.TPL_solver.NewBoolVar(...) instead of TEMPLATEpy.NewBoolVar(...)
-
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     # [GUIDELINE] if TEMPLATE does not support objective functions, you can delete this function definition
@@ -311,8 +331,9 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] solvers typically can not handle partial functions (e.g. element, div, mod)
         #             this transformation makes all partial functions total following the relational semantics
         obj, safe_cons = safen_objective(expr)
+        obj = push_down_negation_objective(obj)
         # [GUIDELINE] all unsupported global functions and (reified) global constraints are decomposed here
-        obj, decomp_cons = decompose_objective(expr,
+        obj, decomp_cons = decompose_objective(obj,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
@@ -369,7 +390,7 @@ class CPM_template(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -378,15 +399,18 @@ class CPM_template(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)  # to also safen at toplevel, add: `, safen_toplevel={"element", "div", "mod"})`
+        cpm_cons = no_partial_functions(cpm_cons) # if the solver requires supported partial function globals to be safened, use the follwing instead:
+        # cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"element", "nd_element", "div", "mod"}))        
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -398,7 +422,7 @@ class CPM_template(SolverInterface):
         # ...
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_template":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -411,27 +435,28 @@ class CPM_template(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
+        for con in self.transform(cpm_expr):
 
-            if isinstance(cpm_expr, _BoolVarImpl):
+            if isinstance(con, _BoolVarImpl):
                 # base case, just var or ~var
-                self.TPL_solver.add_clause([ self.solver_var(cpm_expr) ])
+                self.TPL_solver.add_clause([ self.solver_var(con) ])
 
-            elif isinstance(cpm_expr, Operator):
-                if cpm_expr.name == "or":
-                    self.TPL_solver.add_clause(self.solver_vars(cpm_expr.args))
-                elif cpm_expr.name == "->": # half-reification
-                    bv, subexpr = cpm_expr.args
+            elif isinstance(con, Operator):
+                if con.name == "or":
+                    self.TPL_solver.add_clause(self.solver_vars(con.args))
+                elif con.name == "->": # half-reification
+                    bv, subexpr = con.args
                     # [GUIDELINE] example code for a half-reified sum/wsum comparison e.g. BV -> sum(IVs) >= 5
                     if isinstance(subexpr, Comparison):
                         lhs, rhs = subexpr.args
@@ -444,14 +469,14 @@ class CPM_template(SolverInterface):
                     else:
                         raise NotImplementedError("TEMPLATE: no support for half-reified constraint:", subexpr)
 
-            elif isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
+            elif isinstance(con, Comparison):
+                lhs, rhs = con.args
 
                 # [GUIDELINE] == is used for both double reification and numerical comparisons
                 #       need case by case analysis here. Note that if your solver does not support full-reification,
                 #       you can rely on the transformation only_implies to convert all reifications to half-reification
                 #       for more information, please reach out on github!
-                if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
+                if con.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
                     bv, subexpr = lhs, rhs
                     assert isinstance(lhs, _BoolVarImpl), "lhs of reification should be var because of only_bv_reifies"
 
@@ -469,9 +494,9 @@ class CPM_template(SolverInterface):
                 # otherwise, numerical comparisons
                 if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
                     TPL_lhs = self._make_numexpr(lhs)
-                    self.TPL_solver.add_comparison(TPL_lhs, cpm_expr.name, self.solver_var(rhs))
+                    self.TPL_solver.add_comparison(TPL_lhs, con.name, self.solver_var(rhs))
                 # global functions
-                elif cpm_expr.name == "==":
+                elif con.name == "==":
                     TPL_rhs = self.solver_var(rhs)
                     if lhs.name == "max":
                         self.TPL_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
@@ -480,15 +505,15 @@ class CPM_template(SolverInterface):
                         self.TPL_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
                     # elif...
                     else:
-                        raise NotImplementedError("TEMPLATE: unknown equality constraint:", cpm_expr)
+                        raise NotImplementedError("TEMPLATE: unknown equality constraint:", con)
                 else:
-                    raise NotImplementedError("TEMPLATE: unknown comparison constraint", cpm_expr)
+                    raise NotImplementedError("TEMPLATE: unknown comparison constraint", con)
 
             # global constraints
-            elif cpm_expr.name == "alldifferent":
-                self.TPL_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
+            elif con.name == "alldifferent":
+                self.TPL_solver.add_alldifferent(self.solver_vars(con.args))
             else:
-                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_expr)
+                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", con)
 
         return self
     __add__ = add  # avoid redirect in superclass
@@ -556,9 +581,10 @@ class CPM_template(SolverInterface):
             if display is not None:
                 if isinstance(display, Expression):
                     print(display.value())
-                elif isinstance(display, list):
-                    print([v.value() for v in display])
+                elif is_any_list(display):
+                    print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
         # clear user vars if no solution found

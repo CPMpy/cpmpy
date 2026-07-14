@@ -40,7 +40,7 @@ Install simply with `pip install cpmpy`
 CPMpy can translate to a wide variety of constraint solving paradigms, including both commercial and open-source solvers.
 
 * **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, Pumpkin, MiniZinc+solvers
-* **ILP Solvers**: Gurobi (license required), CPLEX (license required)
+* **ILP Solvers**: SCIP, HiGHS, Gurobi (license required), CPLEX (license required)
 * **GO Solvers**: Hexaly (license required)
 * **SMT Solvers**: Z3
 * **PB Solvers**: Exact
@@ -49,10 +49,10 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
 
-An example that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
+An [example](https://github.com/CPMpy/cpmpy/blob/master/examples/flexible_jobshop.py) that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
 
 ```python
-# Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
+# Parallel machine scheduling: a set of jobs must be scheduled, each can be run on compatible machines,
 # with different duration and energy consumption. Minimize makespan and total energy consumption
 import cpmpy as cp
 import pandas as pd
@@ -65,43 +65,41 @@ num_machines = 3
 data = [[jobid, machid, random.randint(2, 8), random.randint(5, 15)]
         for jobid in range(num_jobs) for machid in range(num_machines)]
 df_data = pd.DataFrame(data, columns=['job_id', 'machine_id', 'duration', 'energy'])
+num_compatible = len(df_data)
 
-# Compute maximal horizon (crude upper bound) and number of alternatives
-horizon = df_data.groupby('job_id')['duration'].max().sum()
-num_alternatives = len(df_data.index)
-assert list(df_data.index) == list(range(num_alternatives)), "Index must be default integer (0,1,..)"
+# Compute maximal horizon (sum of longest duration per job)
+horizon = df_data.groupby("job_id")["duration"].max().sum()
 
+# Decision `start[j]`: integer start time for each job `j`
+start = cp.intvar(0, horizon, shape=num_jobs, name="start")
+# Decision `end[j]`: integer end time for each job `j`
+end = cp.intvar(0, horizon, shape=num_jobs, name="end")
+# Decision `active[c]`: Per compatible job/machine combination `c`, Boolean indicating if it is used
+active = cp.boolvar(shape=num_compatible, name="active")
 
-# --- Decision variables ---
-start = cp.intvar(0, horizon, name="start", shape=num_alternatives)
-end   = cp.intvar(0, horizon, name="end", shape=num_alternatives)
-active = cp.boolvar(name="active", shape=num_alternatives)
-
-# --- Constraints ---
 model = cp.Model()
 
-# Each job must have one active alternative
-for job_id, group in df_data.groupby('job_id'):
-    model += (cp.sum(active[group.index]) == 1)
+# Mandatory jobs: each job must be assigned to exactly one compatible machine
+for _, job_rows in df_data.groupby("job_id"):
+    model += cp.sum(active[job_rows.index]) == 1
 
-# For all jobs ensure start + dur = end (also for inactives, thats OK)
-model += (start + df_data['duration'] == end)
+# Machine capacity: each machine can only process one job at a time
+# also enforces Matching duration: the end time of a job is the start time + the duration on its assigned machine
+for _, mach_rows in df_data.groupby("machine_id", sort=True):
+    model += cp.NoOverlapOptional(
+        start = start[mach_rows["job_id"]],
+        end = end[mach_rows["job_id"]],
+        duration = mach_rows["duration"].values,
+        is_present = active[mach_rows.index],
+    )
 
-# No two active alternatives on the same machine may overlap; (ab)use cumulative with 'active' as demand.
-for mach_id, group in df_data.groupby('machine_id'):
-    sel = group.index
-    model += cp.Cumulative(start[sel], group['duration'].values, end[sel], active[sel], capacity=1)
+# Metric Makespan: end time of the latest job
+makespan = cp.max(end)
 
-# --- Objectives ---
-# Makespan: max over all active alternatives
-makespan = cp.intvar(0, horizon, name="makespan")
-for i in range(num_alternatives):
-    model += active[i].implies(makespan >= end[i])  # end times of actives determines makespan
+# Metric Total energy: total energy consumed by the machines
+total_energy = cp.sum(active * df_data["energy"])
 
-# Total energy consumption
-total_energy = cp.sum(df_data['energy'] * active)
-
-# Minimize makespan first, then total energy
+# Objective: minimize makespan, and to a lesser extend also total energy consumption
 model.minimize(100 * makespan + total_energy)
 
 
@@ -113,8 +111,9 @@ if model.solve():
     # Visualize with Plotly's excellent Gantt chart support
     import plotly.express as px
     df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
-    df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
-    df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
+    df_solution["start"] = pd.to_datetime(start.value(), unit="m")
+    df_solution["end"] = pd.to_datetime(end.value(), unit="m")
+    import plotly.io as pio; pio.renderers.default = "browser"
     px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
     print("No solution found.")
@@ -168,4 +167,4 @@ You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language co
 }
 ```
 
-If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to collaborations and contract research.
+If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to [collaborations and contract research](https://cpmpy.cs.kuleuven.be).

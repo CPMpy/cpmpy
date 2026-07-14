@@ -47,7 +47,7 @@ import argparse
 import warnings
 import traceback
 import multiprocessing
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore[import-untyped]
 from pathlib import Path
 from typing import Optional, Tuple
 from io import StringIO
@@ -55,7 +55,7 @@ from datetime import datetime
 from filelock import FileLock
 from concurrent.futures import ThreadPoolExecutor
 
-from cpmpy.tools.xcsp3.dataset import XCSP3Dataset
+from cpmpy.tools.datasets.xcsp3 import XCSP3Dataset
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, init_signal_handlers, ExitStatus
 
 class Tee:
@@ -155,8 +155,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                   'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
                   'status', 'objective_value', 'solution', 'intermediate', 'checker_result']
     result = dict.fromkeys(fieldnames)  # init all fields to None
-    result['year'] = metadata['year']
-    result['track'] = metadata['track']
+    categories = metadata.get('categories', metadata)
+    result['year'] = categories['year']
+    result['track'] = categories['track']
     result['instance'] = metadata['name'] 
     result['solver'] = solver
 
@@ -177,14 +178,15 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
     process = ctx.Process(target=xcsp3_wrapper, args=(
                                                     child_conn, 
                                                       {
-                                                          "benchname": filename, 
-                                                          "solver": solver, 
-                                                          "time_limit": time_limit, 
-                                                          "mem_limit": mem_limit, 
-                                                          "intermediate": intermediate, 
+                                                          "benchname": filename,
+                                                          "solver": solver,
+                                                          "time_limit": time_limit,
+                                                          "mem_limit": mem_limit,
+                                                          "intermediate": intermediate,
                                                           "force_mem_limit": True,
                                                           "time_buffer": 1,
                                                           "cores": cores,
+                                                          "verbose": verbose,
                                                         }, 
                                                     verbose))
     process.start()
@@ -229,7 +231,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                 obj = int(line[2:].strip())
                 if result['intermediate'] is None:
                     result['intermediate'] = []
-                result['intermediate'] += [(sol_time, obj)]
+                result['intermediate'].append((sol_time, obj))
                 result['objective_value'] = obj
                 obj = None
             elif line.startswith('c Solution'):
@@ -256,7 +258,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
             status = line
 
         else:
-            raise()
+            raise TypeError(f"unexpected pipe message type {type(line).__name__}: {line!r}")
 
     # Parse the exit status
     if status["status"] == "error":
@@ -370,8 +372,6 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                 pass
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
-
-        raise()
     
     return output_file
 

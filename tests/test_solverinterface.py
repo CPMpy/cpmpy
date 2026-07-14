@@ -121,7 +121,29 @@ def test_solve_infeasible(solver):
 
     assert not solver.solve()
     assert solver.status().exitstatus == ExitStatus.UNSATISFIABLE
+    assert x.value() is None
+    assert y.value() is None
+    assert z.value() is None
+    
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_solve_infeasible_ivs(solver):
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
 
+    a = cp.intvar(1, 3, shape=1, name='a')
+
+    solver += ((a == 1) | (a == 3))
+    solver.solve()
+    
+    assert solver.solve()
+    assert solver.status().exitstatus == ExitStatus.FEASIBLE
+
+    solver += (a == 2)
+    
+    assert not solver.solve()
+    assert solver.status().exitstatus == ExitStatus.UNSATISFIABLE
+    assert a.value() is None
 
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
@@ -167,7 +189,8 @@ def test_maximize(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solver_var(solver):
     """Test basic solver_var functionality with different variable types"""
-    solver_class = SolverLookup.lookup(solver)
+    solver_name = solver
+    solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     
     # Test with boolean variable
@@ -187,10 +210,9 @@ def test_solver_var(solver):
     
     try:
         solver_bool = solver.solver_var(bool_var)
-        solver_neg_bool = solver.solver_var(neg_bool_var)
-        
-        # Both should return something
         assert solver_bool is not None
+
+        solver_neg_bool = solver.solver_var(neg_bool_var)
         assert solver_neg_bool is not None
     
     except (NotSupportedError, ValueError) as e: # TODO: fix consistency among solvers
@@ -200,8 +222,8 @@ def test_solver_var(solver):
 
     # Test with integer variable
 
-    # Skip pysdd as it doesn't support sum
-    if solver == "pysdd":
+    # SAT solvers encode integers to Booleans via int2bool, not via solver_var
+    if solver_name in ("pysat", "pindakaas", "rc2", "pysdd"):
         return
 
     # Test with integer variable
@@ -238,11 +260,6 @@ def test_solver_vars(solver):
     assert len(solver_nested) == 2
     assert len(solver_nested[0]) == 2
     assert len(solver_nested[1]) == 2
-    
-    # Test with single variable (should work too)
-    single_var = cp.boolvar(name="single")
-    solver_single = solver.solver_vars(single_var)
-    assert solver_single is not None
 
 
 @pytest.mark.usefixtures("solver")

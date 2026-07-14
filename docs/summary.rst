@@ -9,7 +9,7 @@ Model class
 ~~~~~~~~~~~
 
 - :meth:`model = cp.Model() <cpmpy.model.Model.__init__>` -- Create a :class:`Model <cpmpy.model.Model>`.
-- :meth:`model += constraint <cpmpy.model.Model.__add__>` -- Add a constraint (an :mod:`Expression <cpmpy.expressions>`) to the model.
+- :meth:`model.add(constraint) <cpmpy.model.Model.add>` -- Add a constraint (an :mod:`Expression <cpmpy.expressions>`) to the model, also allowed: model += constraint.
 - :meth:`model.maximize(obj) <cpmpy.model.Model.maximize>` or :meth:`model.minimize(obj) <cpmpy.model.Model.minimize>` -- Set the objective (an :mod:`Expression <cpmpy.expressions>`).
 - :meth:`model.solve() <cpmpy.model.Model.solve>` -- Solve the model with the default solver, returns True/False.
 - :meth:`model.solveAll() <cpmpy.model.Model.solveAll>` -- Solve and enumerate all solutions, returns number of solutions.
@@ -121,7 +121,7 @@ Guidelines and tips
 - Do not ``from cpmpy import *``, the implicit overloading of any/all and sum may break or slow down other libraries.
 - Explicitly use CPMpy versions of built-in functions (``cp.sum``, ``cp.all``, etc.).
 - Use global constraints/global functions where possible, some solvers will be much faster.
-- Stick to integer constants; floats and fractional numbers are not supported.
+- Stick to integer constants in constraints and model objectives (some solvers support FloatSum but its very limited)
 - For maintainability, use logical code organization and comments to explain your constraints.
 
 
@@ -139,10 +139,10 @@ Toy example
     # Constraints
     model = cp.Model()
 
-    model += (x[0] == 1)
-    model += cp.AllDifferent(x)
-    model += cp.Count(x, 9) == 1
-    model += b.implies(x[1] + x[2] > 5)
+    model.add(x[0] == 1)
+    model.add(cp.AllDifferent(x))
+    model.add(cp.Count(x, 9) == 1)
+    model.add(b.implies(x[1] + x[2] > 5))
 
     # Objective
     model.maximize(cp.sum(x) + 100 * b)

@@ -9,14 +9,14 @@ Lazy Clause Generation solvers, like OR-Tools, are built on SAT solvers and henc
 Since version 8.2, OR-Tools supports declaring assumptions, and extracting an unsat core. We also implement this functionality in CPMpy, using PySAT-like `s.solve(assumptions=[...])` and `s.get_core()`:
 
 ```python
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.solvers import CPM_ortools
 
-bv = boolvar(shape=3)
-iv = intvar(0,9, shape=3)
+bv = cp.boolvar(shape=3)
+iv = cp.intvar(0,9, shape=3)
 
 # circular 'bigger then', UNSAT
-m = Model(
+m = cp.Model(
     bv[0].implies(iv[0] > iv[1]),
     bv[1].implies(iv[1] > iv[2]),
     bv[2].implies(iv[2] > iv[0])

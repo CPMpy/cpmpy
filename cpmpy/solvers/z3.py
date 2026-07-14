@@ -24,7 +24,7 @@
     Requires that the 'z3-solver' python package is installed:
 
     .. code-block:: console
-    
+
         $ pip install z3-solver
 
     See detailed installation instructions at:
@@ -44,16 +44,18 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
-from typing import Optional, List
+from typing import Optional, Iterable
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
+from ..expressions.globalfunctions import GlobalFunction, FloatSum
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
@@ -65,7 +67,7 @@ class CPM_z3(SolverInterface):
     Interface to Z3's Python API.
 
     Creates the following attributes (see parent constructor for more):
-        
+
     - ``z3_solver``: object, z3's Solver() object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `z3` namespace and ``z3_solver.add()``'s the result.
@@ -77,7 +79,7 @@ class CPM_z3(SolverInterface):
         Terminology note: a 'model' for z3 is a solution!
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mod"})
+    supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mul", "mod"})
     supported_reified_global_constraints = supported_global_constraints
 
     @staticmethod
@@ -90,7 +92,7 @@ class CPM_z3(SolverInterface):
             return False
         except Exception as e:
             raise e
-        
+
     @classmethod
     def version(cls) -> Optional[str]:
         """
@@ -101,7 +103,7 @@ class CPM_z3(SolverInterface):
             return version('z3-solver')
         except PackageNotFoundError:
             return None
-        
+
     def __init__(self, cpm_model=None, subsolver="sat"):
         """
         Constructor of the native solver object
@@ -130,6 +132,7 @@ class CPM_z3(SolverInterface):
 
         # handle of objective (as returned by solver)
         self.obj_handle = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
@@ -142,13 +145,13 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
             Call the z3 solver
 
             Arguments:
                 time_limit (float, optional):       maximum solve time in seconds
-                assumptions:                        list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                assumptions:                        iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
                 **kwargs:                           any keyword argument, sets parameters of solver object
@@ -158,7 +161,7 @@ class CPM_z3(SolverInterface):
             - ... (no common examples yet)
 
             The full list doesn't seem to be documented online, you have to run its help() function:
-            
+
             .. code-block:: python
 
                 import z3
@@ -168,7 +171,7 @@ class CPM_z3(SolverInterface):
                 Warning! Some parameternames in z3 have a '.' in their name,
                 such as (arbitrarily chosen): ``sat.lookahead_simplify``
                 You have to construct a dictionary of keyword arguments upfront:
-                
+
                 .. code-block:: python
 
                     params = {"sat.lookahead_simplify": True}
@@ -186,12 +189,12 @@ class CPM_z3(SolverInterface):
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
-
-        if assumptions is None:
-            assumptions = []
-
-        z3_assum_vars = self.solver_vars(assumptions)
-        self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
+            z3_assum_vars = self.solver_vars(assumptions)
+            self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        else:
+            z3_assum_vars = []
 
 
         # call the solver, with parameters
@@ -252,12 +255,13 @@ class CPM_z3(SolverInterface):
                 elif isinstance(cpm_var, _NumVarImpl):
                     cpm_var._value = sol[sol_var].as_long()
 
-            # translate objective, for optimisation problems only
             if self.has_objective():
-                obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj).as_long() 
-                if not self._minimize:
-                    self.objective_value_ = -1*self.objective_value_ # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else:  # clear values of variables
             for cpm_var in self.user_vars:
@@ -270,40 +274,49 @@ class CPM_z3(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
         import z3
 
-        if is_num(cpm_var): # shortcut, eases posting constraints
-            return cpm_var
+        if isinstance(cpm_var, _NumVarImpl):
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return z3.Not(self.solver_var(cpm_var._bv))
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
 
-        # create if it does not exit
-        if cpm_var not in self._varmap:
-            # we assume al variables are user variables (because nested expressions)
-            self.user_vars.add(cpm_var)
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = z3.Bool(str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    revar = z3.Not(self.solver_var(cpm_var._bv))
+                else:
+                    revar = z3.Bool(str(cpm_var))
+
+            else:
                 revar = z3.Int(str(cpm_var))
                 # set bounds
                 self.z3_solver.add(revar >= cpm_var.lb)
                 self.z3_solver.add(revar <= cpm_var.ub)
-            else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[name] = revar
+            return revar
 
-        return self._varmap[cpm_var]
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
+
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def has_objective(self):
         import z3
         return isinstance(self.z3_solver, z3.Optimize) and len(self.z3_solver.objectives()) != 0
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -318,21 +331,29 @@ class CPM_z3(SolverInterface):
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
-        # save user variables
-        get_variables(expr, self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # update user variables
+            z3_obj = z3.Sum([w*v for w,v in zip(ws,self.solver_vars(vs))]) + const
+        else:
+            # save user variables
+            get_variables(expr, self.user_vars)
 
-        self.add(safe_cons + decomp_cons)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_objective(obj,
+                                                   supported=self.supported_global_constraints,
+                                                   supported_reified=self.supported_reified_global_constraints,
+                                                   csemap=self._csemap)
 
-        z3_obj = self._z3_expr(obj)
+            self.add(safe_cons + decomp_cons)
+            z3_obj = self._z3_expr(obj)
+
         if isinstance(z3_obj, z3.BoolRef):
             z3_obj = z3.If(z3_obj, 1, 0) # must be integer
+
         if minimize:
             self.obj_handle = self.z3_solver.minimize(z3_obj)
             self._minimize = True # record direction of optimisation
@@ -340,7 +361,7 @@ class CPM_z3(SolverInterface):
             self.obj_handle = self.z3_solver.maximize(z3_obj)
             self._minimize = False # record direction of optimisation
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -349,21 +370,22 @@ class CPM_z3(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"}))
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_z3":
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
@@ -376,10 +398,11 @@ class CPM_z3(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
         # all variables are user variables, handled in `solver_var()`
         # unless their constraint gets simplified away, so lets collect them anyway
@@ -499,6 +522,14 @@ class CPM_z3(SolverInterface):
                 x,y = self._z3_expr(cpm_con.args)
                 return z3.If(z3.And(x >= 0), x % y, -(-x % y))
 
+            elif cpm_con.name == "mul":
+                x, y = self._z3_expr(cpm_con.args)
+                if isinstance(x, z3.BoolRef):
+                    x = z3.If(x, 1, 0)
+                if isinstance(y, z3.BoolRef):
+                    y = z3.If(y, 1, 0)
+                return x * y
+
             elif cpm_con.name == "div":
                 # z3 rounds towards negative infinity, need this hack when result is negative
                 x,y = self._z3_expr(cpm_con.args)
@@ -561,6 +592,7 @@ class CPM_z3(SolverInterface):
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
+
 
 
 

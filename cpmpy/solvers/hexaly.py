@@ -36,6 +36,12 @@
         :nosignatures:
 
         CPM_hexaly
+
+    ==============
+    Module details
+    ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional, List
@@ -43,13 +49,15 @@ import time
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+from ..transformations.safening import no_partial_functions
 
 
 class CPM_hexaly(SolverInterface):
@@ -65,7 +73,7 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "div", "mod", "pow", "element"})
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
 
@@ -131,7 +139,7 @@ class CPM_hexaly(SolverInterface):
         self.hex_solver = HexalyOptimizer()
         self.hex_solver.param.verbosity = 0
         self.hex_model = self.hex_solver.model
-        self.is_satisfaction = True
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="hexaly", cpm_model=cpm_model)
@@ -140,13 +148,19 @@ class CPM_hexaly(SolverInterface):
     def native_model(self):
         return self.hex_model
 
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the Hexaly solver
 
             Arguments:
                 time_limit:  maximum solve time in seconds (float, optional)
-                kwargs:      any keyword argument, sets parameters of solver object
+                solution_callback:             Hexaly callback registered on ``TIME_TICKED``.
+                                               Takes precedence over ``display`` when both are set.
+                display:                       generic solution callback for use during optimization.
+                                               either a list of CPMpy expressions, OR a callback function which
+                                               gets called after the variable-value mapping of the intermediate solution.
+                                               default/None: nothing is displayed
+                kwargs:                        any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
 
@@ -167,18 +181,23 @@ class CPM_hexaly(SolverInterface):
                 raise ValueError(f"Time limit must be positive but was {time_limit}")
             self.hex_solver.param.time_limit = int(time_limit)  # hexaly does not support float time limit
 
+        # register solution callback
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+        elif display is not None:
+            callback = HexSolutionPrinter(self, display)
+        if callback is not None:
+            from hexaly.optimizer import HxCallbackType
+            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, callback)
+
         # set solver parameters
         for arg, val in kwargs.items():
             setattr(self.hex_solver.param, arg, val)
 
-        if self.is_satisfaction: # set dummy objective for satisfaction problems
+        if self.objective_ is None: # set dummy objective for satisfaction problems
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
-        # register solution callback
-        if solution_callback is not None:
-            from hexaly.optimizer import HxCallbackType
-            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
-        
         # new status, translate runtime
         self.hex_model.close() # model must be closed
         self.hex_solver.solve()
@@ -187,8 +206,8 @@ class CPM_hexaly(SolverInterface):
         self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
 
         # unregister solution callback
-        if solution_callback is not None:
-            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if callback is not None:
+            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, callback)
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
@@ -205,7 +224,7 @@ class CPM_hexaly(SolverInterface):
         elif self.hex_sol.status == HxSolutionStatus.FEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.hex_sol.status == HxSolutionStatus.OPTIMAL:
-            if self.is_satisfaction:
+            if self.objective_ is None:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else:
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
@@ -224,11 +243,15 @@ class CPM_hexaly(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = bool(self.hex_sol.get_value(sol_var))
                 else:
-                    cpm_var._value = int(self.hex_sol.get_value(sol_var))
+                    cpm_var._value = round(self.hex_sol.get_value(sol_var))
 
-            # translate objective, for optimisation problems only
-            if not self.is_satisfaction:
-                self.objective_value_ = self.hex_sol.get_objective_bound(0)
+            if self.has_objective():
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -237,7 +260,7 @@ class CPM_hexaly(SolverInterface):
         # now open model again, we might want to add new constraints after
         self.hex_model.open()
 
-        if self.is_satisfaction:
+        if self.objective_ is None:
             self.hex_model.remove_objective(0) # reset to not have any objectives
 
         return has_sol
@@ -247,32 +270,42 @@ class CPM_hexaly(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view, work directly on var inside the view
+                    revar = ~self.solver_var(cpm_var._bv)
+                else:
+                    revar = self.hex_model.bool()
+                    revar.set_name(name)
+            else:
+                revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
+                revar.set_name(name)
+            
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return ~self.solver_var(cpm_var._bv)
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.hex_model.bool()
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            # set name of variable
-            revar.set_name(str(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -284,32 +317,37 @@ class CPM_hexaly(SolverInterface):
         """
         from hexaly.optimizer import HxObjectiveDirection
 
-        # save user vars
-        get_variables(expr, collect=self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
-        self.add(decomp_cons)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
+            hex_obj = self.hex_model.sum(float(c) * self._hex_expr(t) for c, t in zip(ws, vs)) + const
+        else:
+            get_variables(expr, collect=self.user_vars)
+            obj, decomp_cons = decompose_objective(
+                expr,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            self.add(decomp_cons)
+            hex_obj = self._hex_expr(obj)
 
         # make objective function or variable and post
-        while self.has_objective(): # remove prev objective(s)
+        while self.hex_model.nb_objectives > 0: # remove prev objective(s)
             self.hex_model.remove_objective(0)
-        self.is_satisfaction = False
-        hex_obj = self._hex_expr(obj)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
         else:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MAXIMIZE)
 
     def has_objective(self):
-        return self.hex_model.nb_objectives > 0
+        return self.objective_ is not None
 
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -318,21 +356,22 @@ class CPM_hexaly(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        # no flattening, so also no safening required
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"nd_element"})
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hexaly":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -345,17 +384,18 @@ class CPM_hexaly(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            hex_expr = self._hex_expr(cpm_expr)
+        for con in self.transform(cpm_expr):
+            hex_expr = self._hex_expr(con)
             self.hex_model.add_constraint(hex_expr)
 
         return self
@@ -397,9 +437,6 @@ class CPM_hexaly(SolverInterface):
                 return a - b
             if cpm_expr.name == "-":
                 return -self._hex_expr(cpm_expr.args[0])
-            if cpm_expr.name == "mul":
-                a,b = self._hex_expr(cpm_expr.args)
-                return a * b
             raise ValueError(f"Unknown operator {cpm_expr}")
 
         elif isinstance(cpm_expr, Comparison):
@@ -421,6 +458,9 @@ class CPM_hexaly(SolverInterface):
                 return self.hex_model.at(hex_arr,idx)
             if cpm_expr.name == "abs":
                 return self.hex_model.abs(self._hex_expr(cpm_expr.args[0]))
+            if cpm_expr.name == "mul":
+                a, b = self._hex_expr(cpm_expr.args)
+                return a * b
             if cpm_expr.name == "min":
                 return self.hex_model.min(*self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "max":
@@ -471,7 +511,7 @@ class CPM_hexaly(SolverInterface):
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         from hexaly.optimizer import HxObjectiveDirection
-        if self.is_satisfaction: # set dummy objective, otherwise cannot close model
+        if self.objective_ is None: # set dummy objective, otherwise cannot close model
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         cpm_vars = flatlist(cpm_vars)
@@ -522,7 +562,7 @@ class HexSolutionPrinter:
                     default/None: nothing displayed
         solution_limit (default = None): stop after this many solutions 
     """
-    def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+    def __init__(self, solver:CPM_hexaly, display:Optional[Callback]=None, solution_limit:Optional[int]=None, verbose:bool=False):
         self.__last_best_value = None
         self.__solution_count = 0
 
@@ -531,7 +571,7 @@ class HexSolutionPrinter:
         self._display = display
         self._solution_limit = solution_limit
         self._verbose = verbose
-        if isinstance(display, (list,Expression)):
+        if isinstance(display, Expression) or is_any_list(display):
             self._cpm_vars = get_variables(display)
         elif callable(display):
             # might use any, so populate all (user) variables with their values
@@ -549,29 +589,23 @@ class HexSolutionPrinter:
                 hex_sol = optimizer.get_solution()
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            hex_var = self._solver.solver_var(cpm_subvar)
-                            cpm_subvar._value = int(hex_sol.get_value(hex_var))
-                    elif isinstance(cpm_var, _BoolVarImpl):
+                    if isinstance(cpm_var, _BoolVarImpl):
                         hex_var = self._solver.solver_var(cpm_var)
                         cpm_var._value = bool(hex_sol.get_value(hex_var))
-                    else:
+                    elif isinstance(cpm_var, _IntVarImpl):
                         hex_var = self._solver.solver_var(cpm_var)
-                        cpm_var._value = int(hex_sol.get_value(hex_var))
-                # populate objective value
+                        cpm_var._value = round(hex_sol.get_value(hex_var))
+                    else:
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
                 if self._solver.has_objective():
-                    self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
+                    assert self._solver.objective_ is not None
+                    val = self._solver.objective_.value()
+                    if val is not None and round(val) == val:
+                        self._solver.objective_value_ = int(val)
+                    else:  # FloatSum, float value must be read through FloatSum.value()
+                        self._solver.objective_value_ = None
 
-                # display
-                if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif isinstance(self._display, list):
-                    # explicit list of expressions to display
-                    print(argvals(self._display))
-                else: # callable
-                    self._display()
+                self._solver.print_display(self._display)
                 
             # update data
             self.__solution_count += 1

@@ -53,16 +53,12 @@
 import os
 
 from threading import Timer
+
 from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
-from ..transformations.decompose_global import decompose_objective
-from ..transformations.safening import safen_objective
 from ..exceptions import NotSupportedError
-from ..expressions.variables import _IntVarImpl, NegBoolView
-from ..transformations.linearize import only_positive_coefficients_
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_objective
-from ..transformations.int2bool import replace_int_user_vars, _encode_lin_expr
+from ..transformations.to_cnf import to_cnf_objective
 
 
 class CPM_rc2(CPM_pysat):
@@ -159,10 +155,7 @@ class CPM_rc2(CPM_pysat):
         from pysat.examples import rc2
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-
-        # the user vars should have all and only Booleans (e.g. to ensure solveAll behaves consistently)
-        self.user_vars = replace_int_user_vars(self.user_vars, self.ivarmap)
+        self.user_vars = self._int2bool_user_vars()
 
         if not self.has_objective():
             raise NotSupportedError("CPM_rc2: RC2 does not support solving decision problems. Add an objective to your problem.")
@@ -216,42 +209,16 @@ class CPM_rc2(CPM_pysat):
         # add new user vars to the set
         get_variables(expr, collect=self.user_vars)
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(
-            obj,
+        weights, xs, const, extra_cons = to_cnf_objective(
+            expr,
+            encoding=self.encoding,
+            csemap=self._csemap,
+            ivarmap=self.ivarmap,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap
         )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        self.add(safe_cons + decomp_cons + flat_cons)
-
-        weights, xs, const = [], [], 0
-        # we assume obj is a var, a sum or a wsum (over int and bool vars)
-        if isinstance(obj, _IntVarImpl) or isinstance(obj, NegBoolView):  # includes _BoolVarImpl
-            weights = [1]
-            xs = [obj]
-        elif obj.name == "sum":
-            xs = obj.args
-            weights = [1] * len(xs)
-        elif obj.name == "wsum":
-            weights, xs = obj.args
-        else:
-            raise NotImplementedError(f"CPM_rc2: Non supported objective {obj} (yet?)")
-
-        terms, cons, k = _encode_lin_expr(self.ivarmap, xs, weights, self.encoding)
-
-        self += cons
-        const += k
-
-        # remove terms with coefficient 0 (`only_positive_coefficients_` may return them and RC2 does not accept them)
-        terms = [(w, x) for w,x in terms if w != 0]  
-        ws, xs = zip(*terms)  # unzip
-        new_weights, new_xs, k = only_positive_coefficients_(ws, xs)
-        const += k
-
-        return list(new_weights), list(new_xs), const
+        self.add(extra_cons)
+        return weights, xs, const
 
 
     def objective(self, expr, minimize):

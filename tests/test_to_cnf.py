@@ -3,7 +3,8 @@ import itertools
 
 import cpmpy as cp
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
-from cpmpy.transformations.to_cnf import to_cnf, to_gcnf
+from cpmpy.transformations.to_cnf import to_cnf
+from cpmpy.transformations.to_gcnf import to_gcnf
 from cpmpy.transformations.get_variables import get_variables, get_variables_model
 from cpmpy.expressions.utils import argvals
 from cpmpy.solvers.pindakaas import CPM_pindakaas

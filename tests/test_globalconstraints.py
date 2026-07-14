@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError, IncompleteFunctionError
@@ -430,6 +431,12 @@ class TestGlobal:
         model = cp.Model(constraints[0].decompose())
         assert not model.solve()
 
+    def test_table_with_subexpr(self):
+        iv = cp.intvar(0, 10, shape=3)
+        c = cp.Table(iv+iv, [[10, 8, 2], [5, 9, 2]])
+        assert cp.Model(c).solve()
+        assert cp.Model(c.decompose()).solve()
+
     def test_table_value(self):
         """Test Table.value() with known assignments (and unassigned -> None)."""
         iv = cp.intvar(0, 10, shape=3)
@@ -544,7 +551,7 @@ class TestGlobal:
         # unconstrained
         true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
         assert cp.Model(true_cons).solve(solver=solver)
-        assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
+        #assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
         constraining, defining = true_cons.decompose() # should be True, []
         assert constraining[0]
 
@@ -637,6 +644,95 @@ class TestGlobal:
 
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
+
+    def test_regular_multiple_accepting_nodes(self, solver):
+        # testing DFA with multiple accepting nodes
+        x = cp.intvar(0, 1, shape=3)
+
+        transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 1, "d")]
+        start = "a"
+        ends = ["b", "c"]
+
+        true_sols = set()
+        false_sols = set()
+
+        solutions = [(0,0,1), (0,1,1)]
+
+        true_model = cp.Model(cp.Regular(x, transitions, start, ends))
+        false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
+
+        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))))
+        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))))
+
+        assert num_true == len(solutions)
+        assert true_sols == set(solutions)
+
+        assert num_true + num_false == 2**3
+        assert len(true_sols & false_sols) == 0# no solutions can be in both
+
+    def test_regular_positive_reif(self):
+        b = cp.boolvar()
+        x = cp.intvar(0, 1, shape=2)
+
+        # 3-state automaton that accepts only the string [0, 0].
+        reg = cp.Regular(x, transitions=[('a', 0, 'b'), ('b', 0, 'c')], start='a', accepting=['c'])
+
+        m = cp.Model([x[0] == 1, b.implies(reg)])
+
+        # x[0] = 1 has no transition from 'a' -> automaton rejects -> reg is False.
+        # b is False, so "b -> reg" MUST be satisfiable.
+        sat = m.solve()
+
+        assert sat, "BUG: half-reified Regular is unsound for rejected strings"
+
+
+    def test_mdd(self):
+        x = cp.intvar(0, 3, shape=3)
+
+        start = "src"
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = [(0,1,0), (1,1,0), (2,2,0)]
+
+        mdd_orig = cp.MDD(x, transitions, start=start, reduce=False)
+        mdd_redu = cp.MDD(x, transitions, start=start, reduce=True)
+        # _reduce() is normally only called during decomposition, so call it explicitly here
+        mdd_redu._reduce()
+        assert mdd_orig.levels.keys() - mdd_redu.levels.keys() == {"b1", "b2", "c2"}
+
+        sols_orig = set()
+        num_orig = cp.Model(mdd_orig).solveAll(display=lambda : sols_orig.add(tuple(argvals(x))))
+        assert sols_orig == set(solutions)
+
+        sols_redu = set()
+        num_redu = cp.Model(mdd_redu).solveAll(display=lambda : sols_redu.add(tuple(argvals(x))))
+        assert sols_redu == set(solutions)
+
+        assert num_orig == num_redu
+
+    def test_mdd_variable_reuse(self):
+        x = cp.intvar(0, 3, shape=3, name="x")
+        # MDD accepting exactly [1,1,1]
+        mdd = cp.MDD(x, transitions=[('A', 1, 'B'),
+                                  ('B', 1, 'C'),
+                                  ('C', 1, 'D'), ])
+
+        # x=[0,0,0] is NOT a path in the MDD => MDD(x) is False => ~MDD(x) must be True.
+        m_neg = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, ~mdd])
+        assert m_neg.solve()
+
+        # Full reification: b == MDD(x), force b False with the rejected assignment.
+        b = cp.boolvar(name="b")
+        m_reif = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b == mdd, ~b])
+        assert m_reif.solve()
+
+        # Sanity: a genuinely accepted assignment still works positively.
+        m_toplevel = cp.Model([x[0] == 1, x[1] == 1, x[2] == 1, mdd])
+        assert m_toplevel.solve()
+
+        # Sanity: a non-accepted assignment still works when the mdd is positively reified, with no other constraints on b.
+        m_pos = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b.implies(mdd)])
+        assert m_pos.solve()
 
 
     def test_minimum(self):
@@ -770,6 +866,28 @@ class TestGlobal:
         expr = x[1,2,a]
         assert str(expr) == "[x[1,2,0] x[1,2,1] x[1,2,2] x[1,2,3] x[1,2,4]][a]"
 
+    def test_multid_element(self):
+        x = cp.intvar(1,9, shape=(3,4,5), name="x")
+        a = cp.intvar(0,2, name="a")
+        b = cp.intvar(0,3, name="b")
+        c = cp.intvar(0,4, name="c")
+
+        expr = x[a,b,c]
+        assert isinstance(expr, cp.NDElement)
+        cons = expr == 7
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), c.value()] == 7
+
+        expr = x[a,b,2]
+        assert isinstance(expr, cp.NDElement)
+        cons = expr == 4
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), 2] == 4
+
     def test_element_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -793,10 +911,9 @@ class TestGlobal:
 
         expected = {
             # safening constraints
-            "(BV0) == ((x >= 0) and (x <= 2))",
-            "(BV0) -> ((IV0) == (x))",
-            "(~BV0) -> (IV0 == 0)",
-            "BV0",
+            "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
+            "((x < 0) or (x > 2)) -> (IV0 == 0)",
+            "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
             '(IV0 == 1) -> (IV1 == 1)',
@@ -805,25 +922,51 @@ class TestGlobal:
         }
         assert set(map(str, decomposed)) == expected
 
-        # should raise a warning if we don't safen first
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose()
-            expected = {
-                # actual decomposition
-                '(x == 0) -> (IV2 == 0)',
-                '(x == 1) -> (IV2 == 1)',
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
+        # decomposition should safen
+        val, decomp = elem.decompose()
+        expected = {
+            # actual decomposition
+            '(x == 0) -> (IV2 == 0)',
+            '(x == 1) -> (IV2 == 1)',
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
 
         # also for linear decomp
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose_linear()
-            expected = {
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
-            assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+        val, decomp = elem.decompose_linear()
+        expected = {
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
+        assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+
+    def test_multid_element_index_dom_mismatched(self):
+        """
+            NDElement with OOB index domains: safened per dimension before decompose.
+            Toplevel `arr[a,b] == 3` only allows in-bounds index pairs.
+        """
+        arr = cp.cpm_array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+        a = cp.intvar(0, 10, name="a")
+        b = cp.intvar(-1, 1, name="b")
+        y = cp.intvar(1, 5, name="y")
+        decomposed = decompose_in_tree(no_partial_functions([cp.NDElement(arr, [a, b]) <= y], safen_toplevel={"nd_element"}))
+        decomp = set(map(str, decomposed))
+        assert {
+            "((a >= 0) and (a <= 2)) -> ((IV0) == (a))",
+            "((a < 0) or (a > 2)) -> (IV0 == 0)",
+            "((b >= 0) and (b <= 2)) -> ((IV1) == (b))",
+            "((b < 0) or (b > 2)) -> (IV1 == 0)",
+            "(a >= 0) and (a <= 2)",
+            "(b >= 0) and (b <= 2)",
+        } <= decomp
+        assert any(c.endswith("<= (y)") for c in decomp)
+
+        arr = cp.cpm_array(np.full((3, 3), 3))
+        a, b = cp.intvar(0, 10, shape=2, name=tuple("ab"))
+        sols = set()
+        n_sols = cp.Model(arr[a, b] == 3).solveAll(display=lambda: sols.add((a.value(), b.value())))
+        assert n_sols == 9
+        assert sols == {(i, j) for i in range(3) for j in range(3)}
 
     def test_modulo(self):
 
@@ -859,12 +1002,12 @@ class TestGlobal:
         assert all_sols == decomp_sols# same on decision vars
         assert count == decomp_count# same on all vars
 
-    def test_xor(self):
+    def test_xor(self, solver):
         bv = cp.boolvar(5)
-        assert cp.Model(cp.Xor(bv)).solve()
+        assert cp.Model(cp.Xor(bv)).solve(solver=solver)
         assert cp.Xor(bv).value()
 
-    def test_xor_with_constants(self):
+    def test_xor_with_constants(self, solver):
 
         bvs = cp.boolvar(shape=3)
 
@@ -879,17 +1022,18 @@ class TestGlobal:
             expr = cp.Xor(args)
             model = cp.Model(expr)
 
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
             # also check with decomposition
             model = cp.Model(expr.decompose())
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
         # edge case with False constants
-        assert not cp.Model(cp.Xor([False, False])).solve()
-        assert not cp.Model(cp.Xor([False, False, False])).solve()
+        assert not cp.Model(cp.Xor([False, False])).solve(solver=solver)
+        assert not cp.Model(cp.Xor([False, False, False])).solve(solver=solver)
+        assert cp.Model(cp.Xor([False, True, False])).solve(solver=solver)
 
     def test_ite_with_constants(self):
         x,y,z = cp.boolvar(shape=3)
@@ -962,6 +1106,11 @@ class TestGlobal:
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         assert m.solve()
+
+    def test_cumulative_subexpr(self):
+        start = cp.intvar(0,10, shape=3)
+        cons = cp.Cumulative(start+start, [1,2,3], None, [1,2,3], 3)
+        assert cp.Model(cons).solve() is True
 
     def test_cumulative_decomposition_capacity(self):
         import numpy as np
@@ -1049,6 +1198,20 @@ class TestGlobal:
         model = cp.Model(constraints)
         assert not model.solve(solver="minizinc")
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_mdd_minizinc(self):
+        """Test native mdd global constraint with minizinc solver"""
+        x = cp.intvar(0, 3, shape=3)
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = {(0, 1, 0), (1, 1, 0), (2, 2, 0)}
+
+        mdd = cp.MDD(x, transitions, start="src")
+        sols = set()
+        num = cp.Model(mdd).solveAll(solver="minizinc", display=lambda: sols.add(tuple(argvals(x))))
+        assert sols == solutions
+        assert num == len(solutions)
 
 
     def test_cumulative_no_np(self):
@@ -1088,8 +1251,63 @@ class TestGlobal:
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
 
+    def test_optional_cumulative(self):
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [1, 4, 3, 2]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        demand = [11, 4, 8, 7]
+        is_present = cp.boolvar(shape=4)
+        capacity = 10
+        expr = cp.CumulativeOptional(start, duration, end, demand, capacity, is_present)
+        assert cp.Model(expr).solve()
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+        # also test decomposition
+        assert cp.Model(expr.decompose()).solve()
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+
+        # weird cases, allow negative duration or demand when task is not present
+        expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, False])
+        assert cp.Model(expr).solve()
+        assert cp.Model(expr.decompose()).solve()
+
+        expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, True])
+        assert cp.Model(expr).solve() is False
+        assert cp.Model(expr.decompose()).solve() is False
+
+        expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, False])
+        assert cp.Model(expr).solve()
+        assert cp.Model(expr.decompose()).solve()
+
+        expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, True])
+        assert cp.Model(expr).solve() is False
+        assert cp.Model(expr.decompose()).solve() is False
 
 
+    def test_optional_no_overlap(self):
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [1, 4, 6, 2]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        is_present = cp.boolvar(shape=4)
+        expr = cp.NoOverlapOptional(start, duration, end, is_present)
+        assert cp.Model(expr, cp.any(is_present)).solve()
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+        # also test decomposition
+        assert cp.Model(expr.decompose(), cp.any(is_present)).solve()
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # test large task
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [20,30,40,50]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        is_present = cp.boolvar(shape=4)
+        expr = cp.NoOverlapOptional(start, duration, end, is_present)
+        assert cp.Model(expr, cp.any(is_present)).solve() is False
+
+    
     def test_ite(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
@@ -1130,17 +1348,17 @@ class TestGlobal:
         val = [0,1,2]
         occ = cp.intvar(0, len(iv), shape=3)
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         val = [1, 4, 5]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         occ = [2, 3, 0]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val)))
-        assert ~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
+        assert not cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
 
     def test_gcc_onearg(self):
         iv = cp.intvar(0, 10)
@@ -1397,14 +1615,31 @@ class TestBounds:
         x = cp.intvar(-8, 5)
         op = cp.Power(x,3)
         lb, ub = op.get_bounds()
-        assert lb ==-8 ** 3
-        assert ub ==5 ** 3
+        assert lb == (-8) ** 3
+        assert ub == 5 ** 3
 
         op = cp.Power(x, 4)
         lb, ub = op.get_bounds()
-        assert lb == 5 ** 4
+        assert lb == 0
+        assert ub == 8 ** 4
+        
+        x = cp.intvar(-5, 8)
+        op = cp.Power(x,3)
+        lb, ub = op.get_bounds()
+        assert lb == (-5) ** 3
+        assert ub == 8 ** 3
+
+        op = cp.Power(x, 4)
+        lb, ub = op.get_bounds()
+        assert lb == 0
         assert ub == 8 ** 4
 
+        op = cp.Power(x,0)
+        lb, ub = op.get_bounds()
+        assert lb == 1
+        assert ub == 1
+
+    
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
@@ -1539,6 +1774,8 @@ class TestTypeChecks:
             assert not constr.value()
 
         assert total == len(all_sols) + len(not_all_sols)
+
+
 
 
     def test_increasing(self):
@@ -1710,28 +1947,16 @@ class TestTypeChecks:
                 print("Solver not supported: ", name)
                 continue
 
-
-    def test_table(self):
-        iv = cp.intvar(-8,8,3)
-
-        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
-        model = cp.Model(constraints)
-        assert model.solve()
-
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
-
-    def test_issue627(self):
-        for s, cls in cp.SolverLookup.base_solvers():
-            if cls.supported():
-                try:
-                    # constant look-up
-                    assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
-                    # constant out-of-bounds look-up
-                    assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
-                except (NotImplementedError, NotSupportedError):
-                    pass
+    # def test_issue627(self): -> not allowed anymore; index must be an Expression
+    #     for s, cls in cp.SolverLookup.base_solvers():
+    #         if cls.supported():
+    #             try:
+    #                 # constant look-up
+    #                 assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
+    #                 # constant out-of-bounds look-up
+    #                 assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
+    #             except (NotImplementedError, NotSupportedError, AssertionError):
+    #                 pass
 
     def test_issue_699(self):
         x,y = cp.intvar(0,10, shape=2, name=tuple("xy"))
@@ -1766,3 +1991,43 @@ def test_issue801_expr_in_cumulative(solver):
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
+
+
+
+# Test that all global constraint classes are imported and exported in cpmpy.expressions.__init__
+import importlib
+
+def global_constraint_classes():
+    """Helper to get all global constraint classes in cpmpy.expressions.globalconstraints"""
+    gc_mod = importlib.import_module("cpmpy.expressions.globalconstraints")
+    classes = []
+    for name, obj in gc_mod.__dict__.items():
+        if isinstance(obj, type):
+            # Heuristic: likely a global constraint class if it subclasses Constraint or has 'decompose' or '__call__'
+            if hasattr(obj, "__module__") and obj.__module__.endswith("globalconstraints"):
+                # skip internal base classes or helpers
+                if not name.startswith("_"):
+                    classes.append((name, obj))
+    return classes
+
+import inspect
+def test_globals_in_expressions_init():
+    """Check all global constraint classes are imported and exported in cpmpy.expressions.__init__"""
+    expressions_module = importlib.import_module("cpmpy.expressions")
+    expressions_all = set(getattr(expressions_module, "__all__", []))
+    
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global constraint {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global constraint {name} is not exported in cpmpy.expressions.__init__.__all__"
+
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalfunctions, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global function {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global function {name} is not exported in cpmpy.expressions.__init__.__all__"

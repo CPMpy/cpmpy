@@ -19,20 +19,21 @@
         ExitStatus
 
 """
-from typing import Optional, List, Callable, TypeAlias
+from typing import Any, Optional, List, Callable, TypeAlias, Iterable
 import warnings
 import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression
+from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike
 from ..expressions.variables import _NumVarImpl
+from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, argvals
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
-Callback: TypeAlias = Expression | List[Expression] | Callable # type alias to use in solveAll
+Callback: TypeAlias = Expression | ListLike[Expression] | Callable[[], None] # type alias to as display argument in solve and solveAll
 
 class SolverInterface(object):
     """
@@ -76,23 +77,23 @@ class SolverInterface(object):
             - objective_value_: the value of the objective function after solving (or None)
             - user_vars: set(), variables in the original (non-transformed) model,
                            for reverse mapping the values after `solve()`
-            - _varmap: dict(), maps cpmpy variables to native solver variables
+            - _varmap: dict[str, Any], maps cpmpy variable names to native solver variables
         """
         assert(subsolver is None)
 
         self.name = name
         self.cpm_status = SolverStatus(self.name) # status of solving this model
-        self.objective_value_ = None
+        self.objective_value_: Optional[int] = None
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict()  # maps cpmpy variables to native solver variables
-        self._csemap = dict()  # maps cpmpy expressions to solver expressions
+        self._varmap: dict[str, Any] = {}  # maps cpmpy variable names to native solver variables
+        self._csemap = CSEMap()  # maps cpmpy expressions to previously created expressions (typically auxiliary variables)
 
         # rest uses own API
         if cpm_model is not None:
             # post all constraints at once, implemented in `add()`
-            self += cpm_model.constraints
+            self.add(cpm_model.constraints)
 
             # post objective
             if cpm_model.objective_ is not None:
@@ -110,29 +111,29 @@ class SolverInterface(object):
                                   "alternative native objects to access directly.")
 
     # instead of overloading minimize/maximize, better just overload 'objective()'
-    def minimize(self, expr):
+    def minimize(self, expr: Expression) -> None:
         """
             Post the given expression to the solver as objective to minimize
 
             `minimize()` can be called multiple times, only the last one is stored
         """
-        return self.objective(expr, minimize=True)
+        self.objective(expr, minimize=True)
 
-    def maximize(self, expr):
+    def maximize(self, expr: Expression) -> None:
         """
             Post the given expression to the solver as objective to maximize
 
             `maximize()` can be called multiple times, only the last one is stored
         """
-        return self.objective(expr, minimize=False)
+        self.objective(expr, minimize=False)
 
     # REQUIRED functions to mimic `Model` interface:
-    def objective(self, expr, minimize):
+    def objective(self, expr: Expression, minimize: bool) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
             Arguments:
-                expr: Expression, the CPMpy expression that represents the objective function
+                expr: a CPMpy :class:`~cpmpy.expressions.core.Expression`
                 minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             ``objective()`` can be called multiple times, only the last one is stored
@@ -156,13 +157,13 @@ class SolverInterface(object):
         """
         return False
 
-    def has_objective(self):
+    def has_objective(self) -> bool:
         """
             Returns whether the solver has an objective function or not.
         """
         return False
 
-    def objective_value(self):
+    def objective_value(self) -> Optional[int]:
         """
             Returns the value of the objective function of the latest solver run on this model
 
@@ -174,19 +175,32 @@ class SolverInterface(object):
         """
            Creates solver variable for cpmpy variable
            or returns from cache if previously created
+           or returns a constant if the variable is a constant
         """
         return None
 
-    def solver_vars(self, cpm_vars):
+    def solver_vars(self, cpm_vars: Iterable[ExprLike]) -> list[Any]:
         """
            Like `solver_var()` but for arbitrary shaped lists/tensors
         """
-        if is_any_list(cpm_vars):
-            return [self.solver_vars(v) for v in cpm_vars]
-        return self.solver_var(cpm_vars)
+        res: list[Any] = []
+        for cpm_var in cpm_vars:
+            if isinstance(cpm_var, _NumVarImpl):
+                if cpm_var.name in self._varmap:  # fast path
+                    res.append(self._varmap[cpm_var.name])
+                else:  # slow path
+                    res.append(self.solver_var(cpm_var))
+            elif isinstance(cpm_var, int):
+                res.append(cpm_var)
+            elif is_any_list(cpm_var):
+                # recurse
+                res.append(self.solver_vars(cpm_var))
+            else:
+                # slow path, if any at all
+                res.append(self.solver_var(cpm_var))
+        return res
 
-
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -195,14 +209,15 @@ class SolverInterface(object):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -215,10 +230,11 @@ class SolverInterface(object):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -230,12 +246,30 @@ class SolverInterface(object):
         return self
     
     # needed here for subclasses that don't do the more direct `__add__ = add` in their class
-    def __add__(self, cpm_expr):
+    def __add__(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         return self.add(cpm_expr)
 
 
-    # OPTIONAL functions
+    def print_display(self, display: Optional[Callback]) -> None:
+        """
+            Helper function for printing the `display` argument used in `solveAll()`.
 
+            Arguments:
+                display: either a CPMpy Expression, OR a list of expressions,
+                         OR a callback function (no-arg) to call.
+        """
+        if display is None:
+            return
+
+        if isinstance(display, Expression):
+            print(display.value())
+        elif is_any_list(display):
+            print(argvals(display))
+        else:
+            assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+            display()  # callback
+    
+    # OPTIONAL functions
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
@@ -267,13 +301,7 @@ class SolverInterface(object):
         start = time.time()
         while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
             # display if needed
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif isinstance(display, list):
-                    print([v.value() for v in display])
-                else:
-                    display() # callback
+            self.print_display(display)
 
             # count and stop
             solution_count += 1
@@ -281,7 +309,7 @@ class SolverInterface(object):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
+            self.add(any([v != v.value() for v in self.user_vars if v.value() is not None]))
 
             if time_limit is not None: # update remaining time
                 time_limit -= self.status().runtime
@@ -326,6 +354,19 @@ class SolverInterface(object):
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
         raise NotSupportedError("Solver does not support unsat core extraction")
+    
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        For using the solver's internal MUS extractor 
+
+        Args:
+            soft: List of soft constraints over which a MUS needs to be found
+            hard: List of hard constraints that always need to be satisfied
+
+        Returns a MUS.
+        """
+        raise NotSupportedError("Solver does not support MUS extraction")
 
 
     # shared helper functions
@@ -382,7 +423,7 @@ class SolverStatus(object):
         Status and statistics of a solver run
     """
     exitstatus: ExitStatus
-    runtime: time
+    runtime: Optional[float]
 
     def __init__(self, name):
         self.solver_name = name

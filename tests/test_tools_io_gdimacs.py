@@ -1,104 +1,17 @@
-import os
-import tempfile
+"""
+GDIMACS (Grouped DIMACS / GCNF) specific tests for ``cpmpy.tools.io.gdimacs``.
+
+Covers the GCNF parser, the ``write_gdimacs`` writer and round-trips between them.
+"""
 
 import pytest
 import cpmpy as cp
-from cpmpy.tools.dimacs import read_dimacs, write_dimacs, write_gdimacs, read_gdimacs
-from cpmpy.transformations.get_variables import get_variables_model
-from cpmpy.solvers.solver_interface import ExitStatus
+from cpmpy.tools.io.gdimacs import load_gdimacs, write_gdimacs
 from cpmpy.solvers.pindakaas import CPM_pindakaas
 
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
-class TestCNFTool:
-    def setup_method(self) -> None:
-        self.tmpfile = tempfile.NamedTemporaryFile(mode="w", delete=False)
-
-    def teardown_method(self) -> None:
-        self.tmpfile.close()
-        os.remove(self.tmpfile.name)
-
-    def dimacs_to_model(self, cnf_str, **kwargs):
-        typ = "gcnf" if "gcnf" in cnf_str else "cnf"
-        with open(self.tmpfile.name, "w") as f:
-            f.write(cnf_str)
-        return (
-            read_dimacs(self.tmpfile.name, **kwargs)
-            if typ == "cnf"
-            else read_gdimacs(self.tmpfile.name, **kwargs)
-        )
-
-    def test_read_cnf(self):
-        model = self.dimacs_to_model("p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
-        bvs = sorted(get_variables_model(model), key=str)
-        assert str(model) == str(
-            cp.Model(cp.any([~bvs[1], ~bvs[2]]), cp.any([bvs[2], bvs[1], bvs[0]]), ~bvs[0])
-        )
-
-    def test_empty_formula(self):
-        model = self.dimacs_to_model("p cnf 0 0")
-        assert model.solve()
-        assert model.status().exitstatus == ExitStatus.FEASIBLE
-
-    def test_empty_clauses(self):
-        model = self.dimacs_to_model("p cnf 0 2\n0\n0")
-        assert not model.solve()
-        assert model.status().exitstatus == ExitStatus.UNSATISFIABLE
-
-    def test_with_comments(self):
-        model = self.dimacs_to_model(
-            "c this file starts with some comments\nc\np cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n"
-        )
-        vars = sorted(get_variables_model(model), key=str)
-
-        sols = set()
-        addsol = lambda: sols.add(tuple([v.value() for v in vars]))
-
-        assert model.solveAll(display=addsol) == 2
-        assert sols == {(False, False, True), (False, True, False)}
-
-    def test_write_cnf(self):
-
-        a, b, c = [cp.boolvar(name=n) for n in "abc"]
-
-        m = cp.Model()
-        m += cp.any([a, b, c])
-        m += b.implies(~c)
-        m += a <= 0
-
-        assert write_dimacs(model=m, canonical=True) == "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
-
-    def test_missing_p_line(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("1 -2 0\np cnf 2 2")
-
-    def test_incorrect_p_line(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("p cnf 2 2\n1 2 0")
-
-    def test_too_many_clauses(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("p cnf 2 2\n1 2 0\n1 0\n2 0")
-
-    def test_too_few_clauses(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("p cnf 2 2\n1 0")
-
-    def test_too_many_variables(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("p cnf 2 1\n1 2 3 0")
-
-    def test_non_int_literal(self):
-        with pytest.raises(ValueError):
-            self.dimacs_to_model("p cnf 2 1\n1 b 2 0")
-
-    def test_non_terminated_final_clause(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("p cnf 2 2\n1 2 0\n-1 -2 0\n2")
-
-    def test_too_few_variables(self):
-        """ "Fewer variables is still technically correct DIMACS"""
-        self.dimacs_to_model("p cnf 2 1\n1 0")
+class TestGDimacsTool:
 
     def test_gcnf_mus2011_example(self):
         # example from https://satisfiability.org/competition/2011/rules.pdf, but fixed p header vars to 3
@@ -111,7 +24,7 @@ class TestCNFTool:
 {3} -2 -3 0
 {4} -2 3 0
 """
-        m, soft, hard, assumptions = self.dimacs_to_model(example)
+        m, soft, hard, assumptions = load_gdimacs(example, var_name="x")
         out = write_gdimacs(soft, hard=hard, disjoint=False, canonical=True)
         assert example == out
 
@@ -146,12 +59,12 @@ class TestCNFTool:
             write_gdimacs(soft, hard=hard, encoding="direct", canonical=True, disjoint=False)
             == """p gcnf 5 12 4
 {0} 1 2 3 0
-{0} -4 5 0
-{0} -2 -4 0
-{0} 2 4 -5 0
 {0} 2 -3 -5 0
 {0} 3 5 0
 {0} -2 5 0
+{0} -4 5 0
+{0} -2 -4 0
+{0} 2 4 -5 0
 {1} -1 2 0
 {1} -2 3 0
 {2} 3 0
@@ -163,12 +76,12 @@ class TestCNFTool:
         # note: 2nd clause of group 4 is merged with 2nd clause of group 1
         assert """p gcnf 6 13 4
 {0} 1 2 3 0
-{0} -4 5 0
-{0} -2 -4 0
-{0} 2 4 -5 0
 {0} 2 -3 -5 0
 {0} 3 5 0
 {0} -2 5 0
+{0} -4 5 0
+{0} -2 -4 0
+{0} 2 4 -5 0
 {0} -2 3 -6 0
 {1} -1 2 0
 {1} -2 3 0
@@ -237,16 +150,14 @@ c Comment in the middle
     )
     def test_gdimacs_roundtrip(self, gcnf_str, request):
         """Parametrized test for reading various GCNF files"""
-        model, soft, hard, assumptions = self.dimacs_to_model(gcnf_str, var_name="x", assumption_name="a")
+        model, soft, hard, assumptions = load_gdimacs(gcnf_str, var_name="x", assumption_name="a")
 
-        print(model)
         back = write_gdimacs(
             soft,
             hard=hard,
             canonical=True,
             disjoint=False,
         )
-        print(back)
         gcnf_str = "\n".join(l for l in gcnf_str.split("\n") if not l.startswith("c"))
         if request.node.callspec.id != "missing_group":
             assert back == gcnf_str, f"Roundtrip failed from:\n\n{gcnf_str}\nto\n\n{back}"
@@ -259,4 +170,4 @@ c Comment in the middle
 {-1} -1 -2 0
 """
         with pytest.raises(AssertionError, match="Group number must be non-negative"):
-            self.dimacs_to_model(gcnf_str)
+            load_gdimacs(gcnf_str)
