@@ -59,7 +59,7 @@ from cpmpy.tools.io.utils import _handle_loader_input
 def write_gdimacs(
         soft: list[Expression],
         hard: Optional[list[Expression]] = None,
-        assumptions: Optional[list[cp.BoolVar]] = None,
+        assumptions: Optional[list[_BoolVarImpl]] = None,
         path: Optional[Union[str, os.PathLike]] = None,
         encoding: str = "auto",
         disjoint: bool = True,
