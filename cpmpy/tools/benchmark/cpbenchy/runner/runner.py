@@ -310,6 +310,17 @@ class Runner:
         for observer in self.observers:
             observer.print_raw(text)
 
+    def _forward_captured_print_line(self, text: str):
+        """Forward solver-library stdout captured by print_forwarding_context."""
+        from ..observer.write_to_stdout import write_raw_to_stdout
+
+        for observer in self.observers:
+            if getattr(observer, "bypass_print_forwarding", False):
+                continue
+            observer.print_raw(text)
+        if self.verbose:
+            write_raw_to_stdout(text)
+
     @contextlib.contextmanager
     def print_forwarding_context(self):
         """Context manager that forwards all print statements and warnings to observers."""
@@ -318,27 +329,61 @@ class Runner:
                 self.runner = runner
                 self.original_stdout = sys.stdout
                 self.original_stderr = sys.stderr
-                self.buffer = []
-            
+                self._pending_line = ""
+                self._forwarding = False
+
+            def _forward_line(self, line: str):
+                line = line.rstrip()
+                if not line.strip():
+                    return
+                if line.startswith("c" + chr(32)):
+                    formatted = line
+                else:
+                    formatted = "c" + chr(32) + line
+                self.runner._forward_captured_print_line(formatted)
+
             def write(self, text):
-                # Buffer the output
-                self.buffer.append(text)
-                # Mirror to console only in verbose mode
-                # -> skip: handled by auto-added WriteToStdoutObserver
-                # if self.runner.verbose:
-                #     self.original_stdout.write(text)
-            
+                if self._forwarding:
+                    self.original_stdout.write(text)
+                    return
+                if not text:
+                    return
+                text = self._pending_line + text
+                self._pending_line = ""
+
+                lines = text.split("\n")
+                if text.endswith("\n"):
+                    complete_lines = lines[:-1]
+                else:
+                    complete_lines = lines[:-1]
+                    self._pending_line = lines[-1]
+
+                self._forwarding = True
+                try:
+                    for line in complete_lines:
+                        self._forward_line(line)
+                finally:
+                    self._forwarding = False
+
             def flush(self):
+                if self._pending_line.strip():
+                    self._forwarding = True
+                    try:
+                        self._forward_line(self._pending_line)
+                    finally:
+                        self._forwarding = False
+                    self._pending_line = ""
                 if self.runner.verbose:
                     self.original_stdout.flush()
-            
+
             def forward_to_observers(self):
-                # Forward buffered output to observers line by line
-                if self.buffer:
-                    full_text = ''.join(self.buffer)
-                    for line in full_text.splitlines(keepends=True):
-                        if line.strip():  # Only forward non-empty lines
-                            self.runner.print_raw(line.rstrip())
+                if self._pending_line.strip():
+                    self._forwarding = True
+                    try:
+                        self._forward_line(self._pending_line)
+                    finally:
+                        self._forwarding = False
+                    self._pending_line = ""
         
         def warning_handler(message, category, filename, lineno, file=None, line=None):
             """Custom warning handler that forwards warnings to observers."""

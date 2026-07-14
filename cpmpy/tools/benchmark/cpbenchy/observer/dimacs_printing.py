@@ -21,13 +21,8 @@ class DIMACSPrintingObserver(Observer):
         self.verbose = verbose
 
     def print_comment(self, comment: str, runner: Runner = None):
-        adapter = getattr(runner, "instance_runner", None) if runner else None
-        adapter_printer = getattr(adapter, "print_comment", None) if adapter else None
         formatted = "c" + chr(32) + comment.rstrip("\n")
-        if callable(adapter_printer) and getattr(runner, "verbose", False):
-            adapter_printer(comment)
-        else:
-            runner.print_raw(formatted)
+        runner.print_raw(formatted)
 
     def observe_post_solve(self, runner: Runner):
         self.print_result(runner.s, runner)
