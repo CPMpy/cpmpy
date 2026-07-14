@@ -235,8 +235,6 @@ class CPM_cplex(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif cplex_status == "JobFailed":
             self.cpm_status.exitstatus = ExitStatus.ERROR
-        elif cplex_status == "Non-convex QCP":
-            self.cpm_status.exitstatus = ExitStatus.ERROR
         elif "aborted" in cplex_status:
             self.cpm_status.exitstatus = ExitStatus.NOT_RUN
         else:  # another? This can happen when error during solve.
