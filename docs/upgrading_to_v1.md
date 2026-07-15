@@ -91,7 +91,8 @@ format based on the file extension.
 
 The [changelog on GitHub](https://github.com/CPMpy/cpmpy/blob/master/changelog.md#100) additionally covers:
 
-- stricter global constraint constructors (e.g. `Table` requires a rectangular integer table),
+- stricter global constraint constructors (e.g. `Table` requires a rectangular integer table, and
+  `Table`/`Minimum`/`Maximum` no longer flatten nested lists),
 - minor behavior changes from bug fixes (numpy broadcasting, `value()` on partially-assigned globals),
 - changes to the transformation interfaces for advanced users,
 - and the new, widened APIs (intermediate-solution `display=` callbacks, iterable assumptions, ...).
