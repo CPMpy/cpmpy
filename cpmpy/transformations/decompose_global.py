@@ -42,6 +42,7 @@ class CustomDecomp(Protocol):
 def decompose_in_tree(lst_of_expr: list[Expression],
                       supported: Optional[AbstractSet[str]] = None,
                       supported_reified: Optional[AbstractSet[str]] = None,
+                      _toplevel=None, nested=False,
                       csemap: Optional[CSEMap] = None,
                       decompose_custom: Optional[Dict[str, CustomDecomp]] = None,
                       decompose_custom_positive: Optional[Dict[str, CustomDecomp]] = None,
@@ -54,6 +55,8 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param lst_of_expr: list of CPMpy expressions that may contain global constraints or global functions.
     :param supported: a set of names of supported global constraints and global functions (will not be decomposed).
     :param supported_reified: a set of names of supported reified global constraints (those with Boolean return type only).
+    :param _toplevel: DEPRECATED
+    :param nested: DEPRECATED
     :param csemap: CSEMap object used to avoid decomposing the same global constraint twice
     :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
     :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
@@ -70,6 +73,10 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :func:`cpmpy.transformations.reification.reify_rewrite`
     E.g. ``bv -> NumExpr <comp> Var/Const`` will then be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
     """
+    if _toplevel is not None:
+        warnings.warn("decompose_in_tree: argument '_toplevel' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+    if nested:
+        warnings.warn("decompose_in_tree: argument 'nested' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
 
     if supported is None:
         supported = frozenset[str]()

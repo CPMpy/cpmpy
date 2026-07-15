@@ -3,6 +3,7 @@
 """
 
 from copy import copy
+import warnings
 import numpy as np
 
 from ..expressions.variables import boolvar, intvar, NDVarArray, _BoolVarImpl, _NumVarImpl
@@ -13,6 +14,8 @@ from typing import Optional, AbstractSet, Any, Sequence
 
 
 def no_partial_functions(lst_of_expr: list[Expression],
+                        _toplevel: Optional[Any]=None, 
+                        _nbc: Optional[Any] = None, 
                         safen_toplevel: Optional[AbstractSet[str]] = None) -> list[Expression]:
     """
     A partial function is a function whose output is not defined for all possible inputs.
@@ -62,11 +65,18 @@ def no_partial_functions(lst_of_expr: list[Expression],
     
     Arguments:
         lst_of_expr (list[Expression]): list of CPMpy expressions
+        _toplevel (None): DEPRECATED
+        _nbc (None): DEPRECATED
         safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
                                     a solver supports the global function natively (not decomposed) but does not accept
                                     unsafe values in its API (e.g., OR-Tools for `div`).
     """
-    
+
+    if _toplevel is not None:
+        warnings.warn("no_partial_functions: argument '_toplevel' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+    if _nbc is not None:
+        warnings.warn("no_partial_functions: argument '_nbc' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+
     if safen_toplevel is None:
         safen_toplevel = frozenset()
 
