@@ -46,6 +46,48 @@
 * Dev script to time transformations [#853](https://github.com/CPMpy/cpmpy/pull/853) [848febd](https://github.com/CPMpy/cpmpy/commit/848febd9f8831cbf6796ae0175d6547ba679b1ab)
 * Dev script to extract release notes [#671](https://github.com/CPMpy/cpmpy/pull/671)
 
+### Breaking changes
+
+With this v1.0.0 release, a lot has changed to CPMpy's internal workings. Many transformations have been completely rewritten, internal API signatures have changed and datastructures have been replaced by new ones. We split the breaking changes into two groups: changes that affect what and how you can model (with instructions on how to update your code), and changes to CPMpy's internals, which you will only notice if your code uses those internals directly or if you saved models to `.pickle` files.
+
+#### Changes to the modeling API — how to update your code
+
+* **Float objectives are now expressed with the new `FloatSum` global function** [#957](https://github.com/CPMpy/cpmpy/pull/957). Float coefficients are no longer allowed inside regular expressions: multiplying a decision variable with a float constant (e.g. `0.5 * x`) raises a `TypeError`, and `Model.minimize()`/`Model.maximize()` only accept integer-valued expressions.
+    - *If you had a float objective*: use `FloatSum` and pass it **directly to a solver object's** `minimize()`/`maximize()` (supported by OR-Tools, Gurobi, CPLEX, SCIP, HiGHS, Z3, MiniZinc and Hexaly):
+      ```python
+      obj = cp.FloatSum([0.5, 1.5], [x, y])        # replaces 0.5*x + 1.5*y
+      s = cp.SolverLookup.get("ortools", model)    # model contains only the constraints
+      s.minimize(obj)
+      s.solve()
+      print(obj.value())  # read the objective from the FloatSum;
+                          # s.objective_value() stays None when the optimum is not integral
+      ```
+      Note that `FloatSum` is not an `Expression`: it cannot be nested inside constraints or other expressions.
+    - *If you had float coefficients in constraints*: rescale them to integers (e.g. replace `0.5*x + 1.5*y <= 2` by `x + 3*y <= 4`).
+* **The deprecated lowercase constraint aliases `alldifferent()`, `allequal()` and `circuit()` are no longer exported from the `cpmpy` namespace** [#905](https://github.com/CPMpy/cpmpy/pull/905) (deprecated since 0.9.0). Calling e.g. `cp.alldifferent(...)` now fails; use the global constraint classes `AllDifferent`, `AllEqual` and `Circuit` instead. (The functions themselves still exist in `cpmpy.expressions.globalconstraints`, but will be removed in a future release.)
+* **Multiplication is now a global function instead of an operator** [#850](https://github.com/CPMpy/cpmpy/pull/850). `x * y` creates a `Multiplication(x, y)` global function (still named `"mul"`) and `Operator("mul", ...)` can no longer be constructed. Modeling with `*` is unaffected, but code that inspects expressions with `isinstance(expr, Operator)` no longer matches multiplications; use `isinstance(expr, Multiplication)` instead.
+* **`Element` only accepts 1-dimensional arrays** [#926](https://github.com/CPMpy/cpmpy/pull/926). Indexing a multi-dimensional array now creates the new `NDElement` global function. Keep indexing with comma-separated indices (`Arr[i,j]`) or construct `NDElement(Arr, [i,j])` directly; code that constructed `Element` with a flattened index, or that checks `isinstance(expr, Element)`, must be updated accordingly.
+* **`NDVarArray` is no longer an `Expression` subclass** [#886](https://github.com/CPMpy/cpmpy/pull/886). Variable arrays (as returned by `intvar(..., shape=...)`, `boolvar(shape=...)` and `cpm_array()`) are now plain `numpy.ndarray` subclasses. All modeling functionality is unaffected (vectorized operators, `.sum()`, `.min()`/`.max()`, `.any()`/`.all()`, `.value()`, `.implies()`, indexing), but code that treats an array as an expression must be updated: `isinstance(arr, Expression)` now returns `False`, and `arr.args`, `arr.name` and `arr.is_bool()` no longer exist.
+* **Expression arguments are read-only tuples** [#894](https://github.com/CPMpy/cpmpy/pull/894). `expr.args` now returns a `tuple` instead of a `list`, so it can no longer be modified in place (e.g. `expr.args.append(...)` or `expr.args[0] = ...`). Construct a new expression instead, or use `expr.update_args(new_args)` for an explicit in-place update.
+* **`Table`, `ShortTable` and `NegativeTable` require a rectangular table of integers** [#895](https://github.com/CPMpy/cpmpy/pull/895). The table is converted to, and stored as, a two-dimensional integer `numpy` array; ragged tables and non-integer entries now raise an error.
+* **`Cumulative` and `NoOverlap` no longer store `end` in their `.args` when it is not given** [#830](https://github.com/CPMpy/cpmpy/pull/830). Code that unpacks `.args` (e.g. `start, dur, end, demand, cap = c.args`) must first check `len(c.args)`; when no `end` was given, the end times are implicitly `start + duration`.
+
+#### Changes to CPMpy's internals — only relevant if you use internals directly or saved models to pickle files
+
+Due to the changes below, models saved to a `.pickle` file with CPMpy < 1.0.0 will no longer load (or will fail when used) in v1.0.0. Pickle files are tied to the CPMpy version that created them: re-run your model-building code under v1.0.0 and save again. For longer-term storage, consider writing models to a solver-independent text format with the new IO module.
+
+* All `Expression` arguments are now stored as immutable tuples instead of lists [#894](https://github.com/CPMpy/cpmpy/pull/894), and the `has_subexpr()` cache is an eagerly-initialised attribute [#895](https://github.com/CPMpy/cpmpy/pull/895).
+* Expressions created by `x * y` are `Multiplication` global functions instead of `Operator("mul", ...)` [#850](https://github.com/CPMpy/cpmpy/pull/850); multi-dimensional indexing creates `NDElement` instead of a flattened `Element` [#926](https://github.com/CPMpy/cpmpy/pull/926).
+* `Table`-like constraints store their table as a 2D `numpy` array and keep `NDVarArray` arguments as-is instead of converting them to Python lists [#895](https://github.com/CPMpy/cpmpy/pull/895).
+* `Cumulative` and `NoOverlap` store 4 resp. 2 arguments when no `end` is given, instead of a `None` placeholder [#830](https://github.com/CPMpy/cpmpy/pull/830).
+* `set_description()` now stores a `Description` object in `expr._description`; the old `expr.desc` attribute no longer exists [#903](https://github.com/CPMpy/cpmpy/pull/903).
+* The transformations have been largely rewritten in a new, typed pattern:
+    - The deprecated `decompose_global()` and `do_decompose()` are removed; use `decompose_in_tree()` [#835](https://github.com/CPMpy/cpmpy/pull/835), which now also accepts custom (positive) decompositions [#929](https://github.com/CPMpy/cpmpy/pull/929) [#980](https://github.com/CPMpy/cpmpy/pull/980) [#1006](https://github.com/CPMpy/cpmpy/pull/1006).
+    - The `csemap=` argument of transformations expects the new `CSEMap` object instead of a plain `dict` [#917](https://github.com/CPMpy/cpmpy/pull/917).
+    - Several transformations gained parameters or dedicated objective-variants (`flatten_constraint(..., do_simplify=)`, `decompose_objective`, `push_down_negation_objective`, `safen_objective`, `decompose_linear`, `linearize_reified_variables`, ...); consult the `cpmpy.transformations` documentation when upgrading code that calls transformations directly.
+* Solver interfaces: the internal `_varmap` is keyed by variable name instead of by variable object [#990](https://github.com/CPMpy/cpmpy/pull/990), and `solver_var()` of the SAT-based interfaces (PySAT, Pindakaas) consistently returns Boolean literals only [#1017](https://github.com/CPMpy/cpmpy/pull/1017).
+
+
 
 ### Internal improvements
 
