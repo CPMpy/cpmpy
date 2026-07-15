@@ -87,7 +87,34 @@ Due to the changes below, models saved to a `.pickle` file with CPMpy < 1.0.0 wi
     - Several transformations gained parameters or dedicated objective-variants (`flatten_constraint(..., do_simplify=)`, `decompose_objective`, `push_down_negation_objective`, `safen_objective`, `decompose_linear`, `linearize_reified_variables`, ...); consult the `cpmpy.transformations` documentation when upgrading code that calls transformations directly.
 * Solver interfaces: the internal `_varmap` is keyed by variable name instead of by variable object [#990](https://github.com/CPMpy/cpmpy/pull/990), and `solver_var()` of the SAT-based interfaces (PySAT, Pindakaas) consistently returns Boolean literals only [#1017](https://github.com/CPMpy/cpmpy/pull/1017).
 
+#### Minor behavior changes, including bug fixes that may affect code relying on the old behavior
 
+* **`Expression <op> ndarray` now broadcasts correctly** [#1035](https://github.com/CPMpy/cpmpy/pull/1035). Using a CPMpy expression on the left-hand side of an operator with a numpy array on the right (e.g. `x + np.array([1,2,3])`) now broadcasts element-wise and returns an array of expressions, just like the mirrored `ndarray <op> Expression` always did. Code relying on the old (faulty) single-expression result must be updated.
+* **`value()` returns `None` for partially-assigned global constraints** [#872](https://github.com/CPMpy/cpmpy/pull/872). `Xor`, `Cumulative` and `Circuit` now return `None` from `.value()` when some of their arguments have no value (consistent with other expressions), instead of raising an error or computing an incorrect result.
+* **Variable values are cleared after an unsatisfiable solve** [#1001](https://github.com/CPMpy/cpmpy/pull/1001). With Exact and Pindakaas, `.value()` of variables now returns `None` after an UNSAT solve call, instead of returning stale values from a previous (satisfiable) solve.
+* **`cp.sum()` over a single expression returns that expression itself**, instead of wrapping it in a single-argument sum expression.
+* **Expression printing has been refactored** [#893](https://github.com/CPMpy/cpmpy/pull/893). The exact output of `str(expr)` / `repr(expr)` can differ slightly from previous versions; do not rely on the textual form of expressions.
+
+### Deprecated
+
+Old names keep working for now (with a `DeprecationWarning` where applicable), but will be removed in a future release — switch to the new ones:
+
+* **DIMACS tooling moved to the new IO module** [#842](https://github.com/CPMpy/cpmpy/pull/842); `cpmpy.tools.dimacs` is kept as a backward-compatible wrapper around `cpmpy.tools.io.dimacs`:
+    - `read_dimacs(fname)` is deprecated; use `cpmpy.tools.io.load_dimacs(...)`, which also accepts the DIMACS content as a string or an open file object.
+    - `write_dimacs(model, fname)` moved to `cpmpy.tools.io.write_dimacs(model, path)`. Note that the second parameter was renamed (`fname` → `path`) and that the `p cnf` header line is no longer written by default; pass `p_header=True` to restore it.
+* **XCSP3 loading**: `cpmpy.tools.xcsp3.read_xcsp3()` is deprecated; use `cpmpy.tools.io.load_xcsp3()`, which accepts a path, string content or an open file object.
+* **`XCSP3Dataset` moved to the new datasets module** [#900](https://github.com/CPMpy/cpmpy/pull/900): import it from `cpmpy.tools.datasets` (it remains re-exported from `cpmpy.tools.xcsp3` for backward compatibility).
+* More generally, the new IO module provides `cpmpy.tools.io.load()` and `cpmpy.tools.io.write()` as one-stop entry points that automatically select the format (DIMACS, WCNF, OPB, XCSP3, ...) based on the file extension.
+
+### Widened and extended APIs (non-breaking)
+
+* `solve()` now accepts a `display=...` callback that reports intermediate solutions during optimisation (supported for OR-Tools, Gurobi, GCS, CP Optimizer, HiGHS and Hexaly), like `solveAll()` already did [#561](https://github.com/CPMpy/cpmpy/pull/561).
+* `solve(assumptions=...)` accepts any iterable of Boolean literals, not just a list [#712](https://github.com/CPMpy/cpmpy/pull/712).
+* Global constraint and function constructors are formally typed with the new `ExprLike`/`ListLike` type aliases and accept any list-like (list, tuple, numpy array, `NDVarArray`) of expressions or constants, including numpy integers [#871](https://github.com/CPMpy/cpmpy/pull/871) [#873](https://github.com/CPMpy/cpmpy/pull/873) [#874](https://github.com/CPMpy/cpmpy/pull/874) [#877](https://github.com/CPMpy/cpmpy/pull/877).
+* `SolverLookup.supported()` gained a `subsolvers=` flag to optionally exclude subsolver names from the list [#1030](https://github.com/CPMpy/cpmpy/pull/1030).
+* The parameter tuners can tune over multiple problem instances at once [#757](https://github.com/CPMpy/cpmpy/pull/757) and take a `verbose=` level [#771](https://github.com/CPMpy/cpmpy/pull/771).
+* Several globals gained a positive-context decomposition (`decompose_positive()`) for use in linear/SAT contexts [#980](https://github.com/CPMpy/cpmpy/pull/980) [#1006](https://github.com/CPMpy/cpmpy/pull/1006), and `AllDifferent` a linear one (`decompose_linear()`) [#836](https://github.com/CPMpy/cpmpy/pull/836).
+* For advanced users: `Expression.implies(..., simplify=)`, `flatten_constraint(..., do_simplify=)` and `decompose_in_tree(..., decompose_custom=, decompose_custom_positive=)` expose new optional behavior.
 
 ### Internal improvements
 
