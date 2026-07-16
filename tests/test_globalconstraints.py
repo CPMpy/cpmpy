@@ -661,8 +661,13 @@ class TestGlobal:
         true_model = cp.Model(cp.Regular(x, transitions, start, ends))
         false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
 
-        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))))
-        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))))
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10) # all assignments = 8
+        else:
+            kwargs = dict()
+
+        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))), **kwargs)
+        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))), **kwargs)
 
         assert num_true == len(solutions)
         assert true_sols == set(solutions)
