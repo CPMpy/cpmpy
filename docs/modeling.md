@@ -397,9 +397,21 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 # example output -- arr: [2 1 3 4], idx: 0, val: 2
 ```
 
-The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
+The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`. Indexing with an array of integer decision variables is also supported (vectorized): `arr[idx_array]` creates an array of `Element` expressions, one per index.
 
-This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** in our `cpm_array()` or call `Element()` directly:
+```python
+import cpmpy as cp
+
+arr = cp.intvar(1, 10, shape=5)
+idx = cp.intvar(0, 4, shape=3)
+
+m = cp.Model(
+    cp.AllDifferent(idx),
+    arr[idx] == [1, 2, 3]  # equivalent to: [arr[idx[0]] == 1, arr[idx[1]] == 2, arr[idx[2]] == 3]
+)
+```
+
+This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** using `cp.cpm_array()`
 
 ```python
 import numpy as np
