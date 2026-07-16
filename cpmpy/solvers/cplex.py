@@ -467,7 +467,8 @@ class CPM_cplex(SolverInterface):
                         self.cplex_model.add_constraint(self.cplex_model.max(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'abs':
                         self.cplex_model.add_constraint(self.cplex_model.abs(self.solver_var(lhs.args[0])) == cplexrhs)
-                    elif lhs.name == 'mul':
+                    elif lhs.name == 'mul': 
+                        raise ValueError("CPLEX only supports convex multiplication constraints, should be decomposed and linearized already. Please report on github.")
                         cplexlhs = self._make_numexpr(lhs)
                         self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                     else:
