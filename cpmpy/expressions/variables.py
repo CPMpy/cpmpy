@@ -547,8 +547,7 @@ class NDVarArray(np.ndarray):
                     raise NotImplementedError("CPMpy does not support vectorized indexing into multi-dimensional arrays. If you really need this, please report on github.")
                 if any(isinstance(i, Expression) and i.is_bool() for i in index_arr.flat):
                     raise TypeError("Boolean decision variables cannot be used as a mask (result length would depend on their values). Use integer decision variables as indices instead.")
-                # typing: reshape returns NDVarArray
-                return cpm_array([self[i] for i in index_arr.flat]).reshape(index_arr.shape)  # type: ignore
+                return cpm_array([self[i] for i in index_arr.flat]).reshape(index_arr.shape)
 
         return super().__getitem__(index)
 
