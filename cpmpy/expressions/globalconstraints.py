@@ -175,13 +175,10 @@ class GlobalConstraint(Expression):
         Returns whether the global constraint is satisfied under the current variable assignment.
 
         Returns:
-            Optional[bool]: True or False when all variables in the constraint are assigned;
-            None if any variable is unassigned.
-
-        Raises:
-            NotImplementedError: if the subclass does not implement ``value()``.
+            Optional[bool]: True or False when all variables within its scope are assigned;
+            None if any variable within its scope is unassigned.
         """
-        raise NotImplementedError(f"`value` is not implemented for {self!r}")
+        raise NotImplementedError(f"`value` is not implemented for {self}")
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """

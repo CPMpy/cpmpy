@@ -112,6 +112,16 @@ class GlobalFunction(Expression):
         """
         return False
 
+    def value(self) -> Optional[int]:
+        """
+        Returns whether the global function can be evaluated under the current variable assignment.
+
+        Returns:
+            Optional[int]: The numeric value when all variables within its scope are assigned;
+            None if any variable within its scope is unassigned.
+        """
+        raise NotImplementedError(f"`value` is not implemented for {self}")
+
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
             Returns a decomposition into smaller constraints as a tuple of
