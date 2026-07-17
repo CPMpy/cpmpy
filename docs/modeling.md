@@ -662,6 +662,7 @@ for instance_file, metadata in dataset:
 
 See the [I/O API documentation](./api/tools/io.rst) for the available formats and options.
 
+(modeling-datasets)=
 ## Datasets
 
 When experimenting with models or comparing solvers, it is useful to benchmark them against standard problem collections from the community. CPMpy datasets provide a small, PyTorch-style interface for downloading benchmark instances, iterating over them, and accessing their metadata.
