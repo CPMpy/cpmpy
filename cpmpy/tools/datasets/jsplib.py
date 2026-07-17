@@ -10,7 +10,7 @@ import os
 import json
 import pathlib
 import zipfile
-from typing import Any, Optional, Callable
+from typing import Any, Optional, Callable, Union, Tuple
 import numpy as np
 
 import cpmpy as cp
@@ -179,8 +179,18 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             and not str(f).endswith(".json")
         ])
 
+    def __getitem__(self, index: Union[int, str]) -> Tuple[Any, Any]:
+        # Override to support string indexing by instance name
+        if isinstance(index, str):
+            try:
+                index = [f.stem for f in self._list_instances()].index(index)
+            except ValueError:
+                raise ValueError(f"Instance '{index}' not found in dataset")
+        return super().__getitem__(index)
+
 
 if __name__ == "__main__":
     dataset = JSPLibDataset(root=".", download=True)
     print("Dataset size:", len(dataset))
-    print("Instance 0:")
+    print("Instance 0:", dataset[0])
+    print("Instance 'abz5':", dataset["abz5"])
