@@ -638,7 +638,7 @@ def get_linear_decompositions():
     return dict(
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
-        table=Table.decompose_linear,
+        table=lambda expr: expr.decompose_linear(), # dispatch dynamically so Table subclasses with their own decompose_linear are respected 
         short_table=ShortTable.decompose,
         InDomain=InDomain.decompose_linear,
         regular=Regular.decompose_linear,
