@@ -486,13 +486,10 @@ class TestSolvers:
         assert not s.solve()
 
     @pytest.mark.requires_solver("z3")
-    @pytest.mark.xfail(
-        reason="Z3 returns incorrect variable values after optimize; see https://github.com/CPMpy/cpmpy/issues/1036",
-        strict=True,
-    )
     def test_z3_optimize_inconsistent_model_values(self, solver):
         # Minimal Golomb-ruler-style problem: Z3 proves objective 20 but returns x9=500.
         # issue tracked in: https://github.com/CPMpy/cpmpy/issues/1036
+        # resolved in z3 version 5.0.0
         n = 10
         U = 500
         x = cp.intvar(0, U, shape=n)
