@@ -119,7 +119,7 @@ import pathlib
 import io
 import sys
 import tempfile
-from typing import Any, Optional, Tuple, List, Dict, Iterator, Callable, ClassVar
+from typing import Any, Optional, Tuple, List, Iterator, Callable, ClassVar
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
 
@@ -210,7 +210,7 @@ class Dataset(ABC):
         pass
 
     @abstractmethod
-    def instance_metadata(self, instance: Any) -> Dict[str, Any]:
+    def instance_metadata(self, instance: Any) -> dict[str, Any]:
         """
         Return the metadata for a given instance.
 
@@ -228,7 +228,7 @@ class Dataset(ABC):
     # ---------------------------------------------------------------------------- #
 
     @classmethod
-    def dataset_metadata(cls) -> Dict[str, Any]:
+    def dataset_metadata(cls) -> dict[str, Any]:
         """
         Return dataset-level metadata as a dictionary.
 
@@ -377,7 +377,7 @@ class FileDataset(Dataset):
 
 
     @abstractmethod
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         """
         Labels to distinguish instances into categories matching to those of the dataset,
         e.g. ``year`` or ``track``.
@@ -396,7 +396,7 @@ class FileDataset(Dataset):
     #                        Methods to optionally overwrite                       #
     # ---------------------------------------------------------------------------- #
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Provide domain-specific instance metadata.
         Called once after download for each instance.
@@ -462,7 +462,7 @@ class FileDataset(Dataset):
     # ---------------------------------------------------------------------------- #
 
 
-    def instance_metadata(self, instance: os.PathLike) -> Dict[str, Any]:
+    def instance_metadata(self, instance: os.PathLike) -> dict[str, Any]:
         """
         Return the metadata for a given instance file.
 
@@ -617,7 +617,7 @@ class FileDataset(Dataset):
             # Build structured, self-contained sidecar. Let exceptions from
             # collect_instance_metadata() propagate: a failure signals a corrupt
             # instance or a bug, which should surface rather than be buried.
-            sidecar: Dict[str, Any] = {
+            sidecar: dict[str, Any] = {
                 "dataset": self.dataset_metadata(),
                 "instance_name": self._instance_name(file_path),
                 "source_file": str(file_path.relative_to(self.dataset_dir)),
@@ -750,7 +750,7 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
         def __init__(self, dataset_dir: os.PathLike, extension: str = ".txt"):
             super().__init__(dataset_dir=dataset_dir, extension=extension)
 
-        def categories(self) -> Dict[str, Any]:
+        def categories(self) -> dict[str, Any]:
             return {}
 
         def download(self):

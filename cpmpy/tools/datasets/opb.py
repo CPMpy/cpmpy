@@ -11,7 +11,7 @@ import os
 import pathlib
 import tarfile
 import io
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Callable
 
 from cpmpy.tools.datasets.core import FileDataset
 
@@ -83,13 +83,13 @@ class OPBDataset(FileDataset):
             **kwargs
         )
 
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Extract metadata from OPB filename and file header.
 
@@ -97,7 +97,7 @@ class OPBDataset(FileDataset):
         extracts the author from the filename convention (first part before `_`).
         """
         import re
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         # Author from filename
         filename = pathlib.Path(file).name
         parts = filename.split("_")

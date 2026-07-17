@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import pathlib
 import zipfile
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Callable
 import builtins
 
 from cpmpy.tools.datasets.core import FileDataset
@@ -78,18 +78,18 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         """
         return parse_rcpsp(instance, open=cls.open)
 
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         return {
             "variant": self.variant,
             "family": self.family
         }
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Extract project metadata from SM file header.
         """
         import re
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 lines = f.readlines()

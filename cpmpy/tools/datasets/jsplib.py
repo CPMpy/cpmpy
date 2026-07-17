@@ -10,7 +10,7 @@ import os
 import json
 import pathlib
 import zipfile
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Callable
 import numpy as np
 
 import cpmpy as cp
@@ -81,10 +81,10 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         """
         return _parse_jsplib(instance, open=cls.open)
 
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         return {}  # no categories
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Extract metadata from instances.json and instance file header.
         """
@@ -97,7 +97,7 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             else:
                 self._source_metadata = []
 
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         # Extract description from file header comments
         try:

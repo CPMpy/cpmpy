@@ -10,7 +10,7 @@ import lzma
 import os
 import pathlib
 import re
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Callable
 from urllib.request import Request, urlopen
 
 from cpmpy.tools.datasets.core import FileDataset
@@ -66,7 +66,7 @@ class SATDataset(FileDataset):
             **kwargs,
         )
 
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         return {"track": self.track, "context": self.context}
 
     @classmethod
@@ -74,8 +74,8 @@ class SATDataset(FileDataset):
         path = str(instance)
         return lzma.open(instance, "rt") if path.endswith(".xz") else open(instance, "r")
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 for line in f:

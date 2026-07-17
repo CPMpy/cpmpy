@@ -10,7 +10,7 @@ import lzma
 import zipfile
 import pathlib
 import io
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Callable
 
 from cpmpy.tools.datasets.core import FileDataset
 
@@ -65,18 +65,18 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Extract instance type (CSP/COP) from XCSP3 XML root element.
         """
         import re
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 # Read only the first few lines to find the root element

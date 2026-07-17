@@ -10,7 +10,7 @@ import pathlib
 import zipfile
 import re
 import io
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Callable
 
 import cpmpy as cp
 from cpmpy.tools.datasets.core import FileDataset
@@ -89,10 +89,10 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         """
         return parse_scheduling_period(instance, open=cls.open)
 
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         return {}  # no categories
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Extract scheduling metadata from nurse rostering instance.
         """
