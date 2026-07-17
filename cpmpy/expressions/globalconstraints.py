@@ -170,6 +170,16 @@ class GlobalConstraint(Expression):
         """
         return True
 
+    def value(self) -> Optional[bool]:
+        """
+        Returns whether the global constraint is satisfied under the current variable assignment.
+
+        Returns:
+            Optional[bool]: True or False when all variables within its scope are assigned;
+            None if any variable within its scope is unassigned.
+        """
+        raise NotImplementedError(f"`value` is not implemented for {self}")
+
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
             Returns a decomposition into (a conjunction of) smaller constraints.
@@ -216,16 +226,6 @@ class GlobalConstraint(Expression):
 
 
 # Global Constraints (with Boolean return type)
-def alldifferent(args):
-    """
-    .. deprecated:: 0.9.0
-          Please use :class:`AllDifferent` instead.
-    """
-    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in "
-                  "stable version", DeprecationWarning)
-    return AllDifferent(*args) # unfold list as individual arguments
-
-
 class AllDifferent(GlobalConstraint):
     """
     Enforces that all arguments have a different (distinct) value
@@ -330,17 +330,6 @@ class AllDifferentExcept0(AllDifferentExceptN):
         """
         super().__init__(flatlist(args), 0)
 
-
-def allequal(args):
-    """
-    .. deprecated:: 0.9.0
-          Please use :class:`AllEqual` instead.
-    """
-    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version",
-                  DeprecationWarning)
-    return AllEqual(*args) # unfold list as individual arguments
-
-
 class AllEqual(GlobalConstraint):
     """
     Enforces that all arguments have the same value
@@ -415,17 +404,6 @@ class AllEqualExceptN(GlobalConstraint):
             return None
         vals = [v for v in vals if v not in frozenset(exclude_vals)]
         return len(set(vals)) <= 1
-
-
-def circuit(args):
-    """
-    .. deprecated:: 0.9.0
-          Please use :class:`Circuit` instead.
-    """
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version",
-                  DeprecationWarning)
-    return Circuit(*args) # unfold list as individual arguments
-
 
 class Circuit(GlobalConstraint):
     """
