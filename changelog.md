@@ -5,7 +5,15 @@
 ### Added
 
 * **IO** module with file format readers and writers [#842](https://github.com/CPMpy/cpmpy/pull/842)
-* **Datasets**: PyTorch-compatible dataset class providing single-line access to datastes from the CO community [#900](https://github.com/CPMpy/cpmpy/pull/900)
+* **Datasets**: PyTorch-compatible dataset class providing single-line access to datastes from the CO community [#900](https://github.com/CPMpy/cpmpy/pull/900) [#1037](https://github.com/CPMpy/cpmpy/pull/900):
+    * XCSP3
+    * JSPLib
+    * PSPLib rcpsp
+    * MIPLib
+    * MaxSAT Eval
+    * OPB
+    * SAT
+    * Nurse rostering
 * **New Solvers** 
     * **HiGHS** open source ILP solver [#868](https://github.com/CPMpy/cpmpy/pull/868)
     * **SCIP** open source Mixed Integer Programming (MIP) and Mixed Integer Nonlinear Programming (MINLP) solver [#412](https://github.com/CPMpy/cpmpy/pull/412) [#955](https://github.com/CPMpy/cpmpy/pull/955) [#982](https://github.com/CPMpy/cpmpy/pull/982)
@@ -64,7 +72,13 @@ With this v1.0.0 release, a lot has changed to CPMpy's internal workings. Many t
       ```
       Note that `FloatSum` is not an `Expression`: it cannot be nested inside constraints or other expressions.
     - *If you had float coefficients in constraints*: rescale them to integers (e.g. replace `0.5*x + 1.5*y <= 2` by `x + 3*y <= 4`).
-* **The deprecated lowercase constraint aliases `alldifferent()`, `allequal()` and `circuit()` are no longer exported from the `cpmpy` namespace** [#905](https://github.com/CPMpy/cpmpy/pull/905) (deprecated since 0.9.0). Calling e.g. `cp.alldifferent(...)` now fails; use the global constraint classes `AllDifferent`, `AllEqual` and `Circuit` instead. (The functions themselves still exist in `cpmpy.expressions.globalconstraints`, but will be removed in a future release.)
+* **The deprecated lowercase constraint aliases `alldifferent()`, `allequal()` and `circuit()` are removed** [#905](https://github.com/CPMpy/cpmpy/pull/905) [#1050](https://github.com/CPMpy/cpmpy/pull/1050) (deprecated since 0.9.0). They are no longer exported from the `cpmpy` namespace and the functions themselves have been removed from `cpmpy.expressions.globalconstraints`; use the global constraint classes `AllDifferent`, `AllEqual` and `Circuit` instead.
+* **Other functions deprecated since the 0.9.x series are removed** [#1050](https://github.com/CPMpy/cpmpy/pull/1050):
+    - `BoolVar()`, `IntVar()` and `cparray()`: use `boolvar()`, `intvar()` and `cpm_array()` instead.
+    - `Model.deepcopy()` and `Expression.deepcopy()`: use `copy.deepcopy()` instead.
+    - `cpmpy.transformations.negation.negated_normal()`: use `recurse_negation()` (or `push_down_negation()` on the full expression tree) instead.
+    - `cpmpy.transformations.get_variables.vars_expr()`: use `get_variables()` instead.
+    - `cpmpy.solvers.utils.get_supported_solvers()` and the `builtin_solvers` list: use `SolverLookup.supported()` and `SolverLookup.get(name)` instead.
 * **Multiplication is now a global function instead of an operator** [#850](https://github.com/CPMpy/cpmpy/pull/850). `x * y` creates a `Multiplication(x, y)` global function (still named `"mul"`) and `Operator("mul", ...)` can no longer be constructed. Modeling with `*` is unaffected, but code that inspects expressions with `isinstance(expr, Operator)` no longer matches multiplications; use `isinstance(expr, Multiplication)` instead.
 * **`Element` only accepts 1-dimensional arrays** [#926](https://github.com/CPMpy/cpmpy/pull/926). Indexing a multi-dimensional array now creates the new `NDElement` global function. Keep indexing with comma-separated indices (`Arr[i,j]`) or construct `NDElement(Arr, [i,j])` directly; code that constructed `Element` with a flattened index, or that checks `isinstance(expr, Element)`, must be updated accordingly.
 * **`NDVarArray` is no longer an `Expression` subclass** [#886](https://github.com/CPMpy/cpmpy/pull/886). Variable arrays (as returned by `intvar(..., shape=...)`, `boolvar(shape=...)` and `cpm_array()`) are now plain `numpy.ndarray` subclasses. All modeling functionality is unaffected (vectorized operators, `.sum()`, `.min()`/`.max()`, `.any()`/`.all()`, `.value()`, `.implies()`, indexing), but code that treats an array as an expression must be updated: `isinstance(arr, Expression)` now returns `False`, and `arr.args`, `arr.name` and `arr.is_bool()` no longer exist.
@@ -87,6 +101,7 @@ Due to the changes below, models saved to a `.pickle` file with CPMpy < 1.0.0 wi
     - The `csemap=` argument of transformations expects the new `CSEMap` object instead of a plain `dict` [#917](https://github.com/CPMpy/cpmpy/pull/917).
     - Several transformations gained parameters or dedicated objective-variants (`flatten_constraint(..., do_simplify=)`, `decompose_objective`, `push_down_negation_objective`, `safen_objective`, `decompose_linear`, `linearize_reified_variables`, ...); consult the `cpmpy.transformations` documentation when upgrading code that calls transformations directly.
 * Solver interfaces: the internal `_varmap` is keyed by variable name instead of by variable object [#990](https://github.com/CPMpy/cpmpy/pull/990), and `solver_var()` of the SAT-based interfaces (PySAT, Pindakaas) consistently returns Boolean literals only [#1017](https://github.com/CPMpy/cpmpy/pull/1017).
+* The deprecated `objective_value=` parameter of `SolverInterface._solve_return()` is removed, as is the internal helper `cpmpy.transformations.get_variables._uniquify()` [#1050](https://github.com/CPMpy/cpmpy/pull/1050).
 
 #### Minor behavior changes, including bug fixes that may affect code relying on the old behavior
 
@@ -106,6 +121,7 @@ Old names keep working for now (with a `DeprecationWarning` where applicable), b
 * **XCSP3 loading**: `cpmpy.tools.xcsp3.read_xcsp3()` is deprecated; use `cpmpy.tools.io.load_xcsp3()`, which accepts a path, string content or an open file object.
 * **`XCSP3Dataset` moved to the new datasets module** [#900](https://github.com/CPMpy/cpmpy/pull/900): import it from `cpmpy.tools.datasets` (it remains re-exported from `cpmpy.tools.xcsp3` for backward compatibility).
 * More generally, the new IO module provides `cpmpy.tools.io.load()` and `cpmpy.tools.io.write()` as one-stop entry points that automatically select the format (DIMACS, WCNF, OPB, XCSP3, ...) based on the file extension.
+* **`SolverLookup.solvernames()`** now emits a `DeprecationWarning`; use `SolverLookup.supported()` instead [#1050](https://github.com/CPMpy/cpmpy/pull/1050). Similarly, the deprecated `_toplevel`/`nested` arguments of `decompose_in_tree()` and `_toplevel`/`_nbc` of `no_partial_functions()` now emit a `DeprecationWarning` and are ignored, instead of raising an assertion error.
 
 ### Widened and extended APIs (non-breaking)
 
@@ -145,6 +161,7 @@ Old names keep working for now (with a `DeprecationWarning` where applicable), b
 
 ### Changed
 
+* Remove very old deprecated code [#1050](https://github.com/CPMpy/cpmpy/pull/1050)
 * Improve docs for testing a (new) solver [#1031](https://github.com/CPMpy/cpmpy/pull/1031)
 * Standardize reporting intermediate solutions [#561](https://github.com/CPMpy/cpmpy/pull/561)
 * Remove `frozendict` dependency [#1019](https://github.com/CPMpy/cpmpy/pull/1019)
@@ -177,6 +194,15 @@ Old names keep working for now (with a `DeprecationWarning` where applicable), b
 
 ### Fixed
 
+* Remove 'mul' from supported for CPLEX [#1045](https://github.com/CPMpy/cpmpy/pull/1045)
+* Throw `NotImplementedError` for base classes `GlobalConstraint` and `GlobalFunction` [#1047](https://github.com/CPMpy/cpmpy/pull/1047)
+* XCSP3 runner 'verbose' option [#962](https://github.com/CPMpy/cpmpy/pull/962)
+* Implication with single bool in lhs [#1043](https://github.com/CPMpy/cpmpy/pull/1035)
+* `NDVarArray` vectorized ops to use NumPy broadcasting [#1043](https://github.com/CPMpy/cpmpy/pull/1034)
+* Decomposition bugs in `Regular` and `MDD` [#1039](https://github.com/CPMpy/cpmpy/pull/1039)
+* Remove trivial wrapping of bool in linearize_constraint [#1042](https://github.com/CPMpy/cpmpy/pull/1042)
+* Trivial decompose crash with 0 constraints [#1041](https://github.com/CPMpy/cpmpy/pull/1041)
+* Flattening of wsum remove in-place edits [#1040](https://github.com/CPMpy/cpmpy/pull/1040)
 * Fix `Expr OP NDArr` by doing `NDArr ROP Expr` [#1035](https://github.com/CPMpy/cpmpy/pull/1035)
 * Solver var consistent return type [#1017](https://github.com/CPMpy/cpmpy/pull/1017)
 * Enforce version upper limit on HiGHS due to upstream bug [#1032](https://github.com/CPMpy/cpmpy/pull/1032)
