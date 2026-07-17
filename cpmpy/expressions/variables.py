@@ -74,14 +74,6 @@ _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are rese
 _VAR_NAME_CHECK_STATE = threading.local()
 _VAR_NAME_CHECK_STATE.strict = True # default to strict mode
 
-def BoolVar(shape=1, name=None):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.boolvar` instead.
-    """
-    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
-    return boolvar(shape=shape, name=name)
-
 
 @overload
 def boolvar(shape: Literal[1] = 1,  # special case: a shape of =1 returns a single variable
@@ -158,15 +150,6 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     r = NDVarArray(shape, dtype=object, buffer=data)
     r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
-
-
-def IntVar(lb, ub, shape=1, name=None):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.intvar` instead.
-    """
-    warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
-    return intvar(lb, ub, shape=shape, name=name)
 
 
 @overload
@@ -253,14 +236,6 @@ def intvar(lb: int, ub: int, shape: int|np.integer|tuple[int|np.integer, ...] = 
     r = NDVarArray(shape, dtype=object, buffer=data)
     r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
-
-def cparray(arr):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.cpm_array` instead.
-    """
-    warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
-    return cpm_array(arr)
 
 
 def cpm_array(arr: ListLike[ExprLike|Any]) -> NDVarArray:

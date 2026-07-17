@@ -112,6 +112,16 @@ class GlobalFunction(Expression):
         """
         return False
 
+    def value(self) -> Optional[int]:
+        """
+        Returns whether the global function can be evaluated under the current variable assignment.
+
+        Returns:
+            Optional[int]: The numeric value when all variables within its scope are assigned;
+            None if any variable within its scope is unassigned.
+        """
+        raise NotImplementedError(f"`value` is not implemented for {self}")
+
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
             Returns a decomposition into smaller constraints as a tuple of
@@ -137,8 +147,12 @@ class GlobalFunction(Expression):
 
     def decompose_comparison(self, cmp_op: str, cmp_rhs: Expression) -> tuple[list[Expression], list[Expression]]:
         """
-            DEPRECATED: returns a list of constraints representing the decomposed
-            comparison of the global function (and any auxiliary variables introduced).
+
+        .. deprecated:: 1.0.0
+            Please use :meth:`decompose` instead.
+
+        Returns a list of constraints representing the decomposed
+        comparison of the global function (and any auxiliary variables introduced).
 
         Arguments:
             cmp_op (str): Comparison operator
@@ -989,7 +1003,8 @@ class NDElement(GlobalFunction):
 
 def element(arg_list):
     """
-    DEPRECATED: Use Element(arr,idx) instead of element([arr,idx]).
+    .. deprecated:: 1.0.0
+        Please use :meth:`Element(arr,idx)` instead of :meth:`element([arr,idx])`.
 
     Arguments:
         arg_list (list[Expression]): List containing array and index (2 elements)
@@ -997,7 +1012,7 @@ def element(arg_list):
     Returns:
         Element: An Element global function instance
     """
-    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
 
