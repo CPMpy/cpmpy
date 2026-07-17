@@ -170,15 +170,6 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         # Clean up the zip file
         target_download_path.unlink()
 
-    def __getitem__(self, index: Union[int, str]) -> Tuple[Any, Any]:
-        # Override to support string indexing by instance name
-        if isinstance(index, str):
-            try:
-                index = [f.stem for f in self._list_instances()].index(index)
-            except ValueError:
-                raise ValueError(f"Instance '{index}' not found in dataset")
-        return super().__getitem__(index)
-
 
 if __name__ == "__main__":
     dataset = PSPLibDataset(variant="rcpsp", family="j30", download=True)

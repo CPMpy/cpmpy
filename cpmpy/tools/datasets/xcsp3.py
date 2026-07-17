@@ -157,6 +157,7 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
 
 
 if __name__ == "__main__":
-    dataset = XCSP3Dataset(year=2024, track="MiniCOP", download=True)
+    dataset = XCSP3Dataset(year=2024, track="COP", download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])
+    print("Instance 'AircraftAssemblyLine-3-628-000-0_c24':", dataset["AircraftAssemblyLine-3-628-000-0_c24"])

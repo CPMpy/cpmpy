@@ -119,7 +119,7 @@ import pathlib
 import io
 import sys
 import tempfile
-from typing import Any, Optional, Tuple, List, Iterator, Callable, ClassVar
+from typing import Any, Optional, Tuple, List, Iterator, Callable, ClassVar, Union
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
 
@@ -519,10 +519,22 @@ class FileDataset(Dataset):
         """
         return len(self._list_instances())
 
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+    def __getitem__(self, index: Union[int, str]) -> Tuple[Any, Any]:
         """
         Return the instance and metadata at the given index.
+
+        Arguments:
+            index (Union[int, str]): The index or name (without extension) of the instance to return.
+
+        Returns:
+            Tuple[Any, Any]: The instance and metadata.
         """
+        if isinstance(index, str):
+            try:
+                index = [f.name[:-len(self.extension)] if len(self.extension) > 0 else f.name for f in self._list_instances()].index(index)
+            except ValueError:
+                raise ValueError(f"Instance '{index}' not found in dataset")
+
         if index < 0 or index >= len(self):
             raise IndexError("Index out of range")
 
