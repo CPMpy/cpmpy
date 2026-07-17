@@ -8,11 +8,9 @@ from __future__ import annotations
 import os
 import pathlib
 import zipfile
-import re
 import io
 from typing import Any, Optional, Callable
 
-import cpmpy as cp
 from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.io.nurserostering import parse_scheduling_period, _model_nurserostering
 
@@ -48,9 +46,6 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         transform (callable, optional): Optional transform to be applied on the instance data (the file path of each problem instance)
         target_transform (callable, optional): Optional transform to be applied on the metadata (the metadata dictionary of each problem instance)
         download (bool): If True, downloads the dataset from the internet and puts it in `root` directory
-        sort_key (callable, optional): Optional function to sort instance files. If None, uses Python's built-in sorted().
-            For natural/numeric sorting, pass natsorted from natsort library.
-            Example: from natsort import natsorted; dataset = NurseRosteringDataset(..., sort_key=natsorted)
     """
 
     name = "nurserostering"
@@ -65,13 +60,12 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     def __init__(self, root: str = ".", transform: Optional[Callable] = None,
                  target_transform: Optional[Callable] = None, download: bool = False,
-                 sort_key: Optional[Callable] = None, **kwargs: Any):
+                 **kwargs: Any):
         """
         Initialize the Nurserostering Dataset.
         """
 
         self.root = pathlib.Path(root)
-        self.sort_key = sorted if sort_key is None else sort_key
 
         dataset_dir = self.root / self.name
 
