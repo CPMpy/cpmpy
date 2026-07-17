@@ -21,13 +21,13 @@ def callbacks():
 class TestCallbacksCPMPy:
 
     def test_get_cpm_exprs_empty(self, callbacks):
-        # fix from xcsp3_26 branch (commit bd9b6a723): empty input must return [],
+        # empty input must return [],
         # both for plain lists and numpy arrays (where `not lst` raises/misbehaves)
         assert callbacks.get_cpm_exprs([]) == []
         assert callbacks.get_cpm_exprs(np.array([])) == []
 
     def test_get_cpm_var_non_xvar_key(self, callbacks):
-        # fix from xcsp3_26 branch (commit 7e72cc896): keys registered in
+        # keys registered in
         # cpm_variables must be mapped even when they are not XVar instances
         v = cp.intvar(0, 3, name="x")
         callbacks.cpm_variables["k"] = v
