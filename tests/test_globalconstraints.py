@@ -661,14 +661,35 @@ class TestGlobal:
         true_model = cp.Model(cp.Regular(x, transitions, start, ends))
         false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
 
-        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))))
-        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))))
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10) # all assignments = 8
+        else:
+            kwargs = dict()
+
+        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))), **kwargs)
+        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))), **kwargs)
 
         assert num_true == len(solutions)
         assert true_sols == set(solutions)
 
         assert num_true + num_false == 2**3
         assert len(true_sols & false_sols) == 0# no solutions can be in both
+
+    def test_regular_positive_reif(self):
+        b = cp.boolvar()
+        x = cp.intvar(0, 1, shape=2)
+
+        # 3-state automaton that accepts only the string [0, 0].
+        reg = cp.Regular(x, transitions=[('a', 0, 'b'), ('b', 0, 'c')], start='a', accepting=['c'])
+
+        m = cp.Model([x[0] == 1, b.implies(reg)])
+
+        # x[0] = 1 has no transition from 'a' -> automaton rejects -> reg is False.
+        # b is False, so "b -> reg" MUST be satisfiable.
+        sat = m.solve()
+
+        assert sat, "BUG: half-reified Regular is unsound for rejected strings"
+
 
     def test_mdd(self):
         x = cp.intvar(0, 3, shape=3)
@@ -693,6 +714,30 @@ class TestGlobal:
         assert sols_redu == set(solutions)
 
         assert num_orig == num_redu
+
+    def test_mdd_variable_reuse(self):
+        x = cp.intvar(0, 3, shape=3, name="x")
+        # MDD accepting exactly [1,1,1]
+        mdd = cp.MDD(x, transitions=[('A', 1, 'B'),
+                                  ('B', 1, 'C'),
+                                  ('C', 1, 'D'), ])
+
+        # x=[0,0,0] is NOT a path in the MDD => MDD(x) is False => ~MDD(x) must be True.
+        m_neg = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, ~mdd])
+        assert m_neg.solve()
+
+        # Full reification: b == MDD(x), force b False with the rejected assignment.
+        b = cp.boolvar(name="b")
+        m_reif = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b == mdd, ~b])
+        assert m_reif.solve()
+
+        # Sanity: a genuinely accepted assignment still works positively.
+        m_toplevel = cp.Model([x[0] == 1, x[1] == 1, x[2] == 1, mdd])
+        assert m_toplevel.solve()
+
+        # Sanity: a non-accepted assignment still works when the mdd is positively reified, with no other constraints on b.
+        m_pos = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b.implies(mdd)])
+        assert m_pos.solve()
 
 
     def test_minimum(self):
@@ -1734,6 +1779,8 @@ class TestTypeChecks:
             assert not constr.value()
 
         assert total == len(all_sols) + len(not_all_sols)
+
+
 
 
     def test_increasing(self):

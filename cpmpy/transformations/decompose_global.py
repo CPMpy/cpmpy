@@ -21,6 +21,7 @@ This allows to post the decomposed expression tree to the solver if it supports 
 
 import copy
 from typing import AbstractSet, Optional, Dict, Any, Callable, Protocol, cast, overload
+import warnings
 import numpy as np
 
 
@@ -72,8 +73,10 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :func:`cpmpy.transformations.reification.reify_rewrite`
     E.g. ``bv -> NumExpr <comp> Var/Const`` will then be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
     """
-    assert _toplevel is None, "decompose_in_tree: argument '_toplevel' is deprecated, do not use/modify it"
-    assert nested is False, "decompose_in_tree: argument 'nested' is deprecated, do not use/modify it"
+    if _toplevel is not None:
+        warnings.warn("decompose_in_tree: argument '_toplevel' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+    if nested:
+        warnings.warn("decompose_in_tree: argument 'nested' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
 
     if supported is None:
         supported = frozenset[str]()
@@ -90,8 +93,11 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             if csemap is not None:
                 decomp = csemap.get_decomposition(expr)
                 if decomp is not None:
-                    assert decomp.name == "and", "decompose_in_tree: expected a conjunction but got {decomp}"
-                    newlist.extend(decomp.args)
+                    assert isinstance(decomp, Expression)
+                    if decomp.name == "and":
+                        newlist.extend(decomp.args)
+                    else:
+                        newlist.append(decomp)
                     continue
 
             # First see if a custom decomposition is provided for positive context, then for any context, otherwise use the default
@@ -107,8 +113,14 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 todolist.extend(toplevel_exprs)
             if len(exprs) > 0:
                 todolist.extend(exprs)
-                if csemap is not None:
-                    csemap.save_decomposition(expr, Operator("and", exprs))
+                # don't save toplevel decompositions to the csemap, 
+                # we currently don't have a way of distinguishing positive and negative in the csemap ... TODO
+                # if csemap is not None:
+                #     if len(exprs) == 1: # dont wrap in conjunction
+                #         csemap.save_decomposition(expr, exprs[0])
+                #     else:
+                #         csemap.save_decomposition(expr, Operator("and", exprs))
+        
         elif isinstance(expr, (bool, np.bool_)):
             # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
             changed = True
@@ -248,6 +260,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     decomp = csemap.get_decomposition(arg)
                     if decomp is not None:
                         newargs.append(decomp)
+                        changed = True
                         continue
                 arg_orig = arg
 
@@ -268,7 +281,11 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     if len(rec_toplevel) > 0:
                         toplevel.extend(rec_toplevel)
 
-                if len(exprs) == 1:
+                if len(exprs) == 0:
+                    # empty decomposition (e.g. alldifferent over 0/1 elements)
+                    # is a trivially-true conjunction
+                    arg = BoolVal(True)
+                elif len(exprs) == 1:
                     arg = exprs[0]
                 else:
                     # replace arg by conjunction of decompose

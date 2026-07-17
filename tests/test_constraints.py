@@ -117,7 +117,7 @@ def comp_constraints(solver):
 def bool_exprs(solver):
     """
         Generate all boolean expressions:
-        - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var, ...]), or([Var, ...])    (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
         - Global constraints
     """
@@ -128,13 +128,15 @@ def bool_exprs(solver):
 
     for name, arity in names:
         if arity != 0:
-            operator_args = BOOL_ARGS[:arity]
+            arg_counts = [arity]
         else:
-            operator_args = BOOL_ARGS
+            arg_counts = [1, len(BOOL_ARGS)] # singleton and full
 
-        yield Operator(name, operator_args)
-        # Negated boolean values
-        yield Operator(name, [~ arg for arg in operator_args])
+        for n in arg_counts:
+            operator_args = BOOL_ARGS[:n]
+            yield Operator(name, operator_args)
+            # Negated boolean values
+            yield Operator(name, [~ arg for arg in operator_args])
 
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])

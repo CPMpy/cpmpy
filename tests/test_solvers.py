@@ -485,6 +485,32 @@ class TestSolvers:
         s = cp.SolverLookup.get("z3", m)
         assert not s.solve()
 
+    @pytest.mark.requires_solver("z3")
+    @pytest.mark.xfail(
+        reason="Z3 returns incorrect variable values after optimize; see https://github.com/CPMpy/cpmpy/issues/1036",
+        strict=True,
+    )
+    def test_z3_optimize_inconsistent_model_values(self, solver):
+        # Minimal Golomb-ruler-style problem: Z3 proves objective 20 but returns x9=500.
+        # issue tracked in: https://github.com/CPMpy/cpmpy/issues/1036
+        n = 10
+        U = 500
+        x = cp.intvar(0, U, shape=n)
+        ds = [x[j] - x[i] for i in range(n) for j in range(i + 1, n)]
+        m = cp.Model([
+            x[0] == 0,
+            cp.IncreasingStrict(x),
+            cp.AllDifferent(ds),
+        ])
+        m.minimize(x[n - 1])
+
+        s = cp.SolverLookup.get("z3:opt", m)
+        assert s.solve()
+        assert s.status().exitstatus == ExitStatus.OPTIMAL
+        obj_bound = s.z3_solver.lower(s.obj_handle)
+        assert s.z3_solver.lower(s.obj_handle) == s.z3_solver.upper(s.obj_handle)
+        assert x[n - 1].value() == obj_bound
+
     def test_pow(self):
         iv1 = cp.intvar(2,9)
         for i in [0,1,2]:
@@ -726,6 +752,12 @@ class TestSolvers:
         m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
         s = cp.SolverLookup.get("cplex", m)
         assert s.solve()
+
+        x, y = cp.intvar(0, 10, shape=2)
+        m = cp.Model(x * y == 1)
+        s = cp.SolverLookup.get("cplex", m)
+        assert s.solve()
+        assert x.value() * y.value() == 1
 
 
     @pytest.mark.skipif(not CPM_cplex.supported(),

@@ -3,7 +3,6 @@ import cpmpy as cp
 import numpy as np
 import torch
 from torch import nn
-import matplotlib.pyplot as plt
 
 
 # Generic PyEPO wrapper for CPMpy models
@@ -36,9 +35,15 @@ class optCPMpyModel(pyepo.model.opt.optModel):
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--plot", action="store_true", help="Show learning curve plot")
+    args = parser.parse_args()
+
     # Data configuration
-    num_data = 1000
-    num_feat = 5
+    num_data = 500  # increase for better accuracy
+    num_feat = 4
     num_item = 10
     deg = 6
     noise_width = 0
@@ -46,7 +51,7 @@ if __name__ == "__main__":
 
     # Training configuration
     lr = 0.01
-    num_epochs = 2  # kept low so the example test finishes quickly; increase (e.g. 15) for better accuracy
+    num_epochs = 3  # kept low so the example test finishes quickly; increase (e.g. 15) for better accuracy
 
     
     # Generate data
@@ -105,23 +110,25 @@ if __name__ == "__main__":
         pred_model.train()  # Switch back to training mode
 
     
-    # Plot training regrets
-    plt.figure(figsize=(10, 6))
-    plt.plot(
-        range(1, num_epochs + 1),
-        training_regrets,
-        marker='o',
-        linestyle='-',
-        linewidth=2.5,
-        markersize=8,
-        color='#E24A33',
-        alpha=0.9
-    )
-    plt.title('Learning Curves', fontsize=18, fontweight='bold', pad=20)
-    plt.xlabel('Epoch', fontsize=14, labelpad=10)
-    plt.ylabel('Relative regret', fontsize=14, labelpad=10)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.tight_layout()
-    plt.grid(True, which='major', linestyle='--', linewidth=0.6, alpha=0.6)
-    plt.show()
+    if args.plot:
+        import matplotlib.pyplot as plt
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(
+            range(1, num_epochs + 1),
+            training_regrets,
+            marker='o',
+            linestyle='-',
+            linewidth=2.5,
+            markersize=8,
+            color='#E24A33',
+            alpha=0.9
+        )
+        plt.title('Learning Curves', fontsize=18, fontweight='bold', pad=20)
+        plt.xlabel('Epoch', fontsize=14, labelpad=10)
+        plt.ylabel('Relative regret', fontsize=14, labelpad=10)
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.tight_layout()
+        plt.grid(True, which='major', linestyle='--', linewidth=0.6, alpha=0.6)
+        plt.show()

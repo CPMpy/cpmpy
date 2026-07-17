@@ -74,14 +74,6 @@ _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are rese
 _VAR_NAME_CHECK_STATE = threading.local()
 _VAR_NAME_CHECK_STATE.strict = True # default to strict mode
 
-def BoolVar(shape=1, name=None):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.boolvar` instead.
-    """
-    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
-    return boolvar(shape=shape, name=name)
-
 
 @overload
 def boolvar(shape: Literal[1] = 1,  # special case: a shape of =1 returns a single variable
@@ -158,15 +150,6 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     r = NDVarArray(shape, dtype=object, buffer=data)
     r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
-
-
-def IntVar(lb, ub, shape=1, name=None):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.intvar` instead.
-    """
-    warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
-    return intvar(lb, ub, shape=shape, name=name)
 
 
 @overload
@@ -253,14 +236,6 @@ def intvar(lb: int, ub: int, shape: int|np.integer|tuple[int|np.integer, ...] = 
     r = NDVarArray(shape, dtype=object, buffer=data)
     r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
-
-def cparray(arr):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.cpm_array` instead.
-    """
-    warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
-    return cpm_array(arr)
 
 
 def cpm_array(arr: ListLike[ExprLike|Any]) -> NDVarArray:
@@ -659,23 +634,39 @@ class NDVarArray(np.ndarray):
                np.asarray(ubs).reshape(self.shape)
 
     # VECTORIZED master function (delegate)
-    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str) -> NDVarArray:
+    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str, **kwargs) -> NDVarArray:
         """
-        Vectorized implementation of the given attribute (e.g. __eq__, __add__, etc.)
+        NumPy-broadcast ``other`` to ``self.shape``, then apply ``attr`` element-wise.
 
         Args:
             other (ExprLike|Iterable|Any): The other operand.
                 Typically an array/list of Expressions, or a single Expression, or a constant (or anything np compatible)
-            attr (str): The attribute to vectorize (e.g. __eq__, __add__, etc.)
+            attr (str): The attribute to vectorize (e.g. ``__eq__``, ``__add__``, ``implies``, etc.)
+            **kwargs: Extra keyword arguments passed to each element call (e.g. ``simplify`` for ``implies``).
 
         Returns:
             NDVarArray: The vectorized result.
         """
-        if not isinstance(other, Iterable):
-            other = [other]*len(self)
-        # this is a bit cryptic, but it calls 'attr' on s with o as arg
+        if not isinstance(other, np.ndarray):
+            other = np.asarray(other)
+        try:
+            broadcast_shape = np.broadcast_shapes(other.shape, self.shape)
+        except ValueError as e:
+            raise ValueError(
+                f"operands could not be broadcast together with shapes {self.shape} {other.shape}"
+            ) from e
+        if broadcast_shape != self.shape:
+            raise ValueError(
+                f"other with shape {other.shape} could not be broadcast to self with shape {self.shape}"
+            )
+        other = np.broadcast_to(other, self.shape)
         # s.__eq__(o) <-> getattr(s, '__eq__')(o)
-        return cpm_array([getattr(s,attr)(o) for s,o in zip(self, other)])
+        flat_res = cpm_array([
+            # unwrap numpy 'generic' scalar to is Python int item, so int <= np.int64 does not return NotImplemented
+            getattr(s, attr)(o.item() if isinstance(o, np.generic) else o, **kwargs)
+            for s, o in zip(self.flat, other.flat)])
+        # typing is wrong, reshape does return NDVarArray
+        return flat_res.reshape(self.shape) # type: ignore
 
     # VECTORIZED comparisons
     def __eq__(self, other):
@@ -772,9 +763,7 @@ class NDVarArray(np.ndarray):
         return self._vectorized(other, '__rxor__')
 
     def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify=False) -> NDVarArray:
-        if not isinstance(other, Iterable):
-            other = [other] * len(self)
-        return cpm_array([s.implies(o, simplify=simplify) for s, o in zip(self, other)])
+        return self._vectorized(other, 'implies', simplify=simplify)
 
     #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False

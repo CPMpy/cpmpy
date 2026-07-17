@@ -3,6 +3,7 @@
 """
 
 from copy import copy
+import warnings
 import numpy as np
 
 from ..expressions.variables import boolvar, intvar, NDVarArray, _BoolVarImpl, _NumVarImpl
@@ -71,8 +72,10 @@ def no_partial_functions(lst_of_expr: list[Expression],
                                     unsafe values in its API (e.g., OR-Tools for `div`).
     """
 
-    assert _toplevel is None, "no_partial_functions:  argument '_toplevel' is deprecated, do not use/modify it"
-    assert _nbc is None, "no_partial_functions:  argument '_nbc' is deprecated, do not use/modify it"
+    if _toplevel is not None:
+        warnings.warn("no_partial_functions: argument '_toplevel' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+    if _nbc is not None:
+        warnings.warn("no_partial_functions: argument '_nbc' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
 
     if safen_toplevel is None:
         safen_toplevel = frozenset()

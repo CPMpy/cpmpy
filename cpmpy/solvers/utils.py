@@ -133,6 +133,11 @@ class SolverLookup():
 
     @classmethod
     def solvernames(cls):
+        """
+        .. deprecated:: 1.0.0
+            Please use :meth:`supported` instead.
+        """
+        warnings.warn("Deprecated, use supported() instead", DeprecationWarning)
         # The older (more indirectly named) way to get the list of names of *supported* solvers.
         # Will be deprecated at some point.
         return cls.supported()
@@ -244,19 +249,3 @@ class SolverLookup():
                 # For main solvers, show version if available
                 version = version if version else "Not found" if installed else "-"
                 print(f"{basename:<25} {'Yes' if installed else 'No':<10} {version:<15}")
-
-
-# using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
-# Order matters! first is default, then tries second, etc...
-builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, CPM_choco]
-def get_supported_solvers():
-    """
-        Returns a list of solvers supported on this machine.
-       
-        .. deprecated:: 0.9.4
-            Please use :class:`SolverLookup` object instead.
-
-        :return: a list of SolverInterface sub-classes :list[SolverInterface]:
-    """
-    warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
-    return [sv for sv in builtin_solvers if sv.supported()]
