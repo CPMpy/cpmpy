@@ -106,9 +106,11 @@ def _model_jsplib(task_to_machines: np.ndarray, task_durations: np.ndarray) -> t
 
     n_jobs, n_tasks = task_to_machines.shape
 
-    start = cp.intvar(0, task_durations.sum(), name="start", shape=(n_jobs,n_tasks)) # extremely bad upperbound... TODO
-    end = cp.intvar(0, task_durations.sum(), name="end", shape=(n_jobs,n_tasks)) # extremely bad upperbound... TODO
-    makespan = cp.intvar(0, task_durations.sum(), name="makespan") # extremely bad upperbound... TODO
+    horizon = task_durations.sum() # TODO: improve with better upper bound?
+
+    start = cp.intvar(0, horizon, name="start", shape=(n_jobs,n_tasks))
+    end = cp.intvar(0, horizon, name="end", shape=(n_jobs,n_tasks))
+    makespan = cp.intvar(0, horizon, name="makespan") 
 
     model = cp.Model()
     model.add(end[:,:-1] <= start[:,1:]) # precedences
