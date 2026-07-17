@@ -1406,7 +1406,8 @@ class InDomain(GlobalConstraint):
             arr = np.array(arr, dtype=int)
         assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
 
-        has_subexpr = expr.has_subexpr()
+        has_subexpr = not isinstance(expr, (_NumVarImpl, BoolVal))
+
         # args: tuple[Expression, np.ndarray]
         super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
 
