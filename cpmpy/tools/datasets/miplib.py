@@ -42,7 +42,7 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     def __init__(
             self,
             root: str = ".",
-            year: int = 2024, track: str = "exact-unweighted",
+            year: int = 2024,
             transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
             **kwargs: Any
@@ -57,9 +57,8 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
         self.root = pathlib.Path(root)
         self.year = year
-        self.track = track
 
-        dataset_dir = self.root / self.name / str(year) / track
+        dataset_dir = self.root / self.name / str(year)
 
         super().__init__(
             dataset_dir=dataset_dir, 
@@ -71,7 +70,6 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     def categories(self) -> dict[str, Any]:
         return {
             "year": self.year,
-            "track": self.track
         }
 
     def download(self):
