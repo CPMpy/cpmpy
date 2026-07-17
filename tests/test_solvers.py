@@ -823,9 +823,8 @@ class TestSolvers:
 
     @pytest.mark.requires_solver("pumpkin")
     def test_pumpkin_indomain_expression(self, solver):
-        # fix from xcsp3_26 branch (commit cecbbc1c5): InDomain on a non-variable
-        # expression (e.g. a sum) must be flattened into an auxiliary variable
-        # before handing it to Pumpkin's native Table encoding
+        # InDomain on a non-variable expression (e.g. a sum) must be flattened 
+        # into an auxiliary variable before handing it to Pumpkin's native Table encoding
         x = cp.intvar(0, 5, shape=3)
         m = cp.Model(cp.InDomain(cp.sum(x), [2, 4]))
         s = cp.SolverLookup.get(solver, m)
