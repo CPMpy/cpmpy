@@ -610,10 +610,17 @@ class CPM_pumpkin(SolverInterface):
             
             elif cpm_expr.name == "InDomain":
                 val, domain = cpm_expr.args
-                return [constraints.Table(self.to_pum_ivar([val]),
-                                          [[d] for d in domain], # each domain value is its own row
-                                          constraint_tag=tag)
-                        ]
+                pum_cons = []
+                # the native Table encoding needs a plain variable; flatten a
+                # non-variable expression (e.g. a sum) into an auxiliary variable
+                if not isinstance(val, _NumVarImpl):
+                    val, defining = get_or_make_var(val)
+                    for cons in self.transform(defining):
+                        pum_cons.extend(self._get_constraint(cons, tag=tag))
+                pum_cons.append(constraints.Table(self.to_pum_ivar([val]),
+                                                  [[d] for d in domain], # each domain value is its own row
+                                                  constraint_tag=tag))
+                return pum_cons
             
             
             else:
