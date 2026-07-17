@@ -41,6 +41,10 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         - Smet P. Constraint reformulation for nurse rostering problems, in: PATAT 2018 twelfth international conference on the practice and theory of automated timetabling, Vienna, August, 2018, p. 69-80.
         - Rahimian, E., Akartunali, K., and Levine, J. A hybrid integer programming and variable neighbourhood search algorithm to solve nurse rostering problems. European Journal of Operational Research, 2017. 258(2): p. 411-423.
 
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.nurserostering.load_nurserostering`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
+
     Arguments:
         root (str): Root directory containing the nurserostering instances (if 'download', instances will be downloaded to this location)
         transform (callable, optional): Optional transform to be applied on the instance data (the file path of each problem instance)

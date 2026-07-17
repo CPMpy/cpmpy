@@ -21,6 +21,10 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     - Origin: https://www.om-db.wi.tum.de/psplib/main.html
     - Reference: Kolisch, R., Sprecher, A. PSPLIB - A project scheduling problem library. European Journal of Operational Research, 96(1), 205-216, 1997.
 
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.rcpsp.load_rcpsp`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
+
     Arguments:
         root (str): Root directory containing the psplib instances (if 'download', instances will be downloaded to this location)
         variant (str): scheduling variant (only 'rcpsp' is supported for now)

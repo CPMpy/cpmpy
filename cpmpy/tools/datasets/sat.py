@@ -25,6 +25,10 @@ class SATDataset(FileDataset):
 
     - Origin: https://benchmark-database.de/
 
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.dimacs.load_dimacs`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
+
     Arguments:
         root (str): Root directory where the dataset is stored or will be downloaded (default=".").
         track (str): Track query parameter for getinstances (default="main_2025").

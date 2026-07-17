@@ -29,6 +29,10 @@ class OPBDataset(FileDataset):
     - Origin: https://www.cril.univ-artois.fr/PB25/
     - Reference: Berre, D. L., Parrain, A. The Pseudo-Boolean Evaluation 2011. JSAT, 7(1), 2012.
 
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.opb.load_opb`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
+
     Arguments:
         root (str): Root directory where datasets are stored or will be downloaded to (default=".").
         year (int): Competition year of the dataset to use (default=2024).

@@ -34,6 +34,10 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         - T. Yamada, R. Nakano. 'A genetic algorithm applicable to large-scale job-shop problems.', Proceedings of the Second international workshop on parallel problem solving from Nature (PPSN'2). Brussels (Belgium), pp. 281-290, 1992.
         - E. Taillard. 'Benchmarks for basic scheduling problems', European Journal of Operational Research, Vol. 64, Issue 2, pp. 278-285, 1993.
 
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.jsplib.load_jsplib`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
+
     Arguments:
         root (str): Root directory containing the jsp instances (if 'download', instances will be downloaded to this location)
         transform (callable, optional): Optional transform to be applied on the instance data (the file path of each problem instance)

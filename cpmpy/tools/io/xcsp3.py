@@ -11,6 +11,9 @@ More can be read about it here:
 
 - https://xcsp.org/specifications/
 
+For additional XCSP3 utilities (benchmarking, analysis, CLI, …),
+see :mod:`cpmpy.tools.xcsp3`.
+
 =================
 List of functions
 =================
@@ -30,6 +33,20 @@ import cpmpy as cp
 
 
 def load_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins.open) -> cp.Model:
+    """
+    Loads an XCSP3 instance (.xml or .xml.lzma) and returns its matching CPMpy model.
+
+    Arguments:
+        xcsp3 (str or os.PathLike or TextIO):
+            - A file path to an WCNF file (optionally LZMA-compressed with `.xz`), or
+            - A string containing the WCNF content directly, or
+            - A TextIO object already open for reading
+        open: (callable):
+            If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
+
+    Returns:
+        The XCSP3 instance loaded as a CPMpy model.
+    """
     from cpmpy.tools.xcsp3.parser import load_xcsp3 as load_xcsp3_parser
 
     return load_xcsp3_parser(xcsp3, open=open)

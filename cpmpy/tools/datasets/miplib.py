@@ -23,6 +23,10 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     - Origin: https://miplib.zib.de/
     - Reference: Gleixner, A., et al. MIPLIB 2017: Data-Driven Compilation of the 6th Mixed-Integer Programming Library. Mathematical Programming Computation, 2021.
 
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.scip_formats.load_scip_format`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
+
     Arguments:
         root (str): Root directory where datasets are stored or will be downloaded to (default=".").
         year (int): Year of the dataset to use (default=2024).

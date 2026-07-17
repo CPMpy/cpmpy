@@ -28,6 +28,10 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     - Origin: https://maxsat-evaluations.github.io/
 
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.wcnf.load_wcnf`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
+
     Arguments:
         root (str): Root directory where datasets are stored or will be downloaded to (default="."). If `dataset_dir` is provided, this argument is ignored.
         year (int): Competition year of the dataset to use (default=2024).
