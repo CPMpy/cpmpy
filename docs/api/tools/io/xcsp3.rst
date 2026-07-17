@@ -1,4 +1,4 @@
-XCSP3 IO (:mod:`cpmpy.tools.io.xcsp3`)
+XCSP3 (:mod:`cpmpy.tools.io.xcsp3`)
 ======================================
 
 .. automodule:: cpmpy.tools.io.xcsp3
