@@ -83,7 +83,7 @@ class CPM_pindakaas(SolverInterface):
     def supported():
         try:
             import pindakaas
-
+            CPM_pindakaas._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

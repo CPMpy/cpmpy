@@ -45,9 +45,6 @@ import time
 from typing import Optional
 
 import numpy as np
-from packaging.version import Version
-
-import warnings
 
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -98,19 +95,13 @@ class CPM_choco(SolverInterface):
         try:
             # check if pychoco is installed
             import pychoco as chc
-            chc_version = CPM_choco.version()
-            # check it's the correct version
-            # CPMPy uses features only available from 0.2.1
-            if Version(chc_version) < Version("0.2.1"):
-                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
-                              f"but you have version {chc_version}.")
-                return False
+            CPM_choco._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False
         except Exception as e:
             raise e
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """

@@ -7,7 +7,7 @@ To add your solver to CPMpy, you should copy [cpmpy/solvers/TEMPLATE.py](https:/
 Implementing the template consists of the following parts:
 
   * `version()` where you return the installed version of the solver's Python API, if its installed.
-  * `supported()` where you check whether the solver is ready to use. Never include the solver python package at the top-level of the file, CPMpy has to work even if a user did not install your solver package. If needed, split this into helper checks such as `installed()`, `license_ok()`, `executable_installed()`, or version checks.
+  * `supported()` where you check whether the solver is ready to use. Never include the solver python package at the top-level of the file, CPMpy has to work even if a user did not install your solver package. If needed, split this into helper checks such as `installed()`, `license_ok()`, or `executable_installed()`. For package version constraints, call ``cls._warn_outdated_dependencies()`` after a successful import; it checks the constraints of your extras key in ``setup.py`` (derived from the class name, ``CPM_mysolver`` -> ``"mysolver"``). That warns when the installed version is outside the declared range, without making ``supported()`` return ``False``, so users can still try an older optional solver dependency at their own risk.
   * `__init__()` and `native_model()` where you initialize and return the underlying solver object.
   * `solver_var()` where you create new solver variables and map them to CPMpy decision variables.
   * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving.
@@ -24,7 +24,7 @@ Now, to get your solver known and easy to use, you also have to register it in a
   * ``docs/api/solvers/`` needs a `.rst` file for your solver, to appear in CPMpy's [API documentation](./api/solvers.rst) (copy one of the other solvers' file and make the necessary changes)
   * ``cpmpy/solvers/__init__.py`` in the *"List of classes"*, the imports and the all, so its easy to import from cpmpy.solvers
   * ``mypy.ini`` if your solver is not typed, you should set ignore_missing_imports for it here
-  * ``setup.py`` you can add a group to ease install; our policy is to only forbid existing solver versions that we know are incompatible
+  * ``setup.py``: add your package version constraints under your solver extras key (single source of truth, used by both install and the runtime version warnings); our policy is to warn about incompatible versions rather than hard-forbid them at runtime
   * ``.github/workflows/python-test.yml`` if the solver is free to use, then this will make the GitHub CI run the test-suite on every commit (highly recommended)
   * ``tests/test_solvers.py`` its not really required, but you can add one explicit test for your solver here, it will always run if the solver is installed
   * if you want your solver to be named in different places in the docs, check ``docs/solvers.md`` and ``docs/installation_instructions.rst`` for solvers mentioned there

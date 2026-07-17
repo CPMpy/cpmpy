@@ -51,8 +51,6 @@ import time
 import warnings
 from typing import Optional, List, Iterable
 
-from packaging.version import Version
-
 from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -95,17 +93,13 @@ class CPM_exact(SolverInterface):
         try:
             # check if exact is installed
             import exact
-            xct_version = CPM_exact.version()
-            if Version(xct_version) < Version("2.1.0"):
-                warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
-                              f"{xct_version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
-                return False
+            CPM_exact._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError: # exact is not installed
             return False
         except Exception as e:
             raise e
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """

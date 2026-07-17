@@ -86,6 +86,7 @@ class CPM_highs(SolverInterface):
         # try to import the package
         try:
             import highspy  # noqa: F401
+            CPM_highs._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

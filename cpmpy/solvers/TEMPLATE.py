@@ -51,8 +51,6 @@
 from typing import Optional
 import warnings
 
-from packaging.version import Version
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -85,18 +83,17 @@ class CPM_template(SolverInterface):
     # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
     #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
+    # [GUIDELINE] version constraints are read from your extras_require key in ``setup.py``,
+    #           derived from the class name (``CPM_template`` -> ``"template"``);
+    #           only set ``dependency_extra`` if your extras key differs from that
 
     @staticmethod
     def supported():
         # try to import the package
         try:
             import TEMPLATEpy as gp
-            # optionally enforce a specific version
-            tpl_version = CPM_template.version()
-            if Version(tpl_version) < Version("2.1.0"):
-                warnings.warn(f"CPMpy uses features only available from TEMPLATEpy version 0.2.1, "
-                              f"but you have version {tpl_version}.")
-                return False
+            # warns if installed packages do not match the version constraints of this solver's extra in ``setup.py``
+            CPM_template._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
             return False

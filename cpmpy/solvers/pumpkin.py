@@ -37,12 +37,10 @@
     Module details
     ==============
 """
-import warnings
+import time
 from typing import Optional, List, Iterable
-from os.path import join
 
 import numpy as np
-from packaging.version import Version
 
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -59,8 +57,6 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.negation import push_down_negation
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from ..transformations.safening import no_partial_functions, safen_objective
-
-import time
 
 
 class CPM_pumpkin(SolverInterface):
@@ -81,11 +77,7 @@ class CPM_pumpkin(SolverInterface):
         # try to import the package
         try:
             import pumpkin_solver as psp
-            pum_version = CPM_pumpkin.version()
-            if Version(pum_version) < Version("0.3.0"):
-                warnings.warn(f"CPMpy uses features only available from Pumpkin version >=0.3.0 "
-                              f"but you have version {pum_version}")
-                return False
+            CPM_pumpkin._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False
