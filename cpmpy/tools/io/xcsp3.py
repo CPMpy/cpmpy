@@ -38,11 +38,11 @@ def load_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins
 
     Arguments:
         xcsp3 (str or os.PathLike or TextIO):
-            - A file path to an WCNF file (optionally LZMA-compressed with `.xz`), or
-            - A string containing the WCNF content directly, or
+            - A file path to an XML file (optionally LZMA-compressed with `.lzma`), or
+            - A string containing the XML content directly, or
             - A TextIO object already open for reading
         open: (callable):
-            If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
+            If xcsp3 is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         The XCSP3 instance loaded as a CPMpy model.
