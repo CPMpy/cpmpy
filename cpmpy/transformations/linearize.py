@@ -635,13 +635,14 @@ def get_linear_decompositions():
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
+    # dispatch dynamically so subclasses with their own decompose_linear are respected
     return dict(
-        alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
-        table=lambda expr: expr.decompose_linear(), # dispatch dynamically so Table subclasses with their own decompose_linear are respected 
-        short_table=ShortTable.decompose,
-        InDomain=InDomain.decompose_linear,
-        regular=Regular.decompose_linear,
+        alldifferent=lambda expr: expr.decompose_linear(),
+        element=lambda expr: expr.decompose_linear(), 
+        table=lambda expr: expr.decompose_linear(), 
+        short_table=lambda expr: expr.decompose(),
+        InDomain=lambda expr: expr.decompose_linear(),
+        regular=lambda expr: expr.decompose_linear(),
     )
 
 def get_linear_positive_decompositions():
@@ -651,9 +652,10 @@ def get_linear_positive_decompositions():
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
+    # dispatch dynamically so subclasses with their own decompose_linear_positive are respected
     return dict(
-        regular=Regular.decompose_linear_positive,
-        circuit=Circuit.decompose_linear_positive,
+        regular=lambda expr: expr.decompose_linear_positive(),
+        circuit=lambda expr: expr.decompose_linear_positive(),
     )
 
 
