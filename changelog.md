@@ -1,11 +1,12 @@
 # Change log
 
-## 1.0.0
+## 1.0.0 :partying_face:
 
 ### Added
 
+* A **CPMpy Logo** [#1060](https://github.com/CPMpy/cpmpy/pull/1060)
 * **IO** module with file format readers and writers [#842](https://github.com/CPMpy/cpmpy/pull/842)
-* **Datasets**: PyTorch-compatible dataset class providing single-line access to datastes from the CO community [#900](https://github.com/CPMpy/cpmpy/pull/900) [#1037](https://github.com/CPMpy/cpmpy/pull/900):
+* **Datasets**: PyTorch-compatible dataset class providing single-line access to datastes from the CO community [#900](https://github.com/CPMpy/cpmpy/pull/900) [#1037](https://github.com/CPMpy/cpmpy/pull/900) [#1055](https://github.com/CPMpy/cpmpy/pull/1055):
     * XCSP3
     * JSPLib
     * PSPLib rcpsp
@@ -36,6 +37,7 @@
     * `Min`/`Max` [#965](https://github.com/CPMpy/cpmpy/pull/965)
     * Nested constraints and `cpm_array` input [#1023](https://github.com/CPMpy/cpmpy/pull/1023)
     * Other [#901](https://github.com/CPMpy/cpmpy/pull/901) [#918](https://github.com/CPMpy/cpmpy/pull/918) [#907](https://github.com/CPMpy/cpmpy/pull/907) [#934](https://github.com/CPMpy/cpmpy/pull/934) [#958](https://github.com/CPMpy/cpmpy/pull/958)
+* Proper documentation for NumPy compatibility [#1051](https://github.com/CPMpy/cpmpy/pull/1051)
 * Support `Regular` global natively for MiniZinc [#952](https://github.com/CPMpy/cpmpy/pull/952)
 * Linearize reified variables [#855](https://github.com/CPMpy/cpmpy/pull/855)[ #860](https://github.com/CPMpy/cpmpy/pull/860)
 * Custom and typed CSEMap object for Common Subexpression Elimination [#917](https://github.com/CPMpy/cpmpy/pull/917)
@@ -195,6 +197,8 @@ Old names keep working for now (with a `DeprecationWarning` where applicable), b
 
 ### Fixed
 
+* Pumpkin `InDomain` `has_subexpr` [#1057](https://github.com/CPMpy/cpmpy/pull/1057)
+* XCSP3 fixes to parser callbacks [#1056](https://github.com/CPMpy/cpmpy/pull/1056) [#1058](https://github.com/CPMpy/cpmpy/pull/1058)
 * Remove 'mul' from supported for CPLEX [#1045](https://github.com/CPMpy/cpmpy/pull/1045)
 * Throw `NotImplementedError` for base classes `GlobalConstraint` and `GlobalFunction` [#1047](https://github.com/CPMpy/cpmpy/pull/1047)
 * XCSP3 runner 'verbose' option [#962](https://github.com/CPMpy/cpmpy/pull/962)
