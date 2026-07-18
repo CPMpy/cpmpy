@@ -137,7 +137,7 @@ RAW_DATASET_SPECS = [
             "ignore_sidecar": True,
         },
         "categories": [
-            {"track": "main_2025", "context": "cnf"},
+            {"year": 2025, "track": "main", "context": "cnf"},
         ],
         "expected_instance_suffix": ".cnf.xz",
         "expected_categories": {},

@@ -31,7 +31,8 @@ class SATDataset(FileDataset):
 
     Arguments:
         root (str): Root directory where the dataset is stored or will be downloaded (default=".").
-        track (str): Track query parameter for getinstances (default="main_2025").
+        year (int): Competition year (default=2025).
+        track (str): Competition track (default="main").
         context (str): Context query parameter for getinstances (default="cnf").
         transform (callable, optional): Optional transform applied to the instance file path.
         target_transform (callable, optional): Optional transform applied to the metadata dict.
@@ -46,7 +47,8 @@ class SATDataset(FileDataset):
     def __init__(
         self,
         root: str = ".",
-        track: str = "main_2025",
+        year: int = 2025,
+        track: str = "main",
         context: str = "cnf",
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
@@ -57,10 +59,16 @@ class SATDataset(FileDataset):
         Constructor for the SAT competition dataset.
         """
         self.root = pathlib.Path(root)
+        self.year = year
         self.track = track
         self.context = context
 
-        dataset_dir = self.root / self.name / track / context
+        if not str(year).startswith('20'):
+            raise ValueError("Year must start with '20'")
+        if not track:
+            raise ValueError("Track must be specified, e.g. main, submissions, ...")
+
+        dataset_dir = self.root / self.name / str(year) / track / context
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform,
@@ -71,7 +79,7 @@ class SATDataset(FileDataset):
         )
 
     def categories(self) -> dict[str, Any]:
-        return {"track": self.track, "context": self.context}
+        return {"year": self.year, "track": self.track, "context": self.context}
 
     @classmethod
     def open(cls, instance: os.PathLike) -> io.TextIOBase:
@@ -95,7 +103,7 @@ class SATDataset(FileDataset):
         return result
 
     def download(self):
-        params = f"query=track%3D{self.track}&context={self.context}"
+        params = f"query=track%3D{self.track}_{self.year}&context={self.context}"
         list_url = f"{INSTANCE_LIST_URL}?{params}"
         print(f"Fetching SAT instance list from {list_url}")
 
@@ -132,5 +140,5 @@ class SATDataset(FileDataset):
 
 
 if __name__ == "__main__":
-    dataset = SATDataset(track="main_2025", context="cnf", download=False)
+    dataset = SATDataset(year=2025, track="main", context="cnf", download=False)
     print("Dataset size:", len(dataset))
