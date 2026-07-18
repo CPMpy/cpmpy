@@ -172,10 +172,9 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     names = _gen_var_names(name, shape)
 
     # create np.array 'data' representation of the decision variables
-    data = np.array([_BoolVarImpl(name=n) for n in names])
-    # insert into custom ndarray
-    r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    data = np.array([_BoolVarImpl(name=n) for n in names]).reshape(shape)
+    r = data.view(NDVarArray)
+    r._has_subexpr = False  # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
 
 
@@ -258,10 +257,9 @@ def intvar(lb: int, ub: int, shape: int|np.integer|tuple[int|np.integer, ...] = 
     names = _gen_var_names(name, shape)
 
     # create np.array 'data' representation of the decision variables
-    data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
-    # insert into custom ndarray
-    r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]).reshape(shape) # repeat new instances
+    r = data.view(NDVarArray)
+    r._has_subexpr = False  # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
 
 
@@ -296,9 +294,8 @@ def cpm_array(arr: ListLike[ExprLike|Any]) -> NDVarArray:
         arr = np.array(arr)
     elif not arr.flags['FORC']:   # Ensure the array is contiguous
         arr = np.ascontiguousarray(arr)
-    
-    order: Literal['C', 'F'] = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
-    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
+
+    return arr.view(NDVarArray)
 
 
 class NullShapeError(Exception):
