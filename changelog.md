@@ -19,7 +19,7 @@
     * **SCIP** open source Mixed Integer Programming (MIP) and Mixed Integer Nonlinear Programming (MINLP) solver [#412](https://github.com/CPMpy/cpmpy/pull/412) [#955](https://github.com/CPMpy/cpmpy/pull/955) [#982](https://github.com/CPMpy/cpmpy/pull/982)
 * **New transformations** 
     * Positive decomposition [#980](https://github.com/CPMpy/cpmpy/pull/980) [#1006](https://github.com/CPMpy/cpmpy/pull/1006)
-    * Decompose linear [#836](https://github.com/CPMpy/cpmpy/pull/836)
+    * Decompose linear [#836](https://github.com/CPMpy/cpmpy/pull/836) [#1059](https://github.com/CPMpy/cpmpy/pull/1059)
 * **New Globals** 
     * Multi-dimensional element `NDElement` [#926](https://github.com/CPMpy/cpmpy/pull/926) [#1018](https://github.com/CPMpy/cpmpy/pull/1018)
     * FloatSum to still enable floats in objective [#957](https://github.com/CPMpy/cpmpy/pull/957)
@@ -186,6 +186,7 @@ Old names keep working for now (with a `DeprecationWarning` where applicable), b
 * Refactor infix printing in `Operator` for improved readability [#893](https://github.com/CPMpy/cpmpy/pull/893)
 * Seperate GitHub action runners [#885](https://github.com/CPMpy/cpmpy/pull/885)
 * Upgrade pindakaas to v0.5.0 & re-enable BVA for CaDiCal [#852](https://github.com/CPMpy/cpmpy/pull/852) [#869](https://github.com/CPMpy/cpmpy/pull/869)
+* Upgrade Z3 lower version to v5.0.0 for [upstream bugfix](https://github.com/CPMpy/cpmpy/issues/1036) [#1052](https://github.com/CPMpy/cpmpy/pull/1052)
 * Upgrade Pumpkin interface to v0.3.0 [#854](https://github.com/CPMpy/cpmpy/pull/854)
 * OR-Tools and Python version bumps [#847](https://github.com/CPMpy/cpmpy/pull/847)
 * Remove solver version upper limits [#848](https://github.com/CPMpy/cpmpy/pull/848)
