@@ -534,6 +534,16 @@ class NDVarArray(np.ndarray):
                 return cp.Element(arr, new_indices[0])
             return cp.NDElement(arr, new_indices)
 
+        # vectorized indexing: arr[idx_array] -> [arr[idx0], arr[idx1], ...] (shape of index)
+        if isinstance(index, (list, np.ndarray)):
+            index_arr = np.asarray(index)
+            if any(isinstance(i, Expression) for i in index_arr.flat):
+                if self.ndim != 1:
+                    raise NotImplementedError("CPMpy does not support vectorized indexing into multi-dimensional arrays. If you really need this, please report on github.")
+                if any(isinstance(i, Expression) and i.is_bool() for i in index_arr.flat):
+                    raise TypeError("Boolean decision variables cannot be used as a mask (result length would depend on their values). Use integer decision variables as indices instead.")
+                return cpm_array([self[i] for i in index_arr.flat]).reshape(index_arr.shape)
+
         return super().__getitem__(index)
 
     def __array_ufunc__(self, ufunc: np.ufunc, method: str, *inputs: Any, **kwargs: Any) -> Any:
