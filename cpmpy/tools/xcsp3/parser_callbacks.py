@@ -805,10 +805,7 @@ class CallbacksCPMPy(Callbacks):
         return cpm_exprs
 
     def get_cpm_var(self, x):
-        if isinstance(x, XVar):
-            return self.cpm_variables[x]
-        else:
-            return x  # constants
+        return self.cpm_variables.get(x, x)
 
     def get_cpm_vars(self, lst):
         if isinstance(lst[0], (XVar, int)):
@@ -821,6 +818,10 @@ class CallbacksCPMPy(Callbacks):
             return self.vars_from_node(lst)
 
     def get_cpm_exprs(self, lst):
+        # Guard against empty input;
+        # use len() == 0 instead of `not lst` to also support numpy arrays
+        if len(lst) == 0:
+            return []
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
