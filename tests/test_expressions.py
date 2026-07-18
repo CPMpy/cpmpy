@@ -301,16 +301,35 @@ class TestNDVarArrayBroadcast:
         assert all(isinstance(e, Comparison) for e in eq)
         assert str(eq[0]) == "x[0] == 1"
 
+    def test_np_logical_and(self):
+        b = boolvar(shape=3, name="b")
+        expr = np.logical_and(b, ~b)
+        assert isinstance(expr, NDVarArray)
+        assert str(expr[0]) == "(b[0]) and (~b[0])"
+
     def test_reflected_add(self):
         x = intvar(0, 5, shape=3, name="x")
         r = 1 + x
         assert isinstance(r, NDVarArray)
         assert str(r[0]) == "1 + (x[0])"
 
+    def test_expr_left_of_array(self):
+        # Expression.__lt__/__add__ reverse onto NDVarArray (ndarray ufuncs)
+        x = intvar(0, 5, name="x")
+        arr = intvar(0, 5, shape=3, name="arr")
+        lt = x < arr
+        assert isinstance(lt, NDVarArray)
+        assert str(lt[0]) == "(arr[0]) > (x)"
+        s = x + arr
+        assert isinstance(s, NDVarArray)
+        assert str(s[0]) == "(x) + (arr[0])"
+
     def test_unsupported_ufunc_raises(self):
         x = intvar(0, 5, shape=3, name="x")
         with pytest.raises(TypeError, match="does not support"):
             np.sin(x)
+        with pytest.raises(TypeError, match="keyword arguments"):
+            np.add(x, 1, out=np.empty(3, dtype=object))
 
     def test_views_have_has_subexpr(self):
         x = intvar(0, 5, shape=4, name="x")

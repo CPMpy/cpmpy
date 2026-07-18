@@ -70,7 +70,7 @@ from .core import Expression, ExprLike, BoolExprLike, ListLike, BoolVal
 from .utils import is_num, is_int, is_boolexpr, get_bounds
 
 # NumPy ufunc -> Python operator (single source of truth for NDVarArray.__array_ufunc__)
-_ND_BINOPS: dict[np.ufunc, Callable[[Any, Any], Any]] = {
+_ND_UFUNCS: dict[np.ufunc, Callable[..., Any]] = {
     np.add: operator.add,
     np.subtract: operator.sub,
     np.multiply: operator.mul,
@@ -88,8 +88,10 @@ _ND_BINOPS: dict[np.ufunc, Callable[[Any, Any], Any]] = {
     np.bitwise_and: operator.and_,
     np.bitwise_or: operator.or_,
     np.bitwise_xor: operator.xor,
-}
-_ND_UNARYOPS: dict[np.ufunc, Callable[[Any], Any]] = {
+    np.logical_and: operator.and_,
+    np.logical_or: operator.or_,
+    np.logical_xor: operator.xor,
+    np.logical_not: operator.invert,
     np.negative: operator.neg,
     np.absolute: operator.abs,
     np.invert: operator.invert,
@@ -174,7 +176,7 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     # create np.array 'data' representation of the decision variables
     data = np.array([_BoolVarImpl(name=n) for n in names]).reshape(shape)
     r = data.view(NDVarArray)
-    r._has_subexpr = False  # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    r._has_subexpr = False  # set after view; __array_finalize__ left it None
     return r
 
 
@@ -259,7 +261,7 @@ def intvar(lb: int, ub: int, shape: int|np.integer|tuple[int|np.integer, ...] = 
     # create np.array 'data' representation of the decision variables
     data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]).reshape(shape) # repeat new instances
     r = data.view(NDVarArray)
-    r._has_subexpr = False  # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    r._has_subexpr = False  # set after view; __array_finalize__ left it None
     return r
 
 
@@ -554,21 +556,23 @@ class NDVarArray(np.ndarray):
         via :meth:`_elementwise`. Unsupported ufuncs raise :class:`TypeError` (never
         fall through to object-dtype ufuncs that boolify comparisons).
         """
-        if kwargs.get("out") is not None:
-            raise TypeError("NDVarArray does not support the 'out=' argument for ufuncs")
+        if kwargs:
+            raise TypeError(
+                f"NDVarArray does not support ufunc keyword arguments {sorted(kwargs)}; "
+                "use Python operators or cp.*"
+            )
         if method != "__call__":
             # .prod(axis=...) used to call multiply.reduce; we no longer rely on that
             raise TypeError(
                 f"NDVarArray does not support np.{ufunc.__name__}.{method}; "
                 "use Python operators or cp.*"
             )
-        if ufunc in _ND_UNARYOPS:
-            return self._elementwise(_ND_UNARYOPS[ufunc], inputs[0])
-        if ufunc in _ND_BINOPS:
-            return self._elementwise(_ND_BINOPS[ufunc], *inputs)
-        raise TypeError(
-            f"NDVarArray does not support np.{ufunc.__name__}; use Python operators or cp.*"
-        )
+        op = _ND_UFUNCS.get(ufunc)
+        if op is None:
+            raise TypeError(
+                f"NDVarArray does not support np.{ufunc.__name__}; use Python operators or cp.*"
+            )
+        return self._elementwise(op, *inputs)
 
     def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
@@ -676,12 +680,10 @@ class NDVarArray(np.ndarray):
                 f"operands could not be broadcast together with shapes {shapes}"
             ) from e
         out = np.empty(arrays[0].shape, dtype=object)
-        flat_in = [a.flat for a in arrays]
-        flat_out: list[Any] = []
-        for elems in zip(*flat_in):
+        for i, elems in enumerate(zip(*(a.flat for a in arrays))):
+            # unwrap numpy scalars so Expression ops get Python ints/bools
             args = [e.item() if isinstance(e, np.generic) else e for e in elems]
-            flat_out.append(op(*args))
-        out.flat[:] = flat_out
+            out.flat[i] = op(*args)
         return out.view(NDVarArray)
 
     def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify: bool = False) -> NDVarArray:
