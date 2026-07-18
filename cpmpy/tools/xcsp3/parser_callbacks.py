@@ -87,7 +87,9 @@ class CallbacksCPMPy(Callbacks):
         "le": (2, lambda x, y: x <= y),
         "ge": (2, lambda x, y: x >= y),
         "gt": (2, lambda x, y: x > y),
-        "ne": (2, lambda x, y: x != y),
+        # ne is n-ary in XCSP3 (like eq): ne(x0,...,xn) is the logical negation of eq, i.e. "not allequal"
+        # (not the same as pairwise AllDifferent). Binary case stays a plain disequality.
+        "ne": (0, lambda x: x[0] != x[1] if len(x) == 2 else ~cp.AllEqual(x)),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
         'in': (2, lambda x, y: cp.InDomain(x, y)),  # could be mixed context here!
