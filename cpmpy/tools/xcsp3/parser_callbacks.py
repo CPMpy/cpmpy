@@ -87,7 +87,9 @@ class CallbacksCPMPy(Callbacks):
         "le": (2, lambda x, y: x <= y),
         "ge": (2, lambda x, y: x >= y),
         "gt": (2, lambda x, y: x > y),
-        "ne": (2, lambda x, y: x != y),
+        # ne is n-ary in XCSP3 (like eq): ne(x0,...,xn) is the logical negation of eq, i.e. "not allequal"
+        # (not the same as pairwise AllDifferent). Binary case stays a plain disequality.
+        "ne": (0, lambda x: x[0] != x[1] if len(x) == 2 else ~cp.AllEqual(x)),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
         'in': (2, lambda x, y: cp.InDomain(x, y)),  # could be mixed context here!
@@ -805,10 +807,7 @@ class CallbacksCPMPy(Callbacks):
         return cpm_exprs
 
     def get_cpm_var(self, x):
-        if isinstance(x, XVar):
-            return self.cpm_variables[x]
-        else:
-            return x  # constants
+        return self.cpm_variables.get(x, x)
 
     def get_cpm_vars(self, lst):
         if isinstance(lst[0], (XVar, int)):
@@ -821,6 +820,10 @@ class CallbacksCPMPy(Callbacks):
             return self.vars_from_node(lst)
 
     def get_cpm_exprs(self, lst):
+        # Guard against empty input;
+        # use len() == 0 instead of `not lst` to also support numpy arrays
+        if len(lst) == 0:
+            return []
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):

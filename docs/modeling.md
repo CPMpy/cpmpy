@@ -278,8 +278,42 @@ m = cp.Model(
 )
 ```
 
-Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `some_cpm_array.sum()` and `.min()`/`.max()` (including the axis= argument), so these are safe to use.
+### NumPy operations
 
+CPMpy's arrays of decision variables are subclasses of `numpy.ndarray`, so many NumPy operations work on them. The rule of thumb is that an operation is supported when its **result shape is known at modeling time**. Element-wise operators (`+,-,*,//,%`, comparisons, `&|^~`), aggregations (`sum/min/max/...`), reshaping (`reshape`, transpose, slicing, ...) and dot products like `np.dot(x,w)` all fall in this category:
+
+```python
+import cpmpy as cp
+import numpy as np
+
+x = cp.intvar(0, 10, shape=3)
+w = np.array([1, 2, 3])
+M = cp.intvar(0, 10, shape=(2, 3))
+
+x + w          # element-wise
+M + w          # broadcasts w over the rows of M
+M.sum(axis=0)  # vector of column sums
+M.T            # transpose
+np.dot(x, w)   # dot-product
+```
+
+Binary operators follow NumPy broadcasting: the other operand is broadcast to the shape of the CPMpy array. So `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. One limitation compared to plain NumPy is that the result always keeps the shape of the CPMpy array — e.g. a `(3,1)` array plus a length-3 vector does not expand to `(3,3)`.
+
+What does **not** work are operations whose result depends on the (still unknown) values of the decision variables. In particular, you cannot use Boolean decision variables as a mask, because the length of the result would depend on how many are `True`:
+
+```python
+import cpmpy as cp
+import numpy as np
+
+b = cp.boolvar(shape=10)
+# np.arange(10)[b]  # IndexError
+```
+
+Because of our overloading of `+,-,*,//` some NumPy functions like `np.sum(x)` will also create a CPMpy expression. This is not guaranteed for all NumPy functions though — `np.equal(x, y)` for example returns a plain Boolean array, not constraints. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `x.sum()`, `.min()`, `.max()`, `.any()` and `.all()` (including the `axis=` argument), so these are safe to use.
+
+Also note that `np.concatenate` / `stack` / `hstack` / `vstack` return a plain `ndarray`, so wrap the result with `cp.cpm_array(...)` before doing further CPMpy operations on it.
+
+If you encounter a NumPy operation that you think should work, but doesn't, please reach out to us on GitHub! We are keen to improve NumPy compatibility.
 
 ### Global constraints
 
@@ -363,9 +397,21 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 # example output -- arr: [2 1 3 4], idx: 0, val: 2
 ```
 
-The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
+The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`. Indexing with an array of integer decision variables is also supported (vectorized): `arr[idx_array]` creates an array of `Element` expressions, one per index.
 
-This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** in our `cpm_array()` or call `Element()` directly:
+```python
+import cpmpy as cp
+
+arr = cp.intvar(1, 10, shape=5)
+idx = cp.intvar(0, 4, shape=3)
+
+m = cp.Model(
+    cp.AllDifferent(idx),
+    arr[idx] == [1, 2, 3]  # equivalent to: [arr[idx[0]] == 1, arr[idx[1]] == 2, arr[idx[2]] == 3]
+)
+```
+
+This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** using `cp.cpm_array()`
 
 ```python
 import numpy as np
