@@ -57,7 +57,8 @@
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+import operator
 import threading
 import warnings # for deprecation warning
 from functools import reduce
@@ -67,6 +68,34 @@ import numpy as np
 import cpmpy as cp  # to avoid circular import
 from .core import Expression, ExprLike, BoolExprLike, ListLike, BoolVal
 from .utils import is_num, is_int, is_boolexpr, get_bounds
+
+# NumPy ufunc -> Python operator (single source of truth for NDVarArray.__array_ufunc__)
+_ND_UFUNCS: dict[np.ufunc, Callable[..., Any]] = {
+    np.add: operator.add,
+    np.subtract: operator.sub,
+    np.multiply: operator.mul,
+    np.floor_divide: operator.floordiv,
+    np.true_divide: operator.truediv,
+    np.mod: operator.mod,
+    np.remainder: operator.mod,
+    np.power: operator.pow,
+    np.equal: operator.eq,
+    np.not_equal: operator.ne,
+    np.less: operator.lt,
+    np.less_equal: operator.le,
+    np.greater: operator.gt,
+    np.greater_equal: operator.ge,
+    np.bitwise_and: operator.and_,
+    np.bitwise_or: operator.or_,
+    np.bitwise_xor: operator.xor,
+    np.logical_and: operator.and_,
+    np.logical_or: operator.or_,
+    np.logical_xor: operator.xor,
+    np.logical_not: operator.invert,
+    np.negative: operator.neg,
+    np.absolute: operator.abs,
+    np.invert: operator.invert,
+}
 
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
@@ -145,10 +174,9 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     names = _gen_var_names(name, shape)
 
     # create np.array 'data' representation of the decision variables
-    data = np.array([_BoolVarImpl(name=n) for n in names])
-    # insert into custom ndarray
-    r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    data = np.array([_BoolVarImpl(name=n) for n in names]).reshape(shape)
+    r = data.view(NDVarArray)
+    r._has_subexpr = False  # set after view; __array_finalize__ left it None
     return r
 
 
@@ -231,10 +259,9 @@ def intvar(lb: int, ub: int, shape: int|np.integer|tuple[int|np.integer, ...] = 
     names = _gen_var_names(name, shape)
 
     # create np.array 'data' representation of the decision variables
-    data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
-    # insert into custom ndarray
-    r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]).reshape(shape) # repeat new instances
+    r = data.view(NDVarArray)
+    r._has_subexpr = False  # set after view; __array_finalize__ left it None
     return r
 
 
@@ -269,9 +296,8 @@ def cpm_array(arr: ListLike[ExprLike|Any]) -> NDVarArray:
         arr = np.array(arr)
     elif not arr.flags['FORC']:   # Ensure the array is contiguous
         arr = np.ascontiguousarray(arr)
-    
-    order = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
-    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
+
+    return arr.view(NDVarArray)
 
 
 class NullShapeError(Exception):
@@ -445,20 +471,16 @@ class NDVarArray(np.ndarray):
     Do not create this object directly, use one of the functions in this module
 
     ``_has_subexpr`` caches :meth:`has_subexpr` (``None`` = not computed yet; ``True`` / ``False`` = cached).
+
+    Operator overloading follows NumPy's ndarray-subclass rule: all logic lives in
+    :meth:`__array_ufunc__` (not in ``__add__`` / ``__eq__`` / ...). Python operators
+    and ``np.add`` / ``np.equal`` / ... therefore share one path.
     """
     _has_subexpr: Optional[bool] = None  # will be overwritten in instance, here for type hinting
 
-    def __init__(self, shape: int|np.integer|tuple[int|np.integer, ...], **kwargs: Any) -> None:
-        # bit ugly, but np.int and np.bool do not play well with > overloading
-        if np.issubdtype(self.dtype, np.integer):
-            self.astype(int)
-        elif np.issubdtype(self.dtype, np.bool_):
-            self.astype(bool)
-
+    def __array_finalize__(self, obj: Optional[np.ndarray]) -> None:
+        # views / copies / ufunc outputs: __init__ is not called
         self._has_subexpr = None
-        # no need to call ndarray __init__ method as specified in the np.ndarray documentation:
-        # "No ``__init__`` method is needed because the array is fully initialized
-        #         after the ``__new__`` method."
 
     def has_subexpr(self) -> bool:
         """True if :meth:`flat` has an :class:`Expression` that is not a variable (:class:`_NumVarImpl`) or :class:`~cpmpy.expressions.core.BoolVal`."""
@@ -526,38 +548,38 @@ class NDVarArray(np.ndarray):
 
         return super().__getitem__(index)
 
-    """
-    make the given array the first dimension in the returned array
-    """
-    def __axis(self, axis):
+    def __array_ufunc__(self, ufunc: np.ufunc, method: str, *inputs: Any, **kwargs: Any) -> Any:
+        """
+        NumPy ufunc entry point for symbolic element-wise ops.
 
-        arr = self
+        Supported ``__call__`` ufuncs map to :mod:`operator` and build Expression trees
+        via :meth:`_elementwise`. Unsupported ufuncs raise :class:`TypeError` (never
+        fall through to object-dtype ufuncs that boolify comparisons).
+        """
+        if kwargs:
+            raise TypeError(
+                f"NDVarArray does not support ufunc keyword arguments {sorted(kwargs)}; "
+                "use Python operators or cp.*"
+            )
+        if method != "__call__":
+            # .prod(axis=...) used to call multiply.reduce; we no longer rely on that
+            raise TypeError(
+                f"NDVarArray does not support np.{ufunc.__name__}.{method}; "
+                "use Python operators or cp.*"
+            )
+        op = _ND_UFUNCS.get(ufunc)
+        if op is None:
+            raise TypeError(
+                f"NDVarArray does not support np.{ufunc.__name__}; use Python operators or cp.*"
+            )
+        return self._elementwise(op, *inputs)
 
-        # correct type and value checks
-        if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .sum() should always be an integer")
-        if axis >= arr.ndim:
-            raise ValueError("Axis out of range")
-
-        if axis < 0:
-            axis += arr.ndim
-
-        # Change the array to make the selected axis the first dimension
-        if axis > 0:
-            iter_axis = list(range(arr.ndim))
-            iter_axis.remove(axis)
-            iter_axis.insert(0, axis)
-            arr = arr.transpose(iter_axis)
-
-        return arr
-
-    def sum(self, axis=None, out=None):
+    def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
             overwrite np.sum(NDVarArray) as people might use it
         """
-
-        if out is not None:
-            raise NotImplementedError()
+        if out is not None or dtype is not None or keepdims:
+            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want the sum over the whole array
             return cp.sum(self)
@@ -565,53 +587,53 @@ class NDVarArray(np.ndarray):
         return cpm_array(np.apply_along_axis(cp.sum, axis=axis, arr=self))
 
 
-    def prod(self, axis=None, out=None):
+    def prod(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
             overwrite np.prod(NDVarArray) as people might use it
         """
-
-        if out is not None:
-            raise NotImplementedError()
+        if out is not None or dtype is not None or keepdims:
+            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
 
         if axis is None:  # simple case where we want the product over the whole array
             return reduce(lambda a, b: a * b, self.flatten())
 
-        # TODO: is there a better way? This does pairwise multiplication still
-        return cpm_array(np.multiply.reduce(self, axis=axis))
+        return cpm_array(np.apply_along_axis(
+            lambda a: reduce(lambda x, y: x * y, a), axis=axis, arr=self
+        ))
 
-    def max(self, axis=None, out=None):
+    def max(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        if out is not None:
-            raise NotImplementedError()
+        if out is not None or dtype is not None or keepdims:
+            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want the maximum over the whole array
             return cp.max(self)
 
         return cpm_array(np.apply_along_axis(cp.max, axis=axis, arr=self))
 
-    def min(self, axis=None, out=None):
+    def min(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        if out is not None:
-            raise NotImplementedError()
+        if out is not None or dtype is not None or keepdims:
+            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want the minimum over the whole array
             return cp.min(self)
 
         return cpm_array(np.apply_along_axis(cp.min, axis=axis, arr=self))
 
-    def any(self, axis=None, out=None):
+    def any(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
             overwrite np.any(NDVarArray)
         """
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
-        if out is not None:
-            raise NotImplementedError()
+        if out is not None or dtype is not None or keepdims:
+            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want a disjunction over the whole array
             return cp.any(self)
@@ -619,15 +641,15 @@ class NDVarArray(np.ndarray):
         return cpm_array(np.apply_along_axis(cp.any, axis=axis, arr=self))
 
 
-    def all(self, axis=None, out=None):
+    def all(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
-            overwrite np.any(NDVarArray)
+            overwrite np.all(NDVarArray)
         """
         if any(not is_boolexpr(x) for x in self.flat):
-            raise TypeError("Cannot call .any() in an array not consisting only of bools")
+            raise TypeError("Cannot call .all() in an array not consisting only of bools")
 
-        if out is not None:
-            raise NotImplementedError()
+        if out is not None or dtype is not None or keepdims:
+            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
 
         if axis is None:  # simple case where we want a conjunction over the whole array
             return cp.all(self)
@@ -643,137 +665,31 @@ class NDVarArray(np.ndarray):
         return np.asarray(lbs).reshape(self.shape), \
                np.asarray(ubs).reshape(self.shape)
 
-    # VECTORIZED master function (delegate)
-    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str, **kwargs) -> NDVarArray:
-        """
-        NumPy-broadcast ``other`` to ``self.shape``, then apply ``attr`` element-wise.
-
-        Args:
-            other (ExprLike|Iterable|Any): The other operand.
-                Typically an array/list of Expressions, or a single Expression, or a constant (or anything np compatible)
-            attr (str): The attribute to vectorize (e.g. ``__eq__``, ``__add__``, ``implies``, etc.)
-            **kwargs: Extra keyword arguments passed to each element call (e.g. ``simplify`` for ``implies``).
-
-        Returns:
-            NDVarArray: The vectorized result.
-        """
-        if not isinstance(other, np.ndarray):
-            other = np.asarray(other)
+    @staticmethod
+    def _elementwise(op: Callable[..., Any], *inputs: Any) -> NDVarArray:
+        """Broadcast ``inputs`` and apply ``op`` element-wise; return an :class:`NDVarArray`."""
+        arrays = [
+            np.asarray(x, dtype=object) if not np.isscalar(x) else np.array(x, dtype=object)
+            for x in inputs
+        ]
         try:
-            broadcast_shape = np.broadcast_shapes(other.shape, self.shape)
+            arrays = list(np.broadcast_arrays(*arrays))
         except ValueError as e:
+            shapes = " ".join(str(a.shape) for a in arrays)
             raise ValueError(
-                f"operands could not be broadcast together with shapes {self.shape} {other.shape}"
+                f"operands could not be broadcast together with shapes {shapes}"
             ) from e
-        if broadcast_shape != self.shape:
-            raise ValueError(
-                f"other with shape {other.shape} could not be broadcast to self with shape {self.shape}"
-            )
-        other = np.broadcast_to(other, self.shape)
-        # s.__eq__(o) <-> getattr(s, '__eq__')(o)
-        flat_res = cpm_array([
-            # unwrap numpy 'generic' scalar to is Python int item, so int <= np.int64 does not return NotImplemented
-            getattr(s, attr)(o.item() if isinstance(o, np.generic) else o, **kwargs)
-            for s, o in zip(self.flat, other.flat)])
-        # typing is wrong, reshape does return NDVarArray
-        return flat_res.reshape(self.shape) # type: ignore
+        out = np.empty(arrays[0].shape, dtype=object)
+        for i, elems in enumerate(zip(*(a.flat for a in arrays))):
+            # unwrap numpy scalars so Expression ops get Python ints/bools
+            args = [e.item() if isinstance(e, np.generic) else e for e in elems]
+            out.flat[i] = op(*args)
+        return out.view(NDVarArray)
 
-    # VECTORIZED comparisons
-    def __eq__(self, other):
-        return self._vectorized(other, '__eq__')
-
-    def __ne__(self, other):
-        return self._vectorized(other, '__ne__')
-
-    def __lt__(self, other):
-        return self._vectorized(other, '__lt__')
-
-    def __le__(self, other):
-        return self._vectorized(other, '__le__')
-
-    def __gt__(self, other):
-        return self._vectorized(other, '__gt__')
-
-    def __ge__(self, other):
-        return self._vectorized(other, '__ge__')
-
-    # VECTORIZED math operators
-    # only 'abs' 'neg' and binary ones
-    # '~' not needed, gets translated to ==0 and that is already handled
-    def __abs__(self):
-        return cpm_array([abs(s) for s in self])
-
-    def __neg__(self):
-        return cpm_array([-s for s in self])
-
-    def __add__(self, other):
-        return self._vectorized(other, '__add__')
-
-    def __radd__(self, other):
-        return self._vectorized(other, '__radd__')
-
-    def __sub__(self, other):
-        return self._vectorized(other, '__sub__')
-
-    def __rsub__(self, other):
-        return self._vectorized(other, '__rsub__')
-
-    def __mul__(self, other):
-        return self._vectorized(other, '__mul__')
-
-    def __rmul__(self, other):
-        return self._vectorized(other, '__rmul__')
-
-    def __truediv__(self, other):
-        return self._vectorized(other, '__truediv__')
-
-    def __rtruediv__(self, other):
-        return self._vectorized(other, '__rtruediv__')
-
-    def __floordiv__(self, other):
-        return self._vectorized(other, '__floordiv__')
-
-    def __rfloordiv__(self, other):
-        return self._vectorized(other, '__rfloordiv__')
-
-    def __mod__(self, other):
-        return self._vectorized(other, '__mod__')
-
-    def __rmod__(self, other):
-        return self._vectorized(other, '__rmod__')
-
-    def __pow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: modulo not supported"
-        return self._vectorized(other, '__pow__')
-
-    def __rpow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: modulo not supported"
-        return self._vectorized(other, '__rpow__')
-
-    # VECTORIZED Bool operators
-    def __invert__(self):
-        return cpm_array([~s for s in self])
-
-    def __and__(self, other):
-        return self._vectorized(other, '__and__')
-
-    def __rand__(self, other):
-        return self._vectorized(other, '__rand__')
-
-    def __or__(self, other):
-        return self._vectorized(other, '__or__')
-
-    def __ror__(self, other):
-        return self._vectorized(other, '__ror__')
-
-    def __xor__(self, other):
-        return self._vectorized(other, '__xor__')
-
-    def __rxor__(self, other):
-        return self._vectorized(other, '__rxor__')
-
-    def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify=False) -> NDVarArray:
-        return self._vectorized(other, 'implies', simplify=simplify)
+    def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify: bool = False) -> NDVarArray:
+        def _impl(a: Any, b: Any) -> Any:
+            return a.implies(b, simplify=simplify)
+        return self._elementwise(_impl, self, other)
 
     #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False
