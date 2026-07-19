@@ -17,6 +17,8 @@ _format_map = {
     "wcnf"  : "wcnf",
     "cnf"   : "cnf",
     "opb"   : "opb",
+    # Corpus files use ``.sdk.txt``; map the ``sdk`` suffix to the sudoku loader.
+    "sdk"   : "sudoku",
 }
 
 _extension_map: dict[str, list[str]] = {}
@@ -77,7 +79,7 @@ def _derive_format(file_path: Union[str, os.PathLike]) -> str:
     for ext in str(file_path).split(".")[::-1]:
         try:
             return get_format(ext)
-        except ValueError:
+        except KeyError:
             continue
 
     raise ValueError(f"No file format provided and could not derive format from file path: {file_path}")
