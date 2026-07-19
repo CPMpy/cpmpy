@@ -12,6 +12,7 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
 - :doc:`OPBDataset </api/tools/datasets/opb>`: Pseudo-Boolean Competition benchmark instances.
 - :doc:`SATDataset </api/tools/datasets/sat>`: SAT competition benchmark instances (DIMACS CNF).
 - :doc:`NurseRosteringDataset </api/tools/datasets/nurserostering>`: Nurse rostering benchmark instances.
+- :doc:`ScaledSudokuDataset </api/tools/datasets/scaledsudoku>`: Scaled Sudoku puzzles of varying sizes with hardness labels.
 
 
 .. note::
@@ -31,6 +32,7 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
         └── OPBDataset
         └── SATDataset
         └── NurseRosteringDataset
+        └── ScaledSudokuDataset
         └── (your dataset here)
 
 Whilst the class hierarchy will support more exotic dataset types in the future, with a structure put in place 
