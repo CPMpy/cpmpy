@@ -83,6 +83,16 @@ A 2D rectangular packing problem, with visualisation.
 
 ---
 
+### `packing_logos.ipynb`
+
+A 2D packing of CPMpy's solver logos, with visualisation.
+
+<a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/packing_logos.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
+---
+
 ### `tsp.ipynb`
 
 The Traveling Salesman Problem, just a simple `circuit` global constraint for CP.
