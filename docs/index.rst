@@ -100,6 +100,11 @@ Supported solvers
      - SAT ASAT ISAT
      - pip
      - Automatically encodes PB to SAT
+   * - :doc:`Paramita <api/solvers/paramita>`
+     - (Max)SAT
+     - SAT ASAT ISAT - OPT
+     - pip + plugins
+     - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT

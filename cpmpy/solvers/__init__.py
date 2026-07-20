@@ -45,6 +45,7 @@ List of solver submodules
     rc2
     scip
     highs
+    paramita
 
 =========================
 List of helper submodules
@@ -82,6 +83,7 @@ from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
 from .scip import CPM_scip
 from .highs import CPM_highs
+from .paramita import CPM_paramita
 
 __all__ = [
     "CPM_choco",
@@ -94,6 +96,7 @@ __all__ = [
     "CPM_highs",
     "CPM_minizinc",
     "CPM_ortools",
+    "CPM_paramita",
     "CPM_pindakaas",
     "CPM_pumpkin",
     "CPM_pysat",

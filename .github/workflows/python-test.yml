@@ -18,6 +18,10 @@ jobs:
             install_commands: |
               sudo snap install minizinc --classic
           - solver: pindakaas
+          - solver: paramita
+            install_commands: |
+              paramita plugins build cmake '#sat-solvers/cadical-3.0.0' -j 2
+              paramita plugins build cmake '#maxsat-solvers/mse22-EvalMaxSAT2022' -j 2
           - solver: pumpkin
           - solver: scip
           - solver: highs
