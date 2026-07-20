@@ -453,14 +453,12 @@ class CPM_paramita(SolverInterface):
         has_sol = self._solve_return(self.cpm_status)
 
         if has_sol:
-            sol = None
-            use_model = self.is_maxsat  # EvalMaxSAT often lacks val_lit
-            if use_model:
-                sol = set(self.paramita_solver.model())
+            # EvalMaxSAT often lacks val_lit; read a full model instead
+            sol = set(self.paramita_solver.model()) if self.is_maxsat else None
             for cpm_var in self.user_vars:
                 if isinstance(cpm_var, NegBoolView):
                     vid = self.pool.get_variable(cpm_var._bv.name)
-                    if use_model:
+                    if sol is not None:
                         cpm_var._value = vid not in sol
                     else:
                         val = self.paramita_solver.val_lit(vid)
@@ -468,7 +466,7 @@ class CPM_paramita(SolverInterface):
                         cpm_var._value = (not val) if val is not None else True
                 elif isinstance(cpm_var, _BoolVarImpl):
                     vid = self.pool.get_variable(cpm_var.name)
-                    if use_model:
+                    if sol is not None:
                         cpm_var._value = vid in sol
                     else:
                         val = self.paramita_solver.val_lit(vid)
