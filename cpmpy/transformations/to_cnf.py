@@ -28,7 +28,9 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
         Equivalent CPMpy constraints in CNF, and the updated `ivarmap`
     """
     if not CPM_pindakaas.supported():
-        raise ImportError(f"Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use the `to_cnf` transformation")
+        raise ImportError(
+            f"Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use the `to_cnf` transformation"
+        )
 
     import pindakaas as pdk
 
@@ -67,6 +69,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     clauses += ((x | ~x) for x in free_vars)  # add free variables so they are "known" by the CNF
 
     return clauses
+
 
 def to_cnf_objective(expr, encoding="auto", csemap=None, ivarmap=None, supported=frozenset(), supported_reified=frozenset()):
     """

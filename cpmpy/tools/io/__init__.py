@@ -107,6 +107,7 @@ from .opb import load_opb, write_opb
 from .scip_formats import load_scip_format, write_scip_format
 from .wcnf import load_wcnf
 from .dimacs import load_dimacs, write_dimacs
+from .gdimacs import load_gdimacs, write_gdimacs
 from .xcsp3 import load_xcsp3
 
 _all__ = [
@@ -120,6 +121,8 @@ _all__ = [
     "write_scip_format",
     "load_dimacs",
     "write_dimacs",
+    "load_gdimacs",
+    "write_gdimacs",
     "load_wcnf",
     "load_xcsp3",
     "load_jsplib",
