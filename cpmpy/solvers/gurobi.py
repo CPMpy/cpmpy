@@ -96,6 +96,7 @@ class CPM_gurobi(SolverInterface):
     def installed():
         try:
             import gurobipy as gp
+            CPM_gurobi._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

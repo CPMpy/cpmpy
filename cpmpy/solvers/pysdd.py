@@ -82,6 +82,7 @@ class CPM_pysdd(SolverInterface):
         # try to import the package
         try:
             from pysdd.sdd import SddManager
+            CPM_pysdd._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

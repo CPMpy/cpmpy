@@ -95,6 +95,7 @@ class CPM_ortools(SolverInterface):
         # try to import the package
         try:
             import ortools
+            CPM_ortools._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False
