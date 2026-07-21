@@ -39,6 +39,8 @@
 import time
 from typing import Optional
 
+from cpmpy.expressions.globalfunctions import GlobalFunction
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
@@ -48,11 +50,15 @@ from ..expressions.utils import is_num, is_int, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
+from ..transformations.linearize import (
+    decompose_linear,
+    decompose_linear_objective,
+    linearize_reified_variables,
+)
 
 
 class CPM_hermax(SolverInterface):
@@ -112,7 +118,7 @@ class CPM_hermax(SolverInterface):
         self._objective_posted = False
         self._assumption_map = {}  # dimacs lit -> CPMpy assumption expr
         self._last_core = None
-        self._bool2int = {}  # CPMpy bool-var name -> Hermax IntVar 0/1
+        self._bool_intmap = {}  # boolvar name -> channeled {0,1} intvar
 
         super().__init__(name="hermax", cpm_model=cpm_model)
 
@@ -285,9 +291,84 @@ class CPM_hermax(SolverInterface):
             return revar
 
         if is_int(cpm_var):  # shortcut, eases posting constraints
-            return cpm_var
+            return int(cpm_var)
 
         raise NotImplementedError("Not a known var {}".format(cpm_var))
+
+    def _bool_as_int(self, cpm_bool):
+        """
+        Return a {0,1} intvar channeled to ``cpm_bool`` (one intvar per underlying bool).
+        """
+        if isinstance(cpm_bool, NegBoolView):
+            cpm_bool = cpm_bool._bv
+
+        name = cpm_bool.name
+        if name in self._bool_intmap:
+            return self._bool_intmap[name]
+
+        iv = intvar(0, 1, name=f"_hm_{name}")
+        self._bool_intmap[name] = iv
+        hm_bv = self.solver_var(cpm_bool)
+        hm_iv = self.solver_var(iv)
+        self.her_model &= hm_bv.implies(hm_iv == 1)
+        self.her_model &= (~hm_bv).implies(hm_iv == 0)
+        return iv
+
+    @staticmethod
+    def _bool_sum(expr):
+        """True if ``expr`` is a sum/wsum over boolean decision variables."""
+        if not isinstance(expr, Operator):
+            return False
+        if expr.name == "sum":
+            return any(isinstance(a, _BoolVarImpl) for a in expr.args)
+        if expr.name == "wsum":
+            return any(isinstance(a, _BoolVarImpl) for a in expr.args[1])
+        return False
+
+    def _make_numexpr(self, cpm_expr):
+        """
+            Turns a numeric CPMpy 'flat' expression into a solver-specific
+            numeric expression
+
+            Used especially to post an expression as objective function
+
+            Supports sum, wsum , sub operators and single decision variables.
+        """
+        if is_num(cpm_expr):
+            return int(cpm_expr)
+
+        # decision variables, check in varmap
+        if isinstance(cpm_expr, _NumVarImpl): 
+            if cpm_expr.is_bool():
+                # Boolvars are not integer for Hermax, channel to 0-1 intvar
+                if isinstance(cpm_expr, NegBoolView):
+                    return 1 - self.solver_var(self._bool_as_int(cpm_expr._bv))
+                return self.solver_var(self._bool_as_int(cpm_expr))
+            return self.solver_var(cpm_expr)
+
+        if isinstance(cpm_expr, Operator):
+            if cpm_expr.name == "sum":
+                return sum(self.solver_vars(cpm_expr.args))
+            if cpm_expr.name == "wsum":
+                weights, vars_ = cpm_expr.args
+                her_vars = self.solver_vars(cpm_expr.args[1])
+                return sum(w * v for w, v in zip(weights, her_vars))
+            if cpm_expr.name == "sub":
+                a, b = cpm_expr.args
+                return self.solver_var(a) - self.solver_var(b)
+            if cpm_expr.name == "-":
+                return (-1) * self.solver_var(cpm_expr.args[0])
+            if cpm_expr.name == "mul":
+                a, b = cpm_expr.args
+                if is_num(a):
+                    return int(a) * self._make_numexpr(b)
+                if is_num(b):
+                    return self._make_numexpr(a) * int(b)
+                raise NotSupportedError(f"Hermax: non-linear mul {cpm_expr}")
+
+            raise NotSupportedError(f"Hermax: unsupported operator {cpm_expr}")
+
+        raise NotImplementedError("Hermax: Not a known supported numexpr {}".format(cpm_expr))
 
     def objective(self, expr: Expression, minimize: bool = True):
         """
@@ -303,19 +384,21 @@ class CPM_hermax(SolverInterface):
         get_variables(expr, self.user_vars)
 
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(
+        obj = push_down_negation_objective(obj)
+        obj, decomp_cons = decompose_linear_objective(
             obj,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap,
         )
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj_var, obj_cons = get_or_make_var(obj)
         if expr.is_bool():
             ivar = intvar(0, 1)
             obj_cons.append(ivar == obj_var)
             obj_var = ivar
 
-        self.add(safe_cons + decomp_cons + obj_cons)
+        self.add(safe_cons + decomp_cons + flat_cons + obj_cons)
         self._objective = obj_var
 
         hm_obj = self.solver_var(obj_var)
@@ -347,125 +430,27 @@ class CPM_hermax(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = push_down_negation(cpm_cons)
-        cpm_cons = decompose_in_tree(
+        cpm_cons = decompose_linear(
             cpm_cons,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap,
         )
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(
             cpm_cons,
             supported=frozenset({"or", "sum", "wsum", "sub"}),
             csemap=self._csemap,
         )
-        # Hermax posts min/max only as equality to a variable; sums support all comparisons
         cpm_cons = only_numexpr_equality(
             cpm_cons,
             supported=frozenset({"sum", "wsum", "sub"}),
             csemap=self._csemap,
         )
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         return cpm_cons
-
-    def _bool_as_int(self, cpm_bv):
-        """
-        Channel a Boolean variable to an IntVar in {0,1} for numeric use.
-
-        Needed because Hermax PB comparisons gated by ``only_if`` can be incorrect
-        when the same Literal also appears inside the comparison.
-        """
-        if isinstance(cpm_bv, NegBoolView):
-            # 1 - positive bool
-            return 1 - self._bool_as_int(cpm_bv._bv)
-
-        name = cpm_bv.name
-        revar = self._bool2int.get(name)
-        if revar is not None:
-            return revar
-
-        hm_bv = self.solver_var(cpm_bv)
-        revar = self.her_model.int(f"_b2i_{name}", 0, 1)
-        self.her_model &= (1 * hm_bv) == revar
-        self._bool2int[name] = revar
-        return revar
-
-    def _hm_numexpr(self, cpm_expr):
-        """Convert a flat numeric CPMpy expression to a Hermax numeric expression."""
-        if is_num(cpm_expr):
-            return int(cpm_expr)
-        if isinstance(cpm_expr, _BoolVarImpl):
-            return self._bool_as_int(cpm_expr)
-        if isinstance(cpm_expr, _NumVarImpl):
-            return self.solver_var(cpm_expr)
-
-        if isinstance(cpm_expr, Operator):
-            if cpm_expr.name == "sum":
-                args = [self._hm_numexpr(a) for a in cpm_expr.args]
-                return sum(args) if len(args) else 0
-            if cpm_expr.name == "wsum":
-                weights, vars_ = cpm_expr.args
-                total = 0
-                for w, v in zip(weights, vars_):
-                    if w == 0:
-                        continue
-                    total = total + int(w) * self._hm_numexpr(v)
-                return total
-            if cpm_expr.name == "sub":
-                a, b = cpm_expr.args
-                return self._hm_numexpr(a) - self._hm_numexpr(b)
-            if cpm_expr.name == "-":
-                return (-1) * self._hm_numexpr(cpm_expr.args[0])
-            if cpm_expr.name == "mul":
-                a, b = cpm_expr.args
-                if is_num(a):
-                    return int(a) * self._hm_numexpr(b)
-                if is_num(b):
-                    return self._hm_numexpr(a) * int(b)
-                raise NotSupportedError(f"Hermax: non-linear multiplication not supported: {cpm_expr}")
-
-        raise NotImplementedError(f"Hermax: unsupported numeric expression {cpm_expr}")
-
-    def _as_pb(self, hm_expr):
-        """Ensure a Hermax numeric expression supports all relational operators."""
-        from hermax.model.expressions import PBExpr
-        from hermax.model.variables import IntVar
-        if isinstance(hm_expr, PBExpr) or is_num(hm_expr):
-            return hm_expr
-        if isinstance(hm_expr, IntVar):
-            return hm_expr + 0  # promote to PBExpr (IntVar != PBExpr is broken in Hermax)
-        return hm_expr
-
-    def _hm_comparison(self, cpm_expr):
-        """Convert a flat Comparison to a Hermax constraint / literal."""
-        lhs, rhs = cpm_expr.args
-        op = cpm_expr.name
-
-        # Global functions in equality form: min/max(...) == rhs
-        if op == "==" and isinstance(lhs, Expression) and lhs.name in {"min", "max"}:
-            hm_args = [self.solver_var(a) for a in lhs.args]
-            hm_rhs = self.solver_var(rhs) if isinstance(rhs, _NumVarImpl) else int(rhs)
-            if lhs.name == "min":
-                return self.her_model.min(hm_args) == hm_rhs
-            return self.her_model.max(hm_args) == hm_rhs
-
-        hm_lhs = self._as_pb(self._hm_numexpr(lhs))
-        hm_rhs = self._as_pb(self._hm_numexpr(rhs))
-        if op == "==":
-            return hm_lhs == hm_rhs
-        if op == "!=":
-            return hm_lhs != hm_rhs
-        if op == "<=":
-            return hm_lhs <= hm_rhs
-        if op == "<":
-            return hm_lhs < hm_rhs
-        if op == ">=":
-            return hm_lhs >= hm_rhs
-        if op == ">":
-            return hm_lhs > hm_rhs
-
-        raise NotImplementedError(f"Hermax: unsupported comparison {cpm_expr}")
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hermax":
         """
@@ -496,8 +481,6 @@ class CPM_hermax(SolverInterface):
     def _hermax_expr(self, cpm_con):
         """
             Translate a flat CPMpy constraint to a Hermax constraint/expression.
-
-            Accepts single constraints; lists are handled recursively for subexpressions.
         """
         if isinstance(cpm_con, BoolVal):
             return bool(cpm_con.value())
@@ -507,7 +490,7 @@ class CPM_hermax(SolverInterface):
 
         if isinstance(cpm_con, Operator):
             if cpm_con.name == "or":
-                args = [self._hermax_expr(a) for a in cpm_con.args]
+                args = self.solver_vars(cpm_con.args)
                 clause = args[0]
                 for a in args[1:]:
                     clause = clause | a
@@ -517,20 +500,53 @@ class CPM_hermax(SolverInterface):
                 hm_bv = self.solver_var(bv)
                 if isinstance(subexpr, _BoolVarImpl):
                     return hm_bv.implies(self.solver_var(subexpr))
-                if isinstance(subexpr, Operator) and subexpr.name == "or":
-                    return hm_bv.implies(self._hermax_expr(subexpr))
+                elif isinstance(subexpr, Operator) and subexpr.name == "or":
+                    # encode as bigger clause
+                    return ~hm_bv | self._hermax_expr(subexpr)
                 if isinstance(subexpr, Comparison):
-                    return self._hermax_expr(subexpr).only_if(hm_bv)
+                    hm_sub = self._hermax_expr(subexpr)
+                    # Hermax may constant-fold a comparison to True/False once domains
+                    # are fixed by earlier posts; literals have .only_if(), bools do not.
+                    if isinstance(hm_sub, bool):
+                        return True if hm_sub else ~hm_bv
+                    return hm_sub.only_if(hm_bv)
                 raise NotImplementedError(f"Hermax: unsupported implication {cpm_con}")
             raise NotImplementedError(f"Hermax: unsupported operator {cpm_con}")
 
         if isinstance(cpm_con, Comparison):
             lhs, rhs = cpm_con.args
-            if cpm_con.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs):
-                if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
-                    return self.solver_var(lhs) == self.solver_var(rhs)
-                raise NotImplementedError(f"Hermax: unsupported reification {cpm_con}")
-            return self._hm_comparison(cpm_con)
+        
+            # Global functions in equality form: min/max(...) == rhs
+            if isinstance(lhs, GlobalFunction):
+                assert cpm_con.name == "==", "Hermax: only equality comparisons are supported for global functions"
+                if lhs.name == "min":
+                    return self.her_model.min(self.solver_vars(lhs.args)) == self.solver_var(rhs)
+                if lhs.name == "max":
+                    return self.her_model.max(self.solver_vars(lhs.args)) == self.solver_var(rhs)
+                raise NotImplementedError(f"Hermax: unsupported global function {lhs}")
+
+            if cpm_con.name in ("<", ">", ">=") and (self._bool_sum(lhs) or self._bool_sum(rhs)):
+                raise ValueError(
+                    "Hermax: strict comparison (<, >, >=) of a sum of boolean variables against an "
+                    "integer is not supported due to a Hermax encoding bug; use <= or == instead. "
+                    "Issue at https://github.com/josalhor/hermax/issues/3"
+                )
+
+            hm_lhs = self._make_numexpr(lhs)
+            hm_rhs = self._make_numexpr(rhs)
+            if cpm_con.name == "==":
+                return hm_lhs == hm_rhs
+            if cpm_con.name == "!=":
+                return hm_lhs != hm_rhs
+            if cpm_con.name == "<=":
+                return hm_lhs <= hm_rhs
+            if cpm_con.name == "<":
+                return hm_lhs < hm_rhs
+            if cpm_con.name == ">=":
+                return hm_lhs >= hm_rhs
+            if cpm_con.name == ">":
+                return hm_lhs > hm_rhs
+            raise NotImplementedError(f"Hermax: unsupported comparison {cpm_con}")
 
         if isinstance(cpm_con, GlobalConstraint):
             if cpm_con.name == "alldifferent":
