@@ -71,7 +71,7 @@ def main():
 
     # We emulate a user query by selecting random items
     # These items are assigned the opposite value of the current solution
-    # While generating this query, we ensure there exist a feasable solution.
+    # While generating this query, we ensure there exist a feasible solution.
     x_user, foil_items = generate_foil_knapsack(values, weights, capacity, x, m)
 
     # Pretty print user query
@@ -119,7 +119,7 @@ def generate_foil_knapsack(values, weights, capacity, x, m, tries=1):
     """
     Generate a set of foil constraints
     Pick m items and assign the opposite value.
-    If this results in an unfeasable assignment (surpassing the capacity), try again
+    If this results in an unfeasible assignment (surpassing the capacity), try again
     @return A model
     """
     n = len(x)
@@ -128,7 +128,7 @@ def generate_foil_knapsack(values, weights, capacity, x, m, tries=1):
 
     if sum(foil_vals * weights[foil_idx]) > capacity:
         if verbose:
-            print(f"\rGenerated unfeasable user query, retrying...({tries})", end="")
+            print(f"\rGenerated unfeasible user query, retrying...({tries})", end="")
         return generate_foil_knapsack(values, weights, capacity, x, m, tries + 1)
     else:
         return (
@@ -186,7 +186,7 @@ def inverse_optimize(values, weights, capacity, x_d, foil_idx):
     Mapping of variable names to names in the paper (TODO: link papper)
         - c = values
         - d = d
-    @param x_d: A feasable solution found in the foil set X_v
+    @param x_d: A feasible solution found in the foil set X_v
     @param foil_idx: A vector containing the items on which the user asked an explanation
                      All other items must retain their original values
     """
