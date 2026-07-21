@@ -197,7 +197,7 @@ def global_constraints(solver):
             yield cp.all(cp.Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
 
             yield cp.Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
-            if solver != "pumpkin": # only supports with fixed durations
+            if solver not in ("pumpkin", "hermax"): # only supports with fixed durations
                 yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
                 yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
             continue

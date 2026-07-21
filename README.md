@@ -46,6 +46,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 * **GO Solvers**: Hexaly (license required)
 * **SMT Solvers**: Z3
 * **PB Solvers**: Exact
+* **MaxSAT Solvers**: RC2 (via PySAT), Hermax + solvers
 * **SAT Encoders and Solvers**: PySAT+solvers, Pindakaas
 * **Decision Diagrams**: PySDD
 
