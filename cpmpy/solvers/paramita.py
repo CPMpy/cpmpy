@@ -87,6 +87,7 @@ class CPM_paramita(SolverInterface):
 
     - ``paramita_solver``: underlying ``SatSolver`` or ``MaxSatSolver`` plugin
     - ``pool``: ``DimacsVariablePool`` mapping CPMpy Bool names to DIMACS ids
+    - ``_varmap``: maps CPMpy Bool variable names to Paramita ``Bool`` modelling objects
     - ``ivarmap``: a mapping from integer variables to their encoding for ``int2bool``
     - ``encoding``: the encoding used for ``int2bool``, choose from (``"auto"``, ``"direct"``, ``"order"``, or ``"binary"``). Set to ``"auto"`` but can be changed in the solver object.
     - ``objective_``: posted CPMpy objective expression, or ``None``
@@ -215,16 +216,35 @@ class CPM_paramita(SolverInterface):
         return replace_int_user_vars(self.user_vars, self.ivarmap)
 
     def solver_var(self, cpm_var):
+        """
+        Return the Paramita modelling ``Bool`` for a CPMpy Boolean variable
+        (cached in ``_varmap``), or a negated view thereof.
+        """
         if isinstance(cpm_var, _NumVarImpl):
             assert cpm_var.is_bool(), f"CPM_paramita.solver_var only supports Boolean variables, not {cpm_var}"
             if isinstance(cpm_var, NegBoolView):
-                return -self.pool.get_variable(cpm_var._bv.name)
-            return self.pool.get_variable(cpm_var.name)
+                return ~self.solver_var(cpm_var._bv)
+            revar = self._varmap.get(cpm_var.name)
+            if revar is not None:
+                return revar
+            from paramita.modelling import Bool
+
+            revar = Bool(cpm_var.name)
+            self.pool.get_variable(cpm_var.name)  # register DIMACS id in the shared pool
+            self._varmap[cpm_var.name] = revar
+            return revar
 
         if is_int(cpm_var):
             return cpm_var
 
         raise NotImplementedError(f"CPM_paramita: variable {cpm_var} not supported")
+
+    def _dimacs_lit(self, cpm_var):
+        """DIMACS literal for a CPMpy Boolean (for assumptions / model lookup)."""
+        self.solver_var(cpm_var)  # ensure Paramita Bool + pool entry exist
+        if isinstance(cpm_var, NegBoolView):
+            return -self.pool.get_variable(cpm_var._bv.name)
+        return self.pool.get_variable(cpm_var.name)
 
     def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         cpm_cons = toplevel_list(cpm_expr)
@@ -251,7 +271,7 @@ class CPM_paramita(SolverInterface):
 
     def _to_paramita(self, cpm_expr):
         """Map a transformed CPMpy expression to a Paramita modelling expression."""
-        from paramita.modelling import Bool, If, Iff
+        from paramita.modelling import If, Iff
 
         if isinstance(cpm_expr, bool) or cpm_expr is True or cpm_expr is False:
             return bool(cpm_expr)
@@ -262,11 +282,8 @@ class CPM_paramita(SolverInterface):
         elif is_int(cpm_expr):
             return int(cpm_expr)
 
-        elif isinstance(cpm_expr, NegBoolView):
-            return ~Bool(cpm_expr._bv.name)
-
         elif isinstance(cpm_expr, _BoolVarImpl):
-            return Bool(cpm_expr.name)
+            return self.solver_var(cpm_expr)
 
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "and":
@@ -368,7 +385,7 @@ class CPM_paramita(SolverInterface):
         if self.objective_ is not None:
             raise NotSupportedError("CPM_paramita: objective can only be set once")
 
-        from paramita.modelling import Bool, add_to_weighted_container, to_cnf
+        from paramita.modelling import add_to_weighted_container, to_cnf
 
         get_variables(expr, collect=self.user_vars)
         self.objective_ = expr
@@ -388,13 +405,7 @@ class CPM_paramita(SolverInterface):
         if len(weights) == 0:
             return
 
-        terms = []
-        for w, x in zip(weights, xs):
-            if isinstance(x, NegBoolView):
-                lit = ~Bool(x._bv.name)
-            else:
-                lit = Bool(x.name)
-            terms.append(int(w) * lit)
+        terms = [int(w) * self.solver_var(x) for w, x in zip(weights, xs)]
         paramita_obj = terms[0]
         for t in terms[1:]:
             paramita_obj = paramita_obj + t
@@ -411,7 +422,7 @@ class CPM_paramita(SolverInterface):
         else:
             assumptions = list(assumptions)
             self.assumption_vars = assumptions
-            assum_lits = self.solver_vars(assumptions)
+            assum_lits = [self._dimacs_lit(a) for a in assumptions]
 
         t0 = time.time()
         timer = None
@@ -453,24 +464,13 @@ class CPM_paramita(SolverInterface):
         has_sol = self._solve_return(self.cpm_status)
 
         if has_sol:
-            # EvalMaxSAT often lacks val_lit; read a full model instead
-            sol = set(self.paramita_solver.model()) if self.is_maxsat else None
+            sol = set(self.paramita_solver.model())
             for cpm_var in self.user_vars:
                 if isinstance(cpm_var, NegBoolView):
-                    vid = self.pool.get_variable(cpm_var._bv.name)
-                    if sol is not None:
-                        cpm_var._value = vid not in sol
-                    else:
-                        val = self.paramita_solver.val_lit(vid)
-                        # unspecified free vars (e.g. after tautology) default to False
-                        cpm_var._value = (not val) if val is not None else True
+                    # free / unspecified vars default to False → NegBoolView True
+                    cpm_var._value = self._dimacs_lit(cpm_var._bv) not in sol
                 elif isinstance(cpm_var, _BoolVarImpl):
-                    vid = self.pool.get_variable(cpm_var.name)
-                    if sol is not None:
-                        cpm_var._value = vid in sol
-                    else:
-                        val = self.paramita_solver.val_lit(vid)
-                        cpm_var._value = val if val is not None else False
+                    cpm_var._value = self._dimacs_lit(cpm_var) in sol
                 else:
                     raise ValueError(
                         f"Integer variables should have been encoded using int2bool, got {cpm_var}"
@@ -494,4 +494,4 @@ class CPM_paramita(SolverInterface):
         if self.is_maxsat:
             raise NotSupportedError("CPM_paramita: UNSAT cores are only supported with SatSolver plugins")
         core_lits = set(self.paramita_solver.core())
-        return [v for v in self.assumption_vars if self.solver_var(v) in core_lits]
+        return [v for v in self.assumption_vars if self._dimacs_lit(v) in core_lits]
