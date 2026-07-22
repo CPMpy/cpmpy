@@ -676,7 +676,7 @@ class NDVarArray(np.ndarray):
             getattr(s, attr)(o.item() if isinstance(o, np.generic) else o, **kwargs)
             for s, o in zip(self.flat, other.flat)])
         # typing is wrong, reshape does return NDVarArray
-        return flat_res.reshape(self.shape) # type: ignore
+        return flat_res.reshape(self.shape)  # type: ignore
 
     # VECTORIZED comparisons
     def __eq__(self, other):

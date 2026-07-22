@@ -22,6 +22,7 @@ from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
 from cpmpy.solvers.highs import CPM_highs
+from cpmpy.solvers.paramita import CPM_paramita
 from cpmpy import SolverLookup
 
 from test_constraints import numexprs
@@ -368,6 +369,59 @@ class TestSolvers:
         # direct solver
         ps = CPM_pindakaas(model)
         assert ps.solve()
+
+    @pytest.mark.skipif(not CPM_paramita.supported(),
+                        reason="Paramita not installed or no solver plugins")
+    def test_paramita(self):
+        (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
+
+        Nora = mayo | ketchup
+        Leander = ~samurai | mayo
+        Benjamin = ~andalouse | ~curry | ~samurai
+        Behrouz = ketchup | curry | andalouse
+        Guy = ~ketchup | curry | andalouse
+        Daan = ~ketchup | ~curry | andalouse
+        Celine = ~samurai
+        Anton = mayo | ~curry | ~andalouse
+        Danny = ~mayo | ketchup | andalouse | samurai
+        Luc = ~mayo | samurai
+
+        model = cp.Model(
+            Nora, Leander, Benjamin, Behrouz, Guy, Daan,
+            Celine, Anton, Danny, Luc
+        )
+        assert model.solve(solver="paramita")
+
+        ps = CPM_paramita(model)
+        assert ps.solve()
+
+        # assumptions + core on a SatSolver plugin
+        if "Cadical300" in CPM_paramita.solvernames():
+            x, y = cp.boolvar(2)
+            sat = CPM_paramita(subsolver="Cadical300")
+            sat += x | y
+            sat += ~x | ~y
+            assert sat.solve()
+            assert not sat.solve(assumptions=[x, ~x])
+            assert set(sat.get_core()) == {x, ~x}
+
+        # maximize on a MaxSatSolver plugin
+        if "EvalMaxSAT2022" in CPM_paramita.solvernames():
+            b = cp.boolvar(shape=3)
+            m = cp.Model(cp.any(b), maximize=sum(b))
+            assert m.solve(solver="paramita:EvalMaxSAT2022")
+            assert m.objective_value() == 3
+
+    @pytest.mark.skipif(not CPM_paramita.supported(),
+                        reason="Paramita not installed or no solver plugins")
+    def test_paramita_subsolver(self):
+        names = CPM_paramita.solvernames()
+        assert len(names) >= 1
+        s = CPM_paramita(subsolver=names[0])
+        x, y = cp.boolvar(shape=2)
+        s += x | y
+        s += ~x | ~y
+        assert s.solve()
 
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
@@ -973,6 +1027,8 @@ class TestSupportedSolvers:
         assert s.objective_value() == 0
         if solver == "rc2":
             return # RC2 only supports setting obj once
+        if solver == "paramita":
+            return  # Paramita MaxSAT soft objective can only be set once
         s += x[0] == 5
         s.solve()
         assert s.objective_value() == 5
@@ -1140,6 +1196,10 @@ class TestSupportedSolvers:
             assert m.solve(solver=solver)
             assert m.status().exitstatus == ExitStatus.OPTIMAL
         except NotSupportedError:
+            return
+
+        if solver == "paramita":
+            # MaxSAT plugins typically lack interrupt(); the Cumulative timeout below would hang
             return
 
         # now making a tricky problem to solve

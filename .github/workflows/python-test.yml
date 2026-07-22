@@ -18,6 +18,18 @@ jobs:
             install_commands: |
               sudo snap install minizinc --classic
           - solver: pindakaas
+          - solver: paramita
+            install_commands: |
+              # Ubuntu's wget (1.21.x) gets a 404 from bitbucket.org's edge for the
+              # ipasir.h/ipamir.h raw-file fetch in the EvalMaxSAT2022 plugin's CMake
+              # patch step, while curl succeeds against the same URL. Shadow wget with
+              # a curl-based shim so that fetch works on the CI runner.
+              mkdir -p /tmp/wget-shim
+              printf '#!/bin/bash\nexec curl -fsSL -O "$@"\n' > /tmp/wget-shim/wget
+              chmod +x /tmp/wget-shim/wget
+              export PATH="/tmp/wget-shim:$PATH"
+              paramita plugins build cmake '#sat-solvers/cadical-3.0.0' -j 2
+              paramita plugins build cmake '#maxsat-solvers/mse22-EvalMaxSAT2022' -j 2
           - solver: pumpkin
           - solver: scip
           - solver: highs

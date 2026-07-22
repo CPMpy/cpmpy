@@ -46,7 +46,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 * **GO Solvers**: Hexaly (license required)
 * **SMT Solvers**: Z3
 * **PB Solvers**: Exact
-* **SAT Encoders and Solvers**: PySAT+solvers, Pindakaas
+* **SAT Encoders and Solvers**: PySAT+solvers, Pindakaas, Paramita
 * **Decision Diagrams**: PySDD
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling

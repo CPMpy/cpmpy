@@ -1974,7 +1974,7 @@ class TestTypeChecks:
 @pytest.mark.usefixtures("solver")
 def test_issue801_expr_in_cumulative(solver):
 
-    if solver in ("pysat", "pysdd", "pindakaas", "rc2"):
+    if solver in ("pysat", "pysdd", "pindakaas", "paramita", "rc2"):
         pytest.skip(f"{solver} does not support integer variables")
     if solver == "cplex":
         pytest.skip(f"waiting for PR #769 to be merged.")
