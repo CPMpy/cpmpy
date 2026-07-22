@@ -23,12 +23,12 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
     "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
-    "Table", 'NegativeTable', "ShortTable", "Regular",
+    "Table", 'NegativeTable', "ShortTable", "Regular", "MDD",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
+    "Abs", "Element", "NDElement", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
@@ -47,10 +47,13 @@ EXCLUDE_OPERATORS = {"pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [cp.intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
+NUM_ARGS_2D = cp.intvar(-3, 5, shape=(5,5), name="MD") # 2D numerical variables
 SMALL_NUM_ARG = [cp.intvar(-2, 2, name=n) for n in "w"]   # Small domain numerical vars
 NN_VAR = cp.intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
 POS_VAR = cp.intvar(1,10, name="s_pos")                # A strictly positive variable
 NUM_VAR = cp.intvar(0, 10, name="l")                   # A numerical variable
+INDEX_VAR = cp.intvar(0, 4, name="i")
+INDEX_VAR2 = cp.intvar(0, 4, name="j")
 
 BOOL_ARGS = [cp.boolvar(name=n) for n in "abc"]        # Boolean variables
 BOOL_VAR = cp.boolvar(name="p")                        # A boolean variable
@@ -114,7 +117,7 @@ def comp_constraints(solver):
 def bool_exprs(solver):
     """
         Generate all boolean expressions:
-        - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var, ...]), or([Var, ...])    (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
         - Global constraints
     """
@@ -125,13 +128,15 @@ def bool_exprs(solver):
 
     for name, arity in names:
         if arity != 0:
-            operator_args = BOOL_ARGS[:arity]
+            arg_counts = [arity]
         else:
-            operator_args = BOOL_ARGS
+            arg_counts = [1, len(BOOL_ARGS)] # singleton and full
 
-        yield Operator(name, operator_args)
-        # Negated boolean values
-        yield Operator(name, [~ arg for arg in operator_args])
+        for n in arg_counts:
+            operator_args = BOOL_ARGS[:n]
+            yield Operator(name, operator_args)
+            # Negated boolean values
+            yield Operator(name, [~ arg for arg in operator_args])
 
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
@@ -274,6 +279,8 @@ def global_functions(solver):
             yield cp.Count(NUM_ARGS, NUM_VAR)
         elif name == "Element":
             yield cp.Element(NUM_ARGS, POS_VAR)
+        elif name == "NDElement":
+            yield cp.NDElement(NUM_ARGS_2D, [NUM_VAR, POS_VAR])
         elif name == "NValueExcept":
             yield cp.NValueExcept(NUM_ARGS, 3)
         elif name == "Among":

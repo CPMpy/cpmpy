@@ -40,7 +40,7 @@ from cpmpy.tools.xcsp3 import XCSP3Dataset
 dataset = XCSP3Dataset(year=2024, track="COP", download=True)
 ```
 
-This will install the instances under `<cwd>/2024/COP` as `.xml.lzma` compressed files.
+This will install the instances under `<cwd>/xcsp3/2024/COP` as `.xml.lzma` compressed files.
 
 You can now iterate over the dataset and load the instances as CPMpy models:
 
@@ -58,10 +58,10 @@ for filename, metadata in XCSP3Dataset(year=2024, track="COP", download=True): #
 
 To parse, load and solve a single XCSP3 instance, we provide the `xcsp3_cpmpy` CLI.
 
-To use the single-instance CLI:
+To use the single-instance CLI (from this directory):
 
-```python
-python xcsp3_cpmpy.py <benchname> --solver <solver> [-s SEED] [-l TIME_LIMIT] [-m MEM_LIMIT] [-t TMPDIR] [-c CORES] [--time-buffer TIME_BUFFER] [--intermediate]
+```console
+python xcsp3_cpmpy.py <benchname> [--solver <solver>] [-s SEED] [-l TIME_LIMIT] [-m MEM_LIMIT] [-t TMPDIR] [-c CORES] [--time-buffer TIME_BUFFER] [--intermediate] [--verbose]
 ```
 
 
@@ -70,15 +70,17 @@ python xcsp3_cpmpy.py <benchname> --solver <solver> [-s SEED] [-l TIME_LIMIT] [-
 
 For benchmarking CPMpy / a backend solver on XCSP3, we provide a CLI to run against a complete competition dataset.
 
-To use the benchmarking CLI:
+To use the benchmarking CLI (from this directory):
 
-```python
-python xcsp3_benchmark.py --year <YEAR> --track <TRACK> --solver <SOLVER> [--workers WORKERS] [--time-limit TIME_LIMIT] [--mem-limit MEM_LIMIT] [--output-dir OUTPUT_DIR] [--verbose] [--intermediate]
+```console
+python benchmark.py --year <YEAR> --track <TRACK> --solver <SOLVER> [--workers WORKERS] [--cores CORES] [--time-limit TIME_LIMIT] [--mem-limit MEM_LIMIT] [--output-dir OUTPUT_DIR] [--checker-path CHECKER_PATH] [--verbose] [--intermediate]
 ```
 
-This will create a `.csv` file containing (performance) measurements for each of the instances. To compare the results of different solvers: 
+`--workers` runs that many instances in parallel; `--cores` limits each instance to that many solver threads.
 
-```python
-python xcsp3_analyze.py <files> [--time_limit TIME_LIMIT] [--output OUTPUT]
+This will create a `.csv` file containing (performance) measurements for each of the instances. To compare the results of different solvers:
+
+```console
+python analyze.py <csv_files_or_dirs>... [--time_limit TIME_LIMIT] [--output OUTPUT]
 ```
 

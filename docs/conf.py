@@ -114,6 +114,10 @@ autodoc_default_flags = ['members', 'special-members']
 #
 # html_theme = 'sphinx_book_theme'
 html_theme = "sphinx_immaterial"
+html_logo = "CPMpy_Logo__Vertical_White.png"
+html_theme_options = {
+    "logo_only": True,  # logo already includes the CPMpy wordmark
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

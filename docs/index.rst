@@ -11,6 +11,12 @@ CPMpy is ideal for solving combinatorial problems like assignment problems or co
 
    modeling
    summary
+   upgrading_to_v1
+
+.. note::
+   CPMpy v1.0.0 contains a number of breaking changes. If you are upgrading from an
+   earlier version, see :doc:`upgrading_to_v1` and the
+   `full changelog on GitHub <https://github.com/CPMpy/cpmpy/blob/master/changelog.md#100>`_.
 
 .. _supported-solvers:
 
@@ -27,7 +33,7 @@ Supported solvers
      - **Notes**
    * - :doc:`OR-Tools <api/solvers/ortools>`
      - CP (LCG)
-     - SAT ASAT ALLSAT - OPT - PAR
+     - SAT ASAT ALLSAT - OPT FLOBJ - PAR
      - pip
      - The default solver
    * - :doc:`Pumpkin <api/solvers/pumpkin>`
@@ -52,32 +58,37 @@ Supported solvers
      - 
    * - :doc:`MiniZinc <api/solvers/minizinc>`
      - CP
-     - SAT - OPT
+     - SAT - OPT FLOBJ
      - pip + local install
      - Communicates through textfiles
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
-     - SAT ASAT ISAT - OPT
+     - SAT ASAT ISAT - OPT FLOBJ
      - pip
      - 
    * - :doc:`Hexaly <api/solvers/hexaly>`
      - Global Opt.
-     - SAT ISAT ALLSAT - OPT IOPT
+     - SAT ISAT ALLSAT - OPT IOPT FLOBJ
      - pip + local + (aca.) licence
      -
    * - :doc:`HiGHS <api/solvers/highs>`
      - ILP
-     - SAT ISAT - OPT IOPT - PAR
+     - SAT ISAT - OPT IOPT FLOBJ - PAR
      - pip
+     - 
+   * - :doc:`SCIP <api/solvers/scip>`
+     - ILP
+     - SAT ISAT - OPT IOPT - PAR
+     - pip + local install
      - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
-     - SAT ISAT - OPT IOPT - PAR
+     - SAT ISAT - OPT IOPT FLOBJ - PAR
      - pip + (aca.) license
      - 
    * - :doc:`CPLEX <api/solvers/cplex>`
      - ILP
-     - SAT - OPT IOPT - PAR
+     - SAT - OPT IOPT FLOBJ - PAR
      - pip + local + (aca.) license
      - 
    * - :doc:`Exact <api/solvers/exact>`
@@ -110,6 +121,7 @@ Native capability abbreviations:
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
     * OPT: Optimisation, IOPT: Incremental optimisation
     * PAR: Parallel solving, PROOF: Proof logging, KC: Knowledge Compilation
+    * FLOBJ: :class:`~cpmpy.expressions.globalfunctions.FloatSum` objective (solver ``minimize``/``maximize`` only; see :doc:`modeling`)
 
 Different solvers excel at different problems. `Try multiple! <modeling.html#selecting-a-solver>`_
 

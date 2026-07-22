@@ -1,0 +1,38 @@
+# ----------------------------------------------------------------------------------------------------
+# File written by CPMpy
+#     Format: 'cip'
+#     CPMpy Version: 0.10.0
+# ----------------------------------------------------------------------------------------------------
+STATISTICS
+  Problem name     : CPMpy Model
+  Variables        : 12 (0 binary, 12 integer, 0 implicit integer, 0 continuous)
+  Constraints      : 0 initial, 12 maximal
+OBJECTIVE
+  Sense            : maximize
+VARIABLES
+  [integer] <x5>: obj=6, original bounds=[0,10]
+  [integer] <x6>: obj=7, original bounds=[0,10]
+  [integer] <x0>: obj=1, original bounds=[0,10]
+  [integer] <x8>: obj=9, original bounds=[0,10]
+  [integer] <x2>: obj=3, original bounds=[0,10]
+  [integer] <x9>: obj=10, original bounds=[0,10]
+  [integer] <x3>: obj=4, original bounds=[0,10]
+  [integer] <x1>: obj=2, original bounds=[0,10]
+  [integer] <x7>: obj=8, original bounds=[0,10]
+  [integer] <x4>: obj=5, original bounds=[0,10]
+  [integer] <x10>: obj=11, original bounds=[0,10]
+  [integer] <x11>: obj=12, original bounds=[0,10]
+CONSTRAINTS
+  [linear] <c1>: <x0>[I] +<x1>[I] +<x2>[I] +<x3>[I] +<x4>[I] +<x5>[I] +<x6>[I] +<x7>[I] +<x8>[I] +<x9>[I] +<x10>[I] +<x11>[I] == 36;
+  [linear] <c2>: <x0>[I] +<x1>[I] == 3;
+  [linear] <c3>: <x2>[I] +<x3>[I] == 5;
+  [linear] <c4>: <x4>[I] +<x5>[I] == 7;
+  [linear] <c5>: <x6>[I] +<x7>[I] == 4;
+  [linear] <c6>: <x8>[I] +<x9>[I] == 6;
+  [linear] <c7>: <x10>[I] +<x11>[I] == 3;
+  [linear] <c8>: <x0>[I] +<x2>[I] == 4;
+  [linear] <c9>: <x2>[I] +<x4>[I] == 6;
+  [linear] <c10>: <x4>[I] +<x6>[I] == 4;
+  [linear] <c11>: <x6>[I] +<x8>[I] == 6;
+  [linear] <c12>: <x8>[I] +<x10>[I] == 4;
+END

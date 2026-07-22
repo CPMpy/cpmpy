@@ -114,7 +114,7 @@ If no `--solver` option is provided:
 
 Tests can be marked with special markers:
 
-- **`@pytest.mark.requires_solver("solver_name_1", "solver_name_2", ...)`** - Test requires a specific solver, one of the listed names
+- **`@pytest.mark.requires_solver("solver_name_1", "solver_name_2", ...)`** - Test runs only for the listed solver(s). The test must declare a **`solver` parameter** (this wires up the `solver` fixture from `conftest.py`). If that solver is not installed, the test is skipped.
 - **`@pytest.mark.requires_dependency("package_name")`** - Test requires a specific Python package
 - **`@pytest.mark.generate_constraints.with_args(generator_function)`** - Parametrise test's "constraint" argument using the provided generator
 - **`@pytest.mark.depends_on_solver`** - Test indirectly depends on solvers
@@ -123,8 +123,8 @@ Tests can be marked with special markers:
 Examples:
 ```python
 @pytest.mark.requires_solver("cplex")
-def test_cplex_specific_feature():
-    # This test only runs if cplex is available
+def test_cplex_specific_feature(solver):
+    # This test only runs if cplex is available; the 'solver' parameter must be present!
     pass
 ```
 
@@ -183,11 +183,11 @@ def test_with_explicit_solvers(solver):
 
 ### Solver-Specific Tests
 
-For tests that only work with specific solvers:
+For tests that only work with specific solvers (do not forget the explicit 'solver' parameter in the function definition):
 
 ```python
 @pytest.mark.requires_solver("cplex")
-def test_cplex_feature():
+def test_cplex_feature(solver):
     # Test cplex-specific functionality
     pass
 ```

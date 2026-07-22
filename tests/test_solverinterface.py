@@ -189,7 +189,8 @@ def test_maximize(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solver_var(solver):
     """Test basic solver_var functionality with different variable types"""
-    solver_class = SolverLookup.lookup(solver)
+    solver_name = solver
+    solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     
     # Test with boolean variable
@@ -221,8 +222,8 @@ def test_solver_var(solver):
 
     # Test with integer variable
 
-    # Skip pysdd as it doesn't support sum
-    if solver == "pysdd":
+    # SAT solvers encode integers to Booleans via int2bool, not via solver_var
+    if solver_name in ("pysat", "pindakaas", "rc2", "pysdd"):
         return
 
     # Test with integer variable

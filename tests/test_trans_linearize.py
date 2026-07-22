@@ -100,6 +100,21 @@ class TestTransLinearize:
         assert str([Operator("or", [p])]) == str(linearize_constraint([p], supported={"or"}))
         assert str([Operator("or", [~p])]) == str(linearize_constraint([~p], supported={"or"}))
 
+    def test_trivially_false_bool_comparison_not_wrapped_in_or(self):
+        b0 = cp.boolvar(name="b0")
+        b1 = cp.boolvar(name="b1")  # reifies ((~b0) + -7 <= -6)
+        cons = only_implies(only_bv_reifies([((~b0) + -7 <= -6) == b1]))
+        lin = linearize_constraint(cons, supported={"or", "->", "sum", "wsum", "and"})
+        # comparison is trivially true for any b0, so only b1 is forced true
+        assert str(lin) == "[or(b1)]"
+
+    def test_reified_trivially_false_bool_sum(self, solver):
+        b0, b1 = cp.boolvar(name="b0"), cp.boolvar(name="b1")
+        model = cp.Model(((~b0) + -7 <= -6) == b1)
+        assert model.solve(solver=solver)
+        assert b0.value() is not None
+        assert b1.value() is True
+
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
 
@@ -746,3 +761,24 @@ class TestLinearizeReifiedVariablesThreshold:
         b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
         out = linearize_reified_variables(self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]), min_values=2, csemap=self.csemap)
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([BV[b == 1], BV[b == 2], BV[b == 3]]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
+
+
+class TestLinearDecompositionDispatch:
+
+    def test_table_dispatches_to_subclass(self):
+        # The "table" entry in decompose_linear must dispatch on the instance, 
+        # so Table subclasses that override decompose_linear 
+        # (e.g. NonReifiedTable in the XCSP3 tooling) are used
+        from cpmpy.expressions.globalconstraints import Table
+        from cpmpy.transformations.linearize import get_linear_decompositions
+
+        sentinel = [cp.BoolVal(True)]
+        class SubTable(Table):
+            def decompose_linear(self, heuristic="domain"):
+                return sentinel, []
+
+        x = cp.intvar(0, 2, shape=2)
+        expr = SubTable(x, [[0, 1]])
+        decomposed, defining = get_linear_decompositions()["table"](expr)
+        assert decomposed is sentinel
+        assert defining == []
