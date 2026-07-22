@@ -50,15 +50,14 @@ from typing import Iterable, Optional, Set
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
-from ..expressions.utils import is_int, is_bool
+from ..expressions.utils import is_int, is_boolexpr
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
-from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
-from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool, replace_int_user_vars
-from ..transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear
+from ..transformations.int2bool import _decide_encoding, _encode_int_var, replace_int_user_vars
+from ..transformations.int2bool_nested import int2bool_nested
+from ..transformations.linearize import decompose_linear
 from ..transformations.normalize import simplify_boolean, toplevel_list
 from ..transformations.negation import push_down_negation
-from ..transformations.reification import only_bv_reifies, only_implies
 from ..transformations.safening import no_partial_functions
 from ..transformations.to_cnf import to_cnf_objective
 from .solver_interface import ExitStatus, SolverInterface, SolverStatus
@@ -257,16 +256,7 @@ class CPM_paramita(SolverInterface):
             csemap=self._csemap,
         )
         cpm_cons = simplify_boolean(cpm_cons)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(
-            cpm_cons,
-            supported=frozenset({"sum", "wsum", "->", "and", "or"}) | self.supported_global_constraints,
-            csemap=self._csemap,
-        )
-        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
+        cpm_cons = int2bool_nested(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
     def _to_paramita(self, cpm_expr):
@@ -323,11 +313,13 @@ class CPM_paramita(SolverInterface):
             rhs = self._to_paramita(cpm_expr.args[1])
             if cpm_expr.name == "==":
                 # Bool <-> Bool uses Iff when both sides are Boolean-shaped; otherwise PB/arith EQ
-                if is_bool(cpm_expr.args[0]) and is_bool(cpm_expr.args[1]):
+                if is_boolexpr(cpm_expr.args[0]) and is_boolexpr(cpm_expr.args[1]):
                     return Iff(lhs, rhs)
                 return lhs == rhs
             elif cpm_expr.name == "!=":
-                return ~(lhs == rhs) if not (is_bool(cpm_expr.args[0]) and is_bool(cpm_expr.args[1])) else ~Iff(lhs, rhs)
+                if is_boolexpr(cpm_expr.args[0]) and is_boolexpr(cpm_expr.args[1]):
+                    return ~Iff(lhs, rhs)
+                return ~(lhs == rhs)
             elif cpm_expr.name == "<=":
                 return lhs <= rhs
             elif cpm_expr.name == "<":
