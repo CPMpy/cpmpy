@@ -29,6 +29,7 @@ from cpmpy.tools.io.xcsp3 import load_xcsp3
 from cpmpy.tools.io.jsplib import load_jsplib
 from cpmpy.tools.io.rcpsp import load_rcpsp
 from cpmpy.tools.io.nurserostering import load_nurserostering
+from cpmpy.tools.io.sudoku import load_sudoku
 from cpmpy.tools.io.utils import _derive_format, _is_potential_path
 
 # mapping format names to appropriate loader functions
@@ -47,6 +48,7 @@ _loader_map: dict[str, Callable[..., cp.Model]] = {
     "jsplib": load_jsplib,
     "rcpsp": load_rcpsp,
     "nurserostering": load_nurserostering,
+    "sudoku": load_sudoku,
 }
 
 
