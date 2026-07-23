@@ -15,9 +15,9 @@ from typing import List
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Expression, Operator
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import eval_comparison, is_boolexpr, is_int, is_num
+from ..expressions.utils import eval_comparison, is_boolexpr, is_int, is_num, is_true_cst
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl
-from .int2bool import _decide_encoding, _encode_int_var
+from .int2bool import _decide_encoding, _encode_comparison, _encode_int_var
 
 
 def int2bool_nested(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None):
@@ -74,8 +74,32 @@ def _int2bool_nested_expr(expr, ivarmap, encoding, csemap):
                 return expr, toplevel
             return Comparison(expr.name, nl, nr), toplevel
 
-        # Numeric comparison: fold to PB sum/wsum (IntVars expanded in _to_wsum_terms)
+        # Compact IntVar[+offset] ⋈ const (also when used as a 0/1 sum term)
         name = expr.name
+        left = _intvar_offset(lhs)
+        right = _intvar_offset(rhs)
+        iv, d = None, None
+        if left is not None and is_num(rhs):
+            iv, d = left[0], int(rhs) - left[1]
+        elif right is not None and is_num(lhs):
+            flip = {"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
+            iv, name, d = right[0], flip[name], int(lhs) - right[1]
+        if iv is not None:
+            if name == "<":
+                name, d = "<=", d - 1
+            elif name == ">":
+                name, d = ">=", d + 1
+            constraints, toplevel = _encode_comparison(
+                ivarmap, iv, name, d, encoding, csemap=csemap
+            )
+            constraints = [c for c in constraints if not is_true_cst(c)]
+            if len(constraints) == 0:
+                return BoolVal(True), toplevel
+            if len(constraints) == 1:
+                return constraints[0], toplevel
+            return Operator("and", constraints), toplevel
+
+        # General linear: fold to PB sum/wsum (IntVars via encode_term)
         toplevel = []
         ws, xs, k = _to_wsum_terms(lhs, ivarmap, encoding, csemap, toplevel, name)
         w2, x2, k2 = _to_wsum_terms(rhs, ivarmap, encoding, csemap, toplevel, name)
@@ -157,3 +181,26 @@ def _to_wsum_terms(expr, ivarmap, encoding, csemap, toplevel, cmp):
             c = int(expr.args[0])
             return [c * w for w in ws], xs, c * k
     raise NotSupportedError(f"int2bool_nested: non-linear or unsupported numexpr {expr}")
+
+
+def _intvar_offset(expr):
+    """Return ``(iv, offset)`` if expr is ``iv + offset`` (sum of one IntVar and ints), else None.
+
+    BoolVars (incl. negated) are also ``_IntVarImpl``; exclude them — they are 0/1 terms, not int encodings.
+    """
+    if isinstance(expr, _IntVarImpl) and not isinstance(expr, _BoolVarImpl):
+        return expr, 0
+    if isinstance(expr, Operator) and expr.name == "sum":
+        iv, off = None, 0
+        for a in expr.args:
+            if isinstance(a, _IntVarImpl) and not isinstance(a, _BoolVarImpl):
+                if iv is not None:
+                    return None
+                iv = a
+            elif is_num(a):
+                off += int(a)
+            else:
+                return None
+        if iv is not None:
+            return iv, off
+    return None
