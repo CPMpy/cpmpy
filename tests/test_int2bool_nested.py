@@ -55,17 +55,15 @@ class TestInt2BoolNested:
         ivarmap = {}
         out = int2bool_nested(_prep(b.implies(x != y)), ivarmap)
 
-        imps = [c for c in out if isinstance(c, Operator) and c.name == "->"]
-        # At least b -> (pb != 0); domain may also contribute ->
+        # b -> compact pairwise encoding of x!=y (not(...)/or of ands), nesting preserved
         assert any(
             isinstance(c, Operator)
             and c.name == "->"
             and c.args[0] is b
-            and isinstance(c.args[1], Comparison)
-            and c.args[1].name == "!="
+            and isinstance(c.args[1], Operator)
+            and c.args[1].name in ("not", "or", "and")
             for c in out
         )
-        assert imps  # domain and/or the implication itself
         assert _has_domain_side_constraints(out, ivarmap)
 
     def test_preserves_bool_reification(self):
