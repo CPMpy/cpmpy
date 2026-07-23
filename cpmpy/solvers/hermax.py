@@ -314,17 +314,6 @@ class CPM_hermax(SolverInterface):
         self.her_model &= (~hm_bv).implies(hm_iv == 0)
         return iv
 
-    @staticmethod
-    def _bool_sum(expr):
-        """True if ``expr`` is a sum/wsum over boolean decision variables."""
-        if not isinstance(expr, Operator):
-            return False
-        if expr.name == "sum":
-            return any(isinstance(a, _BoolVarImpl) for a in expr.args)
-        if expr.name == "wsum":
-            return any(isinstance(a, _BoolVarImpl) for a in expr.args[1])
-        return False
-
     def _make_numexpr(self, cpm_expr):
         """
             Turns a numeric CPMpy 'flat' expression into a solver-specific
@@ -348,16 +337,14 @@ class CPM_hermax(SolverInterface):
 
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == "sum":
-                return sum(self.solver_vars(cpm_expr.args))
+                return sum(self._make_numexpr(a) for a in cpm_expr.args)
             if cpm_expr.name == "wsum":
                 weights, vars_ = cpm_expr.args
-                her_vars = self.solver_vars(cpm_expr.args[1])
-                return sum(w * v for w, v in zip(weights, her_vars))
+                return sum(w * self._make_numexpr(v) for w, v in zip(weights, vars_))
             if cpm_expr.name == "sub":
-                a, b = cpm_expr.args
-                return self.solver_var(a) - self.solver_var(b)
+                return self._make_numexpr(cpm_expr.args[0]) - self._make_numexpr(cpm_expr.args[1])
             if cpm_expr.name == "-":
-                return (-1) * self.solver_var(cpm_expr.args[0])
+                return (-1) * self._make_numexpr(cpm_expr.args[0])
             if cpm_expr.name == "mul":
                 a, b = cpm_expr.args
                 if is_num(a):
@@ -524,13 +511,6 @@ class CPM_hermax(SolverInterface):
                 if lhs.name == "max":
                     return self.her_model.max(self.solver_vars(lhs.args)) == self.solver_var(rhs)
                 raise NotImplementedError(f"Hermax: unsupported global function {lhs}")
-
-            if cpm_con.name in ("<", ">", ">=") and (self._bool_sum(lhs) or self._bool_sum(rhs)):
-                raise ValueError(
-                    "Hermax: strict comparison (<, >, >=) of a sum of boolean variables against an "
-                    "integer is not supported due to a Hermax encoding bug; use <= or == instead. "
-                    "Issue at https://github.com/josalhor/hermax/issues/3"
-                )
 
             hm_lhs = self._make_numexpr(lhs)
             hm_rhs = self._make_numexpr(rhs)
