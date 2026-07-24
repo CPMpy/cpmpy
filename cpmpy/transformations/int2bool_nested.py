@@ -7,9 +7,10 @@ nesting (``and`` / ``or`` / ``not`` / ``->``) and does not flatten.
 
 Integer comparisons are rewritten as follows:
 - ``IntVar[+offset]`` compared to a constant uses :func:`_encode_comparison`
-- two-variable ``==`` / ``!=`` of the form ``x - y == k`` or ``x + y == c``
-  (including ``x == y`` and ``x == c - y``) are encoded pairwise over the
-  Boolean encodings of ``x`` and ``y``
+- optionally, two-variable ``==`` / ``!=`` of the form ``x - y == k`` or
+  ``x + y == c`` (including ``x == y`` and ``x == c - y``) are encoded
+  pairwise over the Boolean encodings of ``x`` and ``y``
+  (controlled by ``pairwise_eq``)
 - other linear comparisons become ``sum`` / ``wsum`` compared to a constant,
   with integer variables expanded to their Boolean encoding terms
 """
@@ -38,6 +39,7 @@ def int2bool_nested(
     ivarmap: dict[str, IntVarEnc],
     encoding: str = "auto",
     csemap: CSEMap | None = None,
+    pairwise_eq: bool = True,
 ) -> list[Expression]:
     """
     Encode integer comparisons inside nested Boolean expressions to pseudo-Boolean.
@@ -47,6 +49,9 @@ def int2bool_nested(
         ivarmap: dictionary mapping integer variable names to their encoding
         encoding: ``"auto"``, ``"direct"``, ``"order"``, or ``"binary"``
         csemap: optional CSE map passed through to int2bool encodings
+        pairwise_eq: if True (default), encode two-variable ``==`` / ``!=``
+            pairwise over Boolean encodings; if False, use the general
+            linear ``sum`` / ``wsum`` encoding instead
 
     Returns:
         list of constraints: domain constraints first, then transformed exprs
@@ -57,7 +62,9 @@ def int2bool_nested(
 
     newlist: list[Expression] = []
     for expr in cpm_lst:
-        newexpr, domain_constraints = _encode_nested_expr(expr, ivarmap, encoding, csemap)
+        newexpr, domain_constraints = _encode_nested_expr(
+            expr, ivarmap, encoding, csemap, pairwise_eq
+        )
         newlist.extend(domain_constraints)  # domain cons first (needed before use)
         newlist.append(newexpr)
     return newlist
@@ -68,6 +75,7 @@ def _encode_nested_expr(
     ivarmap: dict[str, IntVarEnc],
     encoding: str,
     csemap: CSEMap | None,
+    pairwise_eq: bool,
 ) -> tuple[Expression, list[Expression]]:
     """Return ``(newexpr, domain_constraints)`` — rewritten expr + domain side-constraints."""
     if isinstance(expr, Operator) and expr.name in ("and", "or", "not", "->"):
@@ -75,7 +83,7 @@ def _encode_nested_expr(
         newargs: list[Expression] = []
         changed = False
         for a in expr.args:
-            newarg, dc = _encode_nested_expr(a, ivarmap, encoding, csemap)
+            newarg, dc = _encode_nested_expr(a, ivarmap, encoding, csemap, pairwise_eq)
             newargs.append(newarg)
             domain_constraints.extend(dc)
             if newarg is not a:
@@ -90,8 +98,8 @@ def _encode_nested_expr(
         lhs, rhs = expr.args
         # Boolean reification / xor-style: recurse into both sides, keep structure
         if expr.name in ("==", "!=") and is_boolexpr(lhs) and is_boolexpr(rhs):
-            nl, dc1 = _encode_nested_expr(lhs, ivarmap, encoding, csemap)
-            nr, dc2 = _encode_nested_expr(rhs, ivarmap, encoding, csemap)
+            nl, dc1 = _encode_nested_expr(lhs, ivarmap, encoding, csemap, pairwise_eq)
+            nr, dc2 = _encode_nested_expr(rhs, ivarmap, encoding, csemap, pairwise_eq)
             domain_constraints = dc1 + dc2
             if nl is lhs and nr is rhs:
                 return expr, domain_constraints
@@ -135,7 +143,7 @@ def _encode_nested_expr(
                 if len(constraints) == 1:
                     return constraints[0], domain_constraints
                 return Operator("and", constraints), domain_constraints
-            if ok and len(coeffs) == 2 and name in ("==", "!="):
+            if pairwise_eq and ok and len(coeffs) == 2 and name in ("==", "!="):
                 (x, cx), (y, cy) = list(coeffs.items())
                 if {cx, cy} == {1, -1}:
                     if cx == -1:
@@ -157,8 +165,12 @@ def _encode_nested_expr(
 
         # General linear: fold to PB sum/wsum (IntVars via encode_term)
         domain_constraints = []
-        ws, xs, k = _to_wsum_terms(lhs, ivarmap, encoding, csemap, domain_constraints, name)
-        w2, x2, k2 = _to_wsum_terms(rhs, ivarmap, encoding, csemap, domain_constraints, name)
+        ws, xs, k = _to_wsum_terms(
+            lhs, ivarmap, encoding, csemap, domain_constraints, name, pairwise_eq
+        )
+        w2, x2, k2 = _to_wsum_terms(
+            rhs, ivarmap, encoding, csemap, domain_constraints, name, pairwise_eq
+        )
 
         # normalize comparison to >= CONST or <= CONST
         ws = ws + [-w for w in w2]
@@ -189,6 +201,7 @@ def _to_wsum_terms(
     csemap: CSEMap | None,
     domain_constraints: list[Expression],
     cmp: str,
+    pairwise_eq: bool,
 ) -> tuple[list[int], list[Expression], int]:
     """Return ``(weights, bool_terms, const)``; expand IntVars to encoding BVs."""
     if is_num(expr):
@@ -209,7 +222,7 @@ def _to_wsum_terms(
     # Bool op / comparison as 0/1 term
     elif (isinstance(expr, Operator) and expr.name in ("and", "or", "not", "->")) \
          or isinstance(expr, Comparison):
-        newexpr, dc = _encode_nested_expr(expr, ivarmap, encoding, csemap)
+        newexpr, dc = _encode_nested_expr(expr, ivarmap, encoding, csemap, pairwise_eq)
         domain_constraints.extend(dc)
         if isinstance(newexpr, BoolVal):
             return [], [], int(bool(newexpr.value()))
@@ -218,15 +231,15 @@ def _to_wsum_terms(
     elif isinstance(expr, Operator):
         if expr.name == "-":
             ws, xs, k = _to_wsum_terms(
-                expr.args[0], ivarmap, encoding, csemap, domain_constraints, cmp
+                expr.args[0], ivarmap, encoding, csemap, domain_constraints, cmp, pairwise_eq
             )
             return [-w for w in ws], xs, -k
         elif expr.name == "sub":
             w1, x1, k1 = _to_wsum_terms(
-                expr.args[0], ivarmap, encoding, csemap, domain_constraints, cmp
+                expr.args[0], ivarmap, encoding, csemap, domain_constraints, cmp, pairwise_eq
             )
             w2, x2, k2 = _to_wsum_terms(
-                expr.args[1], ivarmap, encoding, csemap, domain_constraints, cmp
+                expr.args[1], ivarmap, encoding, csemap, domain_constraints, cmp, pairwise_eq
             )
             return w1 + [-w for w in w2], x1 + x2, k1 - k2
         elif expr.name == "sum":
@@ -235,7 +248,7 @@ def _to_wsum_terms(
             k = 0
             for a in expr.args:
                 w, x, kk = _to_wsum_terms(
-                    a, ivarmap, encoding, csemap, domain_constraints, cmp
+                    a, ivarmap, encoding, csemap, domain_constraints, cmp, pairwise_eq
                 )
                 ws_l += w
                 xs_l += x
@@ -247,7 +260,7 @@ def _to_wsum_terms(
             k = 0
             for w, a in zip(expr.args[0], expr.args[1]):
                 ww, xx, kk = _to_wsum_terms(
-                    a, ivarmap, encoding, csemap, domain_constraints, cmp
+                    a, ivarmap, encoding, csemap, domain_constraints, cmp, pairwise_eq
                 )
                 ws_l += [w * wi for wi in ww]
                 xs_l += xx
@@ -255,7 +268,7 @@ def _to_wsum_terms(
             return ws_l, xs_l, k
         elif expr.name == "mul" and is_num(expr.args[0]):
             ws, xs, k = _to_wsum_terms(
-                expr.args[1], ivarmap, encoding, csemap, domain_constraints, cmp
+                expr.args[1], ivarmap, encoding, csemap, domain_constraints, cmp, pairwise_eq
             )
             c = int(cast(int, expr.args[0]))
             return [c * w for w in ws], xs, c * k

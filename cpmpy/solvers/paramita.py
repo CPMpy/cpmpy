@@ -256,7 +256,7 @@ class CPM_paramita(SolverInterface):
             csemap=self._csemap,
         )
         cpm_cons = simplify_boolean(cpm_cons)
-        cpm_cons = int2bool_nested(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
+        cpm_cons = int2bool_nested(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap, pairwise_eq=True)
         return cpm_cons
 
     def _to_paramita(self, cpm_expr):
