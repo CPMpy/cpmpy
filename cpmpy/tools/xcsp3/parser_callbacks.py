@@ -87,8 +87,7 @@ class CallbacksCPMPy(Callbacks):
         "le": (2, lambda x, y: x <= y),
         "ge": (2, lambda x, y: x >= y),
         "gt": (2, lambda x, y: x > y),
-        # ne is n-ary in XCSP3 (like eq): ne(x0,...,xn) is the logical negation of eq, i.e. "not allequal"
-        # (not the same as pairwise AllDifferent). Binary case stays a plain disequality.
+        # arity 0: XCSP3 allows n-ary eq/ne (all-equal / not-all-equal)
         "ne": (0, lambda x: x[0] != x[1] if len(x) == 2 else ~cp.AllEqual(x)),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
@@ -807,7 +806,10 @@ class CallbacksCPMPy(Callbacks):
         return cpm_exprs
 
     def get_cpm_var(self, x):
-        return self.cpm_variables.get(x, x)
+        if isinstance(x, XVar):
+            return self.cpm_variables[x]
+        else:
+            return x  # constants
 
     def get_cpm_vars(self, lst):
         if isinstance(lst[0], (XVar, int)):
