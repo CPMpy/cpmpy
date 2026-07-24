@@ -545,7 +545,7 @@ def solver_arguments(solver: str,
         return cpo_arguments(model=model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
     else:
         print_comment(f"setting parameters of {solver} is not (yet) supported")
-        return dict()
+        return {}, None
 
 @contextmanager
 def prepend_print():
