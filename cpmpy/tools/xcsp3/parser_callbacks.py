@@ -807,7 +807,10 @@ class CallbacksCPMPy(Callbacks):
         return cpm_exprs
 
     def get_cpm_var(self, x):
-        return self.cpm_variables.get(x, x)
+        if isinstance(x, XVar):
+            return self.cpm_variables[x]
+        else:
+            return x  # constants
 
     def get_cpm_vars(self, lst):
         if isinstance(lst[0], (XVar, int)):
