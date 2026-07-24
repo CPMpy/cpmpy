@@ -66,6 +66,23 @@ class TestInt2BoolNested:
         )
         assert _has_domain_side_constraints(out, ivarmap)
 
+    def test_diseq_without_pairwise_eq(self):
+        x, y = cp.intvar(0, 3, shape=2, name="xy")
+        b = cp.boolvar(name="b")
+        ivarmap = {}
+        out = int2bool_nested(_prep(b.implies(x != y)), ivarmap, pairwise_eq=False)
+
+        # b -> general linear sum/wsum != encoding (not pairwise or/and of equalities)
+        implies = [
+            c for c in out
+            if isinstance(c, Operator) and c.name == "->" and c.args[0] is b
+        ]
+        assert len(implies) == 1
+        rhs = implies[0].args[1]
+        assert isinstance(rhs, Comparison) and rhs.name == "!="
+        assert isinstance(rhs.args[0], Operator) and rhs.args[0].name in ("sum", "wsum")
+        assert _has_domain_side_constraints(out, ivarmap)
+
     def test_preserves_bool_reification(self):
         x, y = cp.intvar(0, 3, shape=2, name="xy")
         a = cp.boolvar(name="a")
