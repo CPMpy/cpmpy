@@ -37,7 +37,10 @@
         CPM_hermax
 """
 import time
+import warnings
 from typing import Optional
+
+from packaging.version import Version
 
 from cpmpy.expressions.globalfunctions import GlobalFunction
 
@@ -45,12 +48,12 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.utils import is_num, is_int, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
@@ -60,7 +63,6 @@ from ..transformations.linearize import (
     linearize_reified_variables,
 )
 
-
 class CPM_hermax(SolverInterface):
     """
     Interface to Hermax's modeling API (``hermax.model.Model``).
@@ -68,6 +70,7 @@ class CPM_hermax(SolverInterface):
     Creates the following attributes (see parent constructor for more):
 
     - ``her_model``: the underlying ``hermax.model.Model`` object
+    - ``her_solver``: optional Hermax IPAMIR solver class selected via ``subsolver``
 
     Documentation of the solver's own Python API:
     https://hermax.readthedocs.io/
@@ -83,9 +86,26 @@ class CPM_hermax(SolverInterface):
     def supported():
         try:
             import hermax  # noqa: F401
+            her_version = CPM_hermax.version()
+            if her_version is None or Version(her_version) < Version("1.2.3"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.2.3 "
+                              f"but you have version {her_version}")
+                return False
             return True
         except ModuleNotFoundError:
             return False
+
+    @staticmethod
+    def solvernames(**kwargs):
+        """
+            Returns solvers supported by Hermax on your system
+        """
+        if CPM_hermax.supported():
+            import hermax.non_incremental as her_ni
+            return list(her_ni.__all__)
+        else:
+            warnings.warn("Hermax is not installed or not supported on this system.")
+            return []
 
     @staticmethod
     def version() -> Optional[str]:
@@ -104,23 +124,42 @@ class CPM_hermax(SolverInterface):
 
         Arguments:
             cpm_model: Model(), a CPMpy Model() (optional)
-            subsolver: None, not used
+            subsolver (str, name of the hermax solver, e.g. EvalMaxSAT):  see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
+            her_version = CPM_hermax.version()
+            if her_version is not None and Version(her_version) < Version("1.2.3"):
+                raise ImportError(
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.3 "
+                    f"but you have version {her_version}"
+                )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
 
         from hermax.model import Model
+        import hermax.non_incremental as her_ni
 
-        assert subsolver is None, "Hermax does not support subsolvers yet"
+        # determine subsolver
+        if subsolver is None or subsolver == "hermax":
+            # default: hermax's built-in SAT/MaxSAT backends
+            her_solver = None
+            name = "hermax"
+        else:
+            if subsolver.startswith("hermax:"):
+                subsolver = subsolver[7:]  # strip 'hermax:'
+            if subsolver not in self.solvernames():
+                raise ValueError(f"Unknown Hermax subsolver '{subsolver}', choose from {self.solvernames()}")
+            her_solver = getattr(her_ni, subsolver)
+            name = "hermax:" + subsolver
 
+        # initialise the native solver object
         self.her_model = Model()
+        self.her_solver = her_solver
         self._objective = None
         self._objective_posted = False
         self._assumption_map = {}  # dimacs lit -> CPMpy assumption expr
-        self._last_core = None
-        self._bool_intmap = {}  # boolvar name -> channeled {0,1} intvar
 
-        super().__init__(name="hermax", cpm_model=cpm_model)
+        # initialise everything else and post the constraints/objective
+        super().__init__(name=name, cpm_model=cpm_model)
 
     @property
     def native_model(self):
@@ -134,25 +173,33 @@ class CPM_hermax(SolverInterface):
         Call the Hermax solver
 
         Arguments:
-            time_limit (float, optional): maximum solve time in seconds.
-                Negative values raise ``ValueError``. When supported by the
-                underlying PySAT/backend solver, search is interrupted after
-                the limit.
-            assumptions: iterable of Boolean variables (or their negation) assumed true
-            **kwargs: forwarded to ``hermax.model.Model.solve`` (e.g. ``sat_solver_name``,
-                ``maxsat_backend``, ``incremental``, ``solver``)
+            time_limit (float, optional): not supported yet (raises ``NotSupportedError``)
+            assumptions:                  iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                                          For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
+                                          get_core() returns a small subset of assumption variables that are unsat together.
+            **kwargs:                     any keyword argument, sets parameters of solver object
 
-        Returns:
-            whether a solution was found
+        Arguments that correspond to solver parameters:
+
+        - ``sat_solver_name``
+        - ``maxsat_backend``
+        - ``incremental``
+
+        The MaxSAT subsolver itself is selected at construction time
+        (e.g. ``cp.SolverLookup.get("hermax:EvalMaxSAT")``), not via ``solve()``.
+
+        See https://hermax.readthedocs.io/ for the full list.
         """
-        if time_limit is not None and time_limit < 0:
-            raise ValueError(f"Time limit cannot be negative, but got {time_limit}")
+        if "solver" in kwargs:
+            raise ValueError("Hermax subsolver must be selected at construction (e.g. cp.SolverLookup.get('hermax:EvalMaxSAT')), not via solve(solver=...).")
+
+        if time_limit is not None:
+            raise NotSupportedError("Hermax: time_limit is not supported yet (no reliable interrupt/anytime API on the default MaxSAT path)")
 
         self.solver_vars(list(self.user_vars))
 
         hm_assumptions = None
         self._assumption_map = {}
-        self._last_core = None
         if assumptions is not None:
             assumptions = list(assumptions)
             hm_assumptions = []
@@ -164,77 +211,29 @@ class CPM_hermax(SolverInterface):
                 self._assumption_map[dimacs] = a
 
         start = time.time()
-        timer = None
-        if time_limit is not None and time_limit > 0:
-            from threading import Timer
-
-            def _interrupt():
-                sat = getattr(self.her_model._inc_state, "sat_solver", None)
-                if sat is not None and hasattr(sat, "interrupt"):
-                    try:
-                        sat.interrupt()
-                    except Exception:
-                        pass
-                ip = getattr(self.her_model._inc_state, "ip_solver", None)
-                if ip is not None and hasattr(ip, "interrupt"):
-                    try:
-                        ip.interrupt()
-                    except Exception:
-                        pass
-
-            timer = Timer(time_limit, _interrupt)
-            timer.daemon = True
-            timer.start()
-
-        try:
-            result = self.her_model.solve(assumptions=hm_assumptions, **kwargs)
-        finally:
-            if timer is not None:
-                timer.cancel()
-                sat = getattr(self.her_model._inc_state, "sat_solver", None)
-                if sat is not None and hasattr(sat, "clear_interrupt"):
-                    try:
-                        sat.clear_interrupt()
-                    except Exception:
-                        pass
-
+        result = self.her_model.solve(
+            assumptions=hm_assumptions, solver=self.her_solver, **kwargs
+        )
         runtime = time.time() - start
 
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = runtime
 
-        status = str(result.status).lower()
-        if status in ("optimum", "optimal"):
+        # Hermax SolveResult.status is one of:
+        # sat | unsat | optimum | interrupted_sat | interrupted | unknown | error
+        status = result.status
+        if status == "optimum":
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-        elif status in ("sat", "satisfiable", "feasible"):
-            self.cpm_status.exitstatus = (
-                ExitStatus.OPTIMAL if self.has_objective() else ExitStatus.FEASIBLE
-            )
-        elif status in ("unsat", "unsatisfiable"):
+        elif status in ("sat", "interrupted_sat"):
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif status == "unsat":
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-            # extract unsat core from underlying PySAT solver when available
-            sat = getattr(self.her_model._inc_state, "sat_solver", None)
-            if sat is not None and hasattr(sat, "get_core"):
-                try:
-                    dimacs_core = sat.get_core() or []
-                    core = []
-                    for lit in dimacs_core:
-                        if lit in self._assumption_map:
-                            cpm_a = self._assumption_map[lit]
-                            if cpm_a not in core:
-                                core.append(cpm_a)
-                    self._last_core = core
-                except Exception:
-                    self._last_core = None
-        elif status in ("unknown", "timeout", "interrupted"):
+        elif status in ("interrupted", "unknown"):
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        elif status == "error":
+            self.cpm_status.exitstatus = ExitStatus.ERROR
         else:
-            if result.ok:
-                self.cpm_status.exitstatus = (
-                    ExitStatus.OPTIMAL if self.has_objective() else ExitStatus.FEASIBLE
-                )
-            else:
-                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            raise ValueError(f"Unknown Hermax status: {result.status!r}, please report on github...")
 
         has_sol = self._solve_return(self.cpm_status)
         self.objective_value_ = None
@@ -259,11 +258,21 @@ class CPM_hermax(SolverInterface):
             Core extraction uses the underlying PySAT SAT backend. It may be
             unavailable when solving through a MaxSAT backend.
         """
-        if self._last_core is None:
-            raise NotSupportedError(
-                "Hermax: no unsat core available (solve under assumptions with a SAT backend first)"
-            )
-        return list(self._last_core)
+        assert self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE, "get_core(): solver must return UNSAT"
+        assert len(self._assumption_map) > 0, "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
+
+        sat = getattr(self.her_model._inc_state, "sat_solver", None)
+        if sat is None or not hasattr(sat, "get_core"):
+            raise NotSupportedError("Hermax: no unsat core available (solve under assumptions with a SAT backend first)")
+
+        dimacs_core = sat.get_core() or []
+        core = []
+        for lit in dimacs_core:
+            if lit in self._assumption_map:
+                cpm_a = self._assumption_map[lit]
+                if cpm_a not in core:
+                    core.append(cpm_a)
+        return core
 
     def solver_var(self, cpm_var):
         """
@@ -295,25 +304,6 @@ class CPM_hermax(SolverInterface):
 
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
-    def _bool_as_int(self, cpm_bool):
-        """
-        Return a {0,1} intvar channeled to ``cpm_bool`` (one intvar per underlying bool).
-        """
-        if isinstance(cpm_bool, NegBoolView):
-            cpm_bool = cpm_bool._bv
-
-        name = cpm_bool.name
-        if name in self._bool_intmap:
-            return self._bool_intmap[name]
-
-        iv = intvar(0, 1, name=f"_hm_{name}")
-        self._bool_intmap[name] = iv
-        hm_bv = self.solver_var(cpm_bool)
-        hm_iv = self.solver_var(iv)
-        self.her_model &= hm_bv.implies(hm_iv == 1)
-        self.her_model &= (~hm_bv).implies(hm_iv == 0)
-        return iv
-
     def _make_numexpr(self, cpm_expr):
         """
             Turns a numeric CPMpy 'flat' expression into a solver-specific
@@ -326,13 +316,8 @@ class CPM_hermax(SolverInterface):
         if is_num(cpm_expr):
             return int(cpm_expr)
 
-        # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl): 
-            if cpm_expr.is_bool():
-                # Boolvars are not integer for Hermax, channel to 0-1 intvar
-                if isinstance(cpm_expr, NegBoolView):
-                    return 1 - self.solver_var(self._bool_as_int(cpm_expr._bv))
-                return self.solver_var(self._bool_as_int(cpm_expr))
+        # decision variables, check in varmap (bools are native 0/1 in PB context)
+        if isinstance(cpm_expr, _NumVarImpl):
             return self.solver_var(cpm_expr)
 
         if isinstance(cpm_expr, Operator):
@@ -379,22 +364,15 @@ class CPM_hermax(SolverInterface):
             csemap=self._csemap,
         )
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj_var, obj_cons = get_or_make_var(obj)
-        if expr.is_bool():
-            ivar = intvar(0, 1)
-            obj_cons.append(ivar == obj_var)
-            obj_var = ivar
 
-        self.add(safe_cons + decomp_cons + flat_cons + obj_cons)
-        self._objective = obj_var
+        self.add(safe_cons + decomp_cons + flat_cons)
+        self._objective = obj
 
-        hm_obj = self.solver_var(obj_var)
-        # Hermax soft IntVar terms currently require a non-negative domain
-        lb, ub = int(obj_var.lb), int(obj_var.ub)
-        if minimize:
-            hm_expr = hm_obj - lb  # shift to [0, ub-lb]
-        else:
-            hm_expr = ub - hm_obj  # maximize via minimizing (ub - x)
+        hm_obj = self._make_numexpr(obj)
+        # Hermax soft IntVar terms currently require a non-negative domain;
+        # also encode maximize as minimize(ub - expr).
+        lb, ub = obj.get_bounds()
+        hm_expr = (hm_obj - int(lb)) if minimize else (int(ub) - hm_obj)
         if self._objective_posted:
             self.her_model.obj.replace_with(hm_expr)
         else:
@@ -512,6 +490,10 @@ class CPM_hermax(SolverInterface):
                     return self.her_model.max(self.solver_vars(lhs.args)) == self.solver_var(rhs)
                 raise NotImplementedError(f"Hermax: unsupported global function {lhs}")
 
+            # Hermax rejects Literal != Literal; encode as XOR via PB sum
+            if cpm_con.name == "!=" and is_boolexpr(lhs) and is_boolexpr(rhs):
+                return (self.solver_var(lhs) + self.solver_var(rhs)) == 1
+
             hm_lhs = self._make_numexpr(lhs)
             hm_rhs = self._make_numexpr(rhs)
             if cpm_con.name == "==":
@@ -566,3 +548,4 @@ class CPM_hermax(SolverInterface):
             raise NotImplementedError(f"Hermax: unsupported global {cpm_con}")
 
         raise NotImplementedError(f"Hermax: unexpected constraint {cpm_con}")
+

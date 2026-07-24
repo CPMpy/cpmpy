@@ -266,21 +266,21 @@ def test_solver_vars(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_time_limit(solver):
     """Test time limit functionality"""
+    # Skip solvers that don't support time limits (check name before overwriting)
+    if solver in ("pysdd", "hermax"):
+        return
+
     solver_class = SolverLookup.lookup(solver)
     solver = solver_class()
-    
-    # Skip pysdd as it doesn't support time limits
-    if solver == "pysdd":
-        return
-    
+
     bvar = cp.boolvar(shape=3)
     x, y, z = bvar
     solver += [x | y | z]
-    
+
     # Test with positive time limit
     assert solver.solve(time_limit=1.0)
     assert solver.status().exitstatus == ExitStatus.FEASIBLE
-    
+
     # Test with negative time limit should raise ValueError
     try:
         solver.solve(time_limit=-1)
