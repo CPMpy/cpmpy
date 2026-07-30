@@ -266,8 +266,8 @@ def test_solver_vars(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_time_limit(solver):
     """Test time limit functionality"""
-    # Skip solvers that don't support time limits (check name before overwriting)
-    if solver in ("pysdd", "hermax"):
+    # Skip pysdd as it doesn't support time limits
+    if solver == "pysdd":
         return
 
     solver_class = SolverLookup.lookup(solver)

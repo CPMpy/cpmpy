@@ -864,7 +864,7 @@ class TestSupportedSolvers:
         assert [int(a) for a in v.value()] == [0, 1, 0]
 
     def test_time_limit(self, solver):
-        if solver in ("pysdd", "hermax"):  # no time limit support
+        if solver == "pysdd": # pysdd does not support time limit
             pytest.skip("time limit not supported")
         
         x = cp.boolvar(shape=3)
@@ -1064,7 +1064,7 @@ class TestSupportedSolvers:
     def test_solution_callback(self, solver, capsys):
         
         n = 10
-        kwargs = {} if solver == "hermax" else dict(time_limit=3)
+        kwargs = dict(time_limit=3)
         solver_obj = cp.SolverLookup.get(solver)
         if "display" not in inspect.signature(solver_obj.solve).parameters:
             pytest.skip(f"{solver} does not support solution callbacking")
@@ -1154,8 +1154,6 @@ class TestSupportedSolvers:
             return
 
         # now making a tricky problem to solve
-        if solver == "hermax":
-            return  # no time_limit support; skip timed status checks
         np.random.seed(0)
         start = cp.intvar(0,50, shape=20)
         dur = np.random.randint(1,5, size=20)
@@ -1283,7 +1281,7 @@ def test_objective_numexprs(solver, constraint):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     lb, ub = constraint.get_bounds()
-    kwargs = {} if solver == "hermax" else dict(time_limit=3)
+    kwargs = dict(time_limit=3)
     try:
         # Minimization
         model.minimize(constraint)
@@ -1354,7 +1352,7 @@ class TestRound:
             print(x, x.value())
             assert (x.value() >= 1), f"{x}={x.value()}"
 
-        m.solveAll(solver=solver, solution_limit=1000, time_limit=(None if solver == "hermax" else 10), display=check)
+        m.solveAll(solver=solver, solution_limit=1000, time_limit=10, display=check)
 
 
 def _get_golomb_model(size):

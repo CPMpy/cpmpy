@@ -25,6 +25,12 @@
     See detailed installation instructions at:
     https://hermax.readthedocs.io/
 
+    .. note::
+        With a ``time_limit``, satisfaction problems (no objective) are solved
+        non-incrementally (one-shot SAT): Hermax's live incremental SAT backend
+        cannot interrupt. Optimization (MaxSAT) can stay incremental and may
+        return a feasible suboptimal solution when the limit is hit.
+
     The rest of this documentation is for advanced users.
 
     ===============
@@ -87,8 +93,8 @@ class CPM_hermax(SolverInterface):
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.2.3"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.2.3 "
+            if her_version is None or Version(her_version) < Version("1.2.4"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.2.4 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -128,9 +134,9 @@ class CPM_hermax(SolverInterface):
         """
         if not self.supported():
             her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.2.3"):
+            if her_version is not None and Version(her_version) < Version("1.2.4"):
                 raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.3 "
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.4 "
                     f"but you have version {her_version}"
                 )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
@@ -173,7 +179,16 @@ class CPM_hermax(SolverInterface):
         Call the Hermax solver
 
         Arguments:
-            time_limit (float, optional): not supported yet (raises ``NotSupportedError``)
+            time_limit (float, optional): Maximum solve time in seconds.
+                                          Must be positive when set.
+
+                                          Satisfaction problems (no objective) use a
+                                          non-incremental one-shot SAT solve under a
+                                          time limit, because Hermax's live incremental
+                                          SAT backend cannot interrupt. Optimization
+                                          (MaxSAT) can interrupt a live backend and may
+                                          return a feasible suboptimal solution
+                                          (``interrupted_sat`` → FEASIBLE).
             assumptions:                  iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                           For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                           get_core() returns a small subset of assumption variables that are unsat together.
@@ -194,7 +209,14 @@ class CPM_hermax(SolverInterface):
             raise ValueError("Hermax subsolver must be selected at construction (e.g. cp.SolverLookup.get('hermax:EvalMaxSAT')), not via solve(solver=...).")
 
         if time_limit is not None:
-            raise NotSupportedError("Hermax: time_limit is not supported yet (no reliable interrupt/anytime API on the default MaxSAT path)")
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+            # Live incremental SAT cannot interrupt; use one-shot timed SAT.
+            # Live MaxSAT can take time_limit on the bound backend.
+            if self.her_model._inc_state.mode == "sat":
+                self.her_model.close_incremental()
+            if self.her_model._inc_state.mode != "maxsat":
+                kwargs.setdefault("incremental", False)
 
         self.solver_vars(list(self.user_vars))
 
@@ -212,7 +234,8 @@ class CPM_hermax(SolverInterface):
 
         start = time.time()
         result = self.her_model.solve(
-            assumptions=hm_assumptions, solver=self.her_solver, **kwargs
+            assumptions=hm_assumptions, solver=self.her_solver,
+            time_limit=time_limit, **kwargs
         )
         runtime = time.time() - start
 
@@ -231,7 +254,11 @@ class CPM_hermax(SolverInterface):
         elif status in ("interrupted", "unknown"):
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         elif status == "error":
-            self.cpm_status.exitstatus = ExitStatus.ERROR
+            # One-shot timed MaxSAT (PortfolioSolver + RC2) can report "error" when the
+            # worker is killed at the limit without a model; treat as UNKNOWN then.
+            self.cpm_status.exitstatus = (
+                ExitStatus.UNKNOWN if time_limit is not None else ExitStatus.ERROR
+            )
         else:
             raise ValueError(f"Unknown Hermax status: {result.status!r}, please report on github...")
 
