@@ -59,7 +59,7 @@ import cpmpy as cp
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.globalconstraints import DirectConstraint
@@ -482,10 +482,10 @@ class CPM_cplex(SolverInterface):
                         return self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                     else:
                         raise NotImplementedError(
-                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, con))
+                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
             else:
                 raise NotImplementedError(
-                "Not a known supported cplex comparison '{}' {}".format(lhs.name, con))
+                "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             # Indicator constraints
@@ -502,7 +502,7 @@ class CPM_cplex(SolverInterface):
             if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
                 lin_expr = self._make_numexpr(lhs)
             else:
-                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {con}")
+                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
             constraint = eval_comparison(sub_expr.name, lin_expr, self.solver_var(rhs))
             return self.cplex_model.add_indicator(cond, constraint, trigger_val)
 
