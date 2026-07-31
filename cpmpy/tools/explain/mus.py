@@ -274,10 +274,6 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
     soft = toplevel_list(soft, merge_and=False)
     assert cp.Model(hard + soft).solve(solver) is False, "The model should be UNSAT!"
 
-    # conflict is entirely in the hard constraints
-    if not cp.Model(hard).solve(solver=solver):
-        return []
-
     # the recursive call
     def do_recursion(soft, hard, delta):
 
@@ -286,7 +282,14 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
             # conflict is in hard constraints, no need to recurse
             return []
 
+        if len(soft) == 0:
+            # all soft constraints deleted; conflict (if any) is in hard
+            return []
+
         if len(soft) == 1:
+            # keep deleting if the conflict is already in hard
+            if m.solve(solver) is False:
+                return []
             # conflict is not in hard constraints, but only 1 soft constraint
             return list(soft)  # base case of recursion
 
