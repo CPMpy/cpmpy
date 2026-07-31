@@ -278,18 +278,11 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
     def do_recursion(soft, hard, delta):
 
         m = cp.Model(hard)
-        if len(delta) != 0 and m.solve(solver) is False:
+        if m.solve(solver) is False:
             # conflict is in hard constraints, no need to recurse
             return []
 
-        if len(soft) == 0:
-            # all soft constraints deleted; conflict (if any) is in hard
-            return []
-
         if len(soft) == 1:
-            # keep deleting if the conflict is already in hard
-            if m.solve(solver) is False:
-                return []
             # conflict is not in hard constraints, but only 1 soft constraint
             return list(soft)  # base case of recursion
 
