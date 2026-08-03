@@ -94,7 +94,7 @@ class TestMus:
         mus_naive_cons = self.naive_func(soft=soft, hard=hard)
         assert len(set(mus_naive_cons)) == 1
 
-@pytest.mark.requires_solver("exact", "gurobi")
+@pytest.mark.requires_solver("exact", "gurobi", "cplex")
 class TestNativeMus(TestMus):
     def setup_method(self):
         solver = None

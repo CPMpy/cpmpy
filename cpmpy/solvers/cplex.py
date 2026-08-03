@@ -696,6 +696,7 @@ class CPM_cplex(SolverInterface):
         """
         Compute a MUS using CPLEX's native Conflict Refiner (IIS).
         """
+        return False
         from docplex.mp.conflict_refiner import ConflictRefiner, ConstraintsGroup
         from docplex.mp.constants import ConflictStatus
         
