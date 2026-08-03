@@ -105,8 +105,9 @@ def write_gdimacs(
             stacklevel=2,
         )
 
-    soft = list(model.constraints)
-    _, soft, hard, assumptions = to_gcnf(soft, hard, encoding=encoding, disjoint=disjoint)
+    _, soft, hard, assumptions = to_gcnf(
+        list(model.constraints), hard, encoding=encoding, disjoint=disjoint
+    )
 
     constraints = hard
     groups = list(zip(assumptions, soft)) if assumptions is not None else None

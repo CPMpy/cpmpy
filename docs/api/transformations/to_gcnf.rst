@@ -1,4 +1,4 @@
-Convert soft and hard constraints to grouped cnf (:mod:`cpmpy.transformations.to_gcnf`)
+Convert constraints to grouped CNF (:mod:`cpmpy.transformations.to_gcnf`)
 ========================================================================================
 
 .. automodule:: cpmpy.transformations.to_gcnf

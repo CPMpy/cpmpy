@@ -1,6 +1,7 @@
 """
-Transform soft and hard constraints to **Grouped Conjunctive Normal Form** (GCNF), where each soft
-constraint becomes a group of clauses guarded by an assumption variable, for use by MUS solvers.
+Transform constraints to **Grouped Conjunctive Normal Form** (GCNF), where each
+(soft) constraint becomes a group of clauses guarded by an assumption variable,
+for use by MUS solvers. Optional hard constraints go in group 0.
 """
 
 from typing import Optional, cast
@@ -14,23 +15,23 @@ from cpmpy.transformations.to_cnf import to_cnf
 
 
 def to_gcnf(
-        soft: list[Expression], 
-        hard: Optional[list[Expression]] = None, 
-        name: Optional[str] = None, 
-        csemap: Optional[CSEMap] = None, 
-        ivarmap: Optional[dict[str, IntVarEnc]] = None, 
-        encoding: str = "auto", 
+        constraints: list[Expression],
+        hard: Optional[list[Expression]] = None,
+        name: Optional[str] = None,
+        csemap: Optional[CSEMap] = None,
+        ivarmap: Optional[dict[str, IntVarEnc]] = None,
+        encoding: str = "auto",
         disjoint: bool = True
     ) -> tuple[cp.Model, list[Expression], list[Expression], list[_BoolVarImpl]]:
     """
-    Similar to `make_assump_model`, but the returned model is in (grouped) CNF. 
+    Similar to `make_assump_model`, but the returned model is in (grouped) CNF.
 
-    Follows https://satisfiability.org/competition/2011/rules.pdf, however, 
+    Follows https://satisfiability.org/competition/2011/rules.pdf, however,
     there is no guarantee that the groups are disjoint.
 
     Arguments:
-        soft (list[Expression]): list of CPMpy constraints that can be violated (soft constraints)
-        hard (list[Expression], optional): list of CPMpy constraints that must be satisfied (hard constraints), optional
+        constraints (list[Expression]): CPMpy constraints treated as soft (one GCNF group each)
+        hard (list[Expression], optional): constraints that must be satisfied (group 0)
         name (str, optional): name of the model
         csemap (CSEMap, optional): CSE map
         ivarmap (dict[str, IntVarEnc], optional): IVAR map
@@ -38,12 +39,15 @@ def to_gcnf(
         disjoint (bool): whether to make the groups disjoint
 
     Returns:
-        tuple[cp.Model, list[Expression], list[Expression], list[_BoolVarImpl]]: tuple containing the model, the soft constraints, the hard constraints, and the assumption variables
+        tuple[cp.Model, list[Expression], list[Expression], list[_BoolVarImpl]]:
+        model, soft constraints, hard constraints, and assumption variables
     """
     # deferred import: cpmpy.tools imports this module at package-import time
     from cpmpy.tools.explain.utils import make_assump_model
 
-    model, soft_, assump = make_assump_model(soft, hard=[] if hard is None else hard, name=name)
+    model, soft_, assump = make_assump_model(
+        constraints, hard=[] if hard is None else hard, name=name
+    )
 
     cnf = to_cnf(model.constraints, encoding=encoding, csemap=csemap, ivarmap=ivarmap)
 
