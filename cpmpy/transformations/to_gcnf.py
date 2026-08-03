@@ -4,19 +4,19 @@ Transform constraints to **Grouped Conjunctive Normal Form** (GCNF), where each
 for use by MUS solvers. Optional hard constraints go in group 0.
 """
 
-from typing import Optional, cast
+from typing import Optional, Sequence, cast
 
 import cpmpy as cp
 from cpmpy.expressions.variables import _BoolVarImpl
-from cpmpy.expressions.core import Expression, Operator
+from cpmpy.expressions.core import Expression, NestedBoolExprLike, Operator
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.int2bool import IntVarEnc
 from cpmpy.transformations.to_cnf import to_cnf
 
 
 def to_gcnf(
-        constraints: list[Expression],
-        hard: Optional[list[Expression]] = None,
+        constraints: Sequence[NestedBoolExprLike],
+        hard: Optional[Sequence[NestedBoolExprLike]] = None,
         name: Optional[str] = None,
         csemap: Optional[CSEMap] = None,
         ivarmap: Optional[dict[str, IntVarEnc]] = None,
@@ -30,8 +30,8 @@ def to_gcnf(
     To guarentee that the groups are disjoint, set `disjoint` to True.
 
     Arguments:
-        constraints (list[Expression]): CPMpy constraints treated as soft (one GCNF group each)
-        hard (list[Expression], optional): constraints that must be satisfied (group 0)
+        constraints (Sequence[NestedBoolExprLike]): CPMpy constraints treated as soft (one GCNF group each)
+        hard (Sequence[NestedBoolExprLike], optional): constraints that must be satisfied (group 0)
         name (str, optional): name of the model
         csemap (CSEMap, optional): CSE map
         ivarmap (dict[str, IntVarEnc], optional): IVAR map
@@ -87,8 +87,10 @@ def to_gcnf(
                     cl_db.add(clause_entry)
 
     model = cp.Model(cnf)
-    soft = [cp.all(cp.any(c) for c in groups[a]) for a in assump]
-    hard = [cp.all(cp.any(c) for c in groups[True])] if groups[True] else []
+    soft: list[Expression] = [cp.all(cp.any(c) for c in groups[a]) for a in assump]
+    hard: list[Expression] = (
+        [cp.all(cp.any(c) for c in groups[True])] if groups[True] else []
+    )
 
     return (model, soft, hard, assump)
 
