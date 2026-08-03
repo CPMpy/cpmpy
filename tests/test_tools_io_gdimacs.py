@@ -212,7 +212,7 @@ class TestWriteGCNF:
 
     def test_p_header_counts(self):
         a, b = cp.boolvar(name="wa"), cp.boolvar(name="wb")
-        text = write_gdimacs([~a, ~b], hard=[a | b])
+        text = write_gdimacs(cp.Model(~a, ~b), hard=[a | b])
 
         p, typ, n_vars, n_clauses, n_groups = text.splitlines()[0].split()
         assert (p, typ) == ("p", "gcnf")
@@ -221,23 +221,31 @@ class TestWriteGCNF:
 
     def test_group_prefixes(self):
         a, b = cp.boolvar(name="wa"), cp.boolvar(name="wb")
-        text = write_gdimacs([~a, ~b], hard=[a | b])
+        text = write_gdimacs(cp.Model(~a, ~b), hard=[a | b])
 
         groups = [line.split()[0] for line in text.splitlines()[1:]]
         assert set(groups) == {"{0}", "{1}", "{2}"}
 
     def test_only_hard(self):
         a, b = cp.boolvar(name="wa"), cp.boolvar(name="wb")
-        text = write_gdimacs([], hard=[a | b], canonical=True)
+        text = write_gdimacs(cp.Model(), hard=[a | b], canonical=True)
 
         assert text == "p gcnf 2 1 0\n{0} 1 2 0\n"
 
     def test_write_to_file(self, tmp_path):
         a, b = cp.boolvar(name="wa"), cp.boolvar(name="wb")
         path = tmp_path / "model.gcnf"
-        text = write_gdimacs([~a, ~b], hard=[a | b], path=path)
+        text = write_gdimacs(cp.Model(~a, ~b), hard=[a | b], path=path)
 
         assert path.read_text() == text
+
+    def test_ignores_objective_with_warning(self):
+        a, b = cp.boolvar(name="wa"), cp.boolvar(name="wb")
+        model = cp.Model(~a, ~b)
+        model.minimize(a + b)
+        with pytest.warns(UserWarning, match="ignores the model objective"):
+            text = write_gdimacs(model, hard=[a | b])
+        assert text.startswith("p gcnf")
 
     def test_mus2011_example(self):
         # example from https://satisfiability.org/competition/2011/rules.pdf, but fixed p header vars to 3
@@ -251,7 +259,7 @@ class TestWriteGCNF:
 {4} -2 3 0
 """
         m, soft, hard, assumptions = load_gdimacs(example, var_name="x")
-        out = write_gdimacs(soft, hard=hard, disjoint=False, canonical=True)
+        out = write_gdimacs(cp.Model(soft), hard=hard, disjoint=False, canonical=True)
         assert example == out
 
     def test_spec_example(self):
@@ -279,10 +287,11 @@ class TestWriteGCNF:
             x_(3).implies(x_(2)) & (~x_(2)) | (~x_(3)),
             x_(2).implies(x_(3)),
         ]
+        model = cp.Model(soft)
 
         # compare with (canonicalized) example
         assert (
-            write_gdimacs(soft, hard=hard, encoding="direct", canonical=True, disjoint=False)
+            write_gdimacs(model, hard=hard, encoding="direct", canonical=True, disjoint=False)
             == """p gcnf 5 12 4
 {0} 1 2 3 0
 {0} 2 -3 -5 0
@@ -314,7 +323,7 @@ class TestWriteGCNF:
 {2} 3 0
 {3} -3 4 0
 {4} 6 0
-""" == write_gdimacs(soft, hard=hard, encoding="direct", disjoint=True, canonical=True)
+""" == write_gdimacs(model, hard=hard, encoding="direct", disjoint=True, canonical=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -372,7 +381,7 @@ c Comment in the middle
     def test_roundtrip(self, gcnf_str):
         model, soft, hard, assumptions = load_gdimacs(gcnf_str, var_name="x", assumption_name="a")
 
-        back = write_gdimacs(soft, hard=hard, canonical=True, disjoint=False)
+        back = write_gdimacs(cp.Model(soft), hard=hard, canonical=True, disjoint=False)
 
         gcnf_str = "\n".join(l for l in gcnf_str.split("\n") if not l.startswith("c"))
         assert back == gcnf_str, f"Roundtrip failed from:\n\n{gcnf_str}\nto\n\n{back}"
@@ -384,14 +393,14 @@ c Comment in the middle
             var_name="x",
         )
 
-        back = write_gdimacs(soft, hard=hard, canonical=True, disjoint=False)
+        back = write_gdimacs(cp.Model(soft), hard=hard, canonical=True, disjoint=False)
         assert back.splitlines()[0] == "p gcnf 3 5 2"
 
     def test_roundtrip_preserves_semantics(self):
         model, soft, hard, assumptions = load_gdimacs(BASIC_GCNF, var_name="x")
 
         model2, soft2, hard2, assumptions2 = load_gdimacs(
-            write_gdimacs(soft, hard=hard), var_name="y"
+            write_gdimacs(cp.Model(soft), hard=hard), var_name="y"
         )
 
         assert len(soft2) == len(soft)

@@ -43,6 +43,7 @@ import os
 import re
 import builtins
 import itertools
+import warnings
 from functools import partial
 from typing import Callable, Optional, TextIO, Union
 
@@ -57,9 +58,8 @@ from cpmpy.tools.io.utils import _handle_loader_input
 
 
 def write_gdimacs(
-        soft: list[Expression],
+        model: cp.Model,
         hard: Optional[list[Expression]] = None,
-        assumptions: Optional[list[_BoolVarImpl]] = None,
         path: Optional[Union[str, os.PathLike]] = None,
         encoding: str = "auto",
         disjoint: bool = True,
@@ -67,17 +67,23 @@ def write_gdimacs(
         open: Callable = partial(builtins.open, mode="w"),
     ) -> str:
     """
-    Writes CPMpy constraints to GDIMACS (Grouped DIMACS) format for MUS extraction.
+    Writes a CPMpy model to GDIMACS (Grouped DIMACS) format for MUS extraction.
 
     Uses the :func:`~cpmpy.transformations.to_gcnf.to_gcnf` transformation to convert
-    soft and hard constraints into grouped CNF.
+    the model constraints (soft) and optional hard constraints into grouped CNF.
 
-    Each soft constraint is assigned to a separate group (after transformation to CNF, 
-    the resulting clauses are grouped by the soft constraint that they belong to).
-    Hard constraints are placed in group ``{0}``.
+    Each constraint in ``model.constraints`` is treated as soft and assigned to a
+    separate group (after transformation to CNF, the resulting clauses are grouped
+    by the soft constraint that they belong to). Optional ``hard`` constraints are
+    placed in group ``{0}``.
+
+    .. note::
+        Unlike :func:`~cpmpy.tools.io.dimacs.write_dimacs`, an objective on the
+        model is not encoded (GCNF has no weighted softs). If present, it is
+        ignored and a warning is raised.
 
     Arguments:
-        soft: list of CPMpy constraints that can be violated (soft constraints)
+        model (cp.Model): CPMpy model whose constraints become the soft groups
         hard: list of CPMpy constraints that must be satisfied (hard constraints), optional
         path (str or os.PathLike, optional): file path to write the GDIMACS output to.
             If None, the GDIMACS string is only returned.
@@ -92,6 +98,14 @@ def write_gdimacs(
     Returns:
         GDIMACS formatted string
     """
+    if model.has_objective():
+        warnings.warn(
+            "write_gdimacs ignores the model objective; GCNF has no weighted soft clauses.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    soft = list(model.constraints)
     _, soft, hard, assumptions = to_gcnf(soft, hard, encoding=encoding, disjoint=disjoint)
 
     constraints = hard
