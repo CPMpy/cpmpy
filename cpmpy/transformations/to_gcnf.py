@@ -26,8 +26,8 @@ def to_gcnf(
     """
     Similar to `make_assump_model`, but the returned model is in (grouped) CNF.
 
-    Follows https://satisfiability.org/competition/2011/rules.pdf, however,
-    there is no guarantee that the groups are disjoint.
+    Follows https://satisfiability.org/competition/2011/rules.pdf. 
+    To guarentee that the groups are disjoint, set `disjoint` to True.
 
     Arguments:
         constraints (list[Expression]): CPMpy constraints treated as soft (one GCNF group each)
