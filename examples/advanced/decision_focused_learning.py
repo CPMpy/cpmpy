@@ -1,8 +1,8 @@
 import pyepo
 import cpmpy as cp
+import numpy as np
 import torch
 from torch import nn
-import matplotlib.pyplot as plt
 
 
 # Generic PyEPO wrapper for CPMpy models
@@ -14,6 +14,7 @@ class optCPMpyModel(pyepo.model.opt.optModel):
         self.s = cp.SolverLookup.get(solver, model)
         self.modelSense = sense
         self.prec = prec
+        self._obj = None
 
     def _getModel(self):
         return None, None  # created by constructor
@@ -22,20 +23,27 @@ class optCPMpyModel(pyepo.model.opt.optModel):
         if isinstance(c, torch.Tensor):
             c = c.detach().cpu().numpy()
 
+        self._obj = cp.FloatSum(c, self.x)
         if self.modelSense == pyepo.EPO.MAXIMIZE:
-            self.s.maximize(cp.sum(self.x*c))
+            self.s.maximize(self._obj)
         else:
-            self.s.minimize(cp.sum(self.x*c))
+            self.s.minimize(self._obj)
 
     def solve(self):
         self.s.solve()
-        return self.x.value().astype(int), self.s.objective_value()
+        return self.x.value().astype(int), self._obj.value()
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--plot", action="store_true", help="Show learning curve plot")
+    args = parser.parse_args()
+
     # Data configuration
-    num_data = 1000
-    num_feat = 5
+    num_data = 500  # increase for better accuracy
+    num_feat = 4
     num_item = 10
     deg = 6
     noise_width = 0
@@ -43,21 +51,23 @@ if __name__ == "__main__":
 
     # Training configuration
     lr = 0.01
-    num_epochs = 15
+    num_epochs = 3  # kept low so the example test finishes quickly; increase (e.g. 15) for better accuracy
 
     
     # Generate data
     weights, x, y = pyepo.data.knapsack.genData(num_data, num_feat, num_item, 1, deg, noise_width, seed)
     weights = weights[0]
-    capacity = 0.2 * weights.sum()
+    weight_scale = 100
+    weights = np.round(weights * weight_scale).astype(int)
+    capacity = int(round(0.2 * weights.sum()))
 
     
     # Initialize PyEPO-wrapped optimisation model (just the constraints, works for any CPMpy model)
     dv = cp.boolvar(shape=num_item, name="x")
     m = cp.Model(
-        weights * dv <= capacity,  # capacity constraint
+        cp.sum(weights * dv) <= capacity,  # capacity constraint
     )
-    optmodel = optCPMpyModel(m, dv, sense=pyepo.EPO.MAXIMIZE, solver="gurobi")
+    optmodel = optCPMpyModel(m, dv, sense=pyepo.EPO.MAXIMIZE, solver="highs")
 
     # Initialize machine learning model, optimizer and PyEPO-wrapped loss
     pred_model = nn.Linear(num_feat, num_item)  # linear regressor
@@ -100,23 +110,25 @@ if __name__ == "__main__":
         pred_model.train()  # Switch back to training mode
 
     
-    # Plot training regrets
-    plt.figure(figsize=(10, 6))
-    plt.plot(
-        range(1, num_epochs + 1),
-        training_regrets,
-        marker='o',
-        linestyle='-',
-        linewidth=2.5,
-        markersize=8,
-        color='#E24A33',
-        alpha=0.9
-    )
-    plt.title('Learning Curves', fontsize=18, fontweight='bold', pad=20)
-    plt.xlabel('Epoch', fontsize=14, labelpad=10)
-    plt.ylabel('Relative regret', fontsize=14, labelpad=10)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.tight_layout()
-    plt.grid(True, which='major', linestyle='--', linewidth=0.6, alpha=0.6)
-    plt.show()
+    if args.plot:
+        import matplotlib.pyplot as plt
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(
+            range(1, num_epochs + 1),
+            training_regrets,
+            marker='o',
+            linestyle='-',
+            linewidth=2.5,
+            markersize=8,
+            color='#E24A33',
+            alpha=0.9
+        )
+        plt.title('Learning Curves', fontsize=18, fontweight='bold', pad=20)
+        plt.xlabel('Epoch', fontsize=14, labelpad=10)
+        plt.ylabel('Relative regret', fontsize=14, labelpad=10)
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.tight_layout()
+        plt.grid(True, which='major', linestyle='--', linewidth=0.6, alpha=0.6)
+        plt.show()
