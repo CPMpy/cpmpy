@@ -87,12 +87,12 @@ def to_gcnf(
                     cl_db.add(clause_entry)
 
     model = cp.Model(cnf)
-    soft: list[Expression] = [cp.all(cp.any(c) for c in groups[a]) for a in assump]
-    hard: list[Expression] = (
+    soft_out: list[Expression] = [cp.all(cp.any(c) for c in groups[a]) for a in assump]
+    hard_out: list[Expression] = (
         [cp.all(cp.any(c) for c in groups[True])] if groups[True] else []
     )
 
-    return (model, soft, hard, assump)
+    return (model, soft_out, hard_out, assump)
 
 
 def _to_clauses(cons: Expression) -> list[frozenset[_BoolVarImpl]]:
