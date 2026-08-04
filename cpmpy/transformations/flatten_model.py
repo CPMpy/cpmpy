@@ -262,17 +262,38 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr, csemap=csemap)
-            # Reification (double implication): Boolexpr == Var
-            # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
-            if exprname == '==' and lexpr.is_bool():
+
+            # simplify Boolean comparisons, should this become part of simplify_boolean?
+            if lexpr.is_bool():
+
                 if rvar.is_bool():
-                    if csemap is not None and csemap.get(lexpr) is None:
-                        csemap.put(lexpr, rvar)
-                    # this is a reification
-                    (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
-                else:
-                    # integer comparison
-                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    lhs, lcons = normalized_boolexpr(lexpr, csemap=csemap)
+
+                    if exprname == "==":  # full reification, lhs need not be a var at toplevel
+                        if csemap is not None and csemap.get(lexpr) is None:
+                            csemap.put(lexpr, rvar)
+                        newlist.append(Comparison("==", lhs, rvar))
+                    elif exprname == "!=":  # write as full reification
+                        if csemap is not None and csemap.get(lexpr) is None:
+                            csemap.put(lexpr, ~rvar)
+                        newlist.append(Comparison("==", lhs, ~rvar))
+                    elif exprname == "<=":  # write as half-reification
+                        newlist.append(lhs.implies(rvar))
+                    elif exprname == ">=":  # write as half-reification
+                        newlist.append(rvar.implies(lhs))
+                    elif exprname == "<":
+                        newlist.extend([recurse_negation(lhs), rvar])
+                    elif exprname == ">":
+                        newlist.extend([lhs, ~rvar])  # rvar is var so safe to just negate
+
+                else:  # mix of integer and Boolean comparison
+                    lhs, lcons = get_or_make_var(lexpr, csemap=csemap)
+                    newlist.append(Comparison(exprname, lhs, rvar))
+
+                newlist.extend(lcons)
+                newlist.extend(rcons)
+                continue
+
             else:
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
 
@@ -455,22 +476,42 @@ def normalized_boolexpr(expr, csemap=None):
             lexpr, rexpr = expr.args
             exprname = expr.name
 
-            # ==,!=: can swap if lhs is var and rhs is not
-            if (exprname == '==' or exprname == '!=') and \
-                not __is_flat_var(rexpr) and __is_flat_var(lexpr):
+            # can swap if lhs is var and rhs is not
+            if not __is_flat_var(rexpr) and __is_flat_var(lexpr):
+                if exprname == "<":
+                    exprname = ">"
+                elif exprname == ">":
+                    exprname = "<"
+                elif exprname == "<=":
+                    exprname = ">="
+                elif exprname == ">=":
+                    exprname = "<="
                 lexpr, rexpr = rexpr, lexpr
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr, csemap=csemap)
 
-            # LHS: check if Boolexpr == smth:
-            if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
-                # this is a reified constraint, so lhs must be var too to be in normal form
-                (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
-                if expr.name == '!=' and rvar.is_bool():
-                    # != not needed, negate RHS variable
-                    rvar = ~rvar  # rvar is var, so safe to just negate
-                    exprname = '=='
+            # simplify Boolean comparisons (nested: must return a normalized boolexpr)
+            if lexpr.is_bool() and rvar.is_bool():
+                if exprname == "==":  # full reification, lexpr needs to be var too to be in normal form
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    return Comparison("==", lhs, rvar), lcons+rcons
+                if exprname == "!=":  # write as full reification
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    return Comparison("==", lhs, ~rvar), lcons+rcons  # rvar is var so safe to just negate
+                if exprname == "<=":  # p <= q :: ~p | q
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    return (~lhs) | rvar, lcons+rcons
+                if exprname == ">=":  # p >= q :: p | ~q
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    return lhs | (~rvar), lcons+rcons
+                if exprname == "<":  # p < q :: ~p & q
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    return (~lhs) & rvar, lcons+rcons
+                if exprname == ">":  # p > q :: p & ~q
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    return lhs & (~rvar), lcons+rcons
+
             else:
                 # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
