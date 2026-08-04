@@ -70,6 +70,38 @@ class TestTransSimplify:
                 assert str(self.transform(expr)) == str([expr_should])
 
 
+    def test_bool_comparisons(self):
+        """Boolean <=/>=/</>/!= rewritten in simplify_boolean."""
+        a, b = self.ivs[0], self.ivs[1]
+        x, y = self.bvs[0], self.bvs[1]
+
+        # boolexpr # boolvar
+        assert str(self.transform((a > 5) != x)) == "[(iv[0] > 5) == (~bv[0])]"
+        assert str(self.transform((a > 5) <= x)) == "[(iv[0] > 5) -> (bv[0])]"
+        assert str(self.transform((a > 5) >= x)) == "[(bv[0]) -> (iv[0] > 5)]"
+        assert str(self.transform((a > 5) < x)) == "[iv[0] <= 5, bv[0]]"
+        assert str(self.transform((a > 5) > x)) == "[iv[0] > 5, ~bv[0]]"
+
+        # boolvar # boolexpr
+        assert str(self.transform(x != (a > 5))) == "[(bv[0]) == (iv[0] <= 5)]"
+        assert str(self.transform(x <= (a > 5))) == "[(bv[0]) -> (iv[0] > 5)]"
+        assert str(self.transform(x >= (a > 5))) == "[(iv[0] > 5) -> (bv[0])]"
+
+        # nested under implication
+        assert str(self.transform(y.implies((a > 5) <= x))) == "[(bv[1]) -> ((iv[0] > 5) -> (bv[0]))]"
+        assert str(self.transform(y.implies((a > 5) < x))) == "[(bv[1]) -> ((iv[0] <= 5) and (bv[0]))]"
+
+    def test_bool_comparisons_both_sides(self):
+        """Both sides Boolean expressions."""
+        a, b = self.ivs[0], self.ivs[1]
+
+        assert str(self.transform((a > 5) <= (b < 3))) == "[(iv[0] > 5) -> (iv[1] < 3)]"
+        assert str(self.transform((a > 5) >= (b < 3))) == "[(iv[1] < 3) -> (iv[0] > 5)]"
+        assert str(self.transform((a > 5) < (b < 3))) == "[iv[0] <= 5, iv[1] < 3]"
+        assert str(self.transform((a > 5) > (b < 3))) == "[iv[0] > 5, iv[1] >= 3]"
+        assert str(self.transform((a > 5) != (b < 3))) == "[(iv[0] > 5) == (iv[1] >= 3)]"
+        assert str(self.transform((a > 5) == (b < 3))) == "[(iv[0] > 5) == (iv[1] < 3)]"
+
     def test_simplify_expressions(self):
         # global constraints
         expr = cp.AllDifferent(self.ivs) == 0
@@ -101,7 +133,7 @@ class TestTransSimplify:
 
         # very nested one
         expr = Operator("and", self.bvs[:1].tolist() + [BoolVal(False)]) == Operator("or", self.bvs)
-        assert str(self.transform(expr)) == '[and(~bv[0], ~bv[1], ~bv[2])]'
+        assert str(self.transform(expr)) == '[~bv[0], ~bv[1], ~bv[2]]'
 
     def test_nested_boolval(self):
 

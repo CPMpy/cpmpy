@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator, NestedBoolExprLike
+from ..expressions.variables import _BoolVarImpl
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..exceptions import NotSupportedError
@@ -77,7 +78,10 @@ def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[E
         if changed_expr:
             changed = True
             assert not isinstance(newexpr, int)
-            newlist.append(newexpr)
+            if isinstance(newexpr, Operator) and newexpr.name == "and":
+                newlist.extend(newexpr.args)
+            else:
+                newlist.append(newexpr)
         else:
             newlist.append(expr)
     
@@ -268,6 +272,28 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                     return True, (1 if num_context else BoolVal(True))
             elif rhs > 1:
                 return True, BoolVal(name in {"!=", "<", "<="}) # all other operators evaluate to False
+
+        # Boolean-Boolean comparisons: rewrite to reification / half-reification / and
+        if is_boolexpr(lhs) and is_boolexpr(rhs):
+            # '==' left unchanged, just a full reification
+            if name == "==":
+                pass # just a reification
+            elif name == "!=": 
+                # need to negate one of the sides, pick a side that is a variable or constant if it exists
+                if isinstance(lhs, (_BoolVarImpl, BoolVal)):
+                    lhs = ~lhs
+                else:
+                    rhs = recurse_negation(rhs)
+                return True, Comparison("==", lhs, rhs)
+            elif name == "<=":
+                return True, lhs.implies(rhs)
+            elif name == ">=":
+                return True, rhs.implies(lhs)
+            elif name == "<":
+                return True, recurse_negation(lhs) & rhs
+            elif name == ">":
+                return True, lhs & recurse_negation(rhs)
+            
 
         # normalize comparison orientation to keep expression on lhs
         if is_num(lhs) and isinstance(rhs, Expression):
