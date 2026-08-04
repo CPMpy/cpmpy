@@ -6,8 +6,8 @@ either constants, variables, list of constants or list of variables, and
 some binary constraints have a canonical order of variables.
 
 Furthermore, it is 'negated normal' meaning that the ~ (negation operator) only appears
-before a Boolean variable (in CPMpy, absorbed in a 'NegBoolView'),
-and it is 'negation normal' meaning that the - (negative operator) only appears before
+before a Boolean variable (in CPMpy, absorbed in a 'NegBoolView'), or a GlobalConstraint.
+Additionally, it is 'negation normal' meaning that the - (negative operator) only appears before
 a constant, that is a - b :: a + -1*b :: wsum([1,-1],[a,b])
 
 The three families of possible constraints are:
@@ -20,7 +20,8 @@ Boolean variable               ``Var``
 Boolean operators              ``or([Var])``                         :class:`~cpmpy.expressions.core.Operator`, :func:`~cpmpy.expressions.core.Operator.is_bool()`                        
 Boolean implication            ``Var -> Var``                        :class:`~cpmpy.expressions.core.Operator`, :func:`~cpmpy.expressions.core.Operator.is_bool()`                                                                                
 Boolean equality               ``Var == Var``, ``Var == Constant``   :class:`~cpmpy.expressions.core.Comparison`                                                                          
-Global constraint (Boolean)    ``global([Var]*)``                    :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`, :func:`~cpmpy.expressions.core.Operator.is_bool()`                                           
+Global constraint (Boolean)    ``global([Var]*)``                    :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`       
+Negated global constraint      ``~global([Var]*)``                   :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`            
 =============================  ====================================  ==============
 
 Comparison constraints: (up to one nesting on one side)
@@ -95,7 +96,7 @@ import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 
 from .cse import CSEMap
-from .normalize import toplevel_list, simplify_boolean
+from .normalize import toplevel_list, simplify_boolean, _simplify_boolean_expr
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
@@ -310,7 +311,7 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions: {expr}")
 
-    expr = simplify_boolean([expr])[0]
+    _, expr = _simplify_boolean_expr(expr) # avoid re-wrapping in and-operator
     (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)  # might rewrite expr into a (w)sum
     if isinstance(flatexpr, Expression) and flatexpr.name in supported:
         return (flatexpr, flatcons)

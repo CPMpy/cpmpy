@@ -87,7 +87,7 @@ class TestFlattenExpr:
 
     # not directly tested on its own, new functions 'normalized_boolexpr' and 'normalized_numexpr'
 
-    def test_get_or_make_var__bool(self):
+    def test_get_or_make_var_bool(self):
         (a,b,c,d,e) = self.ivars[:5]
         (x,y,z) = self.bvars[:3]
 
@@ -191,9 +191,9 @@ class TestFlattenExpr:
             "(IV0 >= 10) == (BV27)",
         }
 
-        v, cons = get_or_make_var(Operator('not', [x]) == y)
-        assert str(v) == "BV29"
-        assert {str(c) for c in cons} == {"((~BV0) == (BV1)) == (BV29)"}
+        # v, cons = get_or_make_var(Operator('not', [x]) == y) # no longer supported, not-operators are eliminated by push_down_negation
+        # assert str(v) == "BV29"
+        # assert {str(c) for c in cons} == {"((~BV0) == (BV1)) == (BV29)"}
 
     def test_get_or_make_var__num(self):
         (a,b,c,d,e) = self.ivars[:5]
@@ -324,7 +324,7 @@ class TestFlattenExpr:
         # != in boolexpr, bug #170
         assert  str(normalized_boolexpr(x != (a == 1))) == "((BV12) == (~BV0), [(IV0 == 1) == (BV12)])"
         #simplify output
-        assert  str(normalized_boolexpr(Operator('not',[x]) == y)) == "((~BV0) == (BV1), [])"
+        # assert  str(normalized_boolexpr(Operator('not',[x]) == y)) == "((~BV0) == (BV1), [])" # no longer supported, not-operators are eliminated by push_down_negation
 
         # wsum negation shares the vars list; flatten must not corrupt paired coefficients
         vars_list = [a, Operator('sum', [x, y]), 1]

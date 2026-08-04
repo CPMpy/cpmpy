@@ -56,7 +56,7 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from ..transformations.safening import no_partial_functions, safen_objective
 
@@ -346,6 +346,7 @@ class CPM_pumpkin(SolverInterface):
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
+        obj = push_down_negation_objective(obj)
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
         if expr.is_bool():
             ivar = intvar(0,1)
