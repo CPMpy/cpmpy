@@ -471,6 +471,8 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.and_(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'or':
                 return self.chc_model.or_(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == 'not':
+                return self.chc_model.not_(self._get_constraint(cpm_expr.args[0]))
 
             elif cpm_expr.name == "->":
                 cond, subexpr = cpm_expr.args

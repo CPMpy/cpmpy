@@ -17,7 +17,7 @@ Base constraints: (no nesting)
 
 =============================  ====================================  ==============
 Boolean variable               ``Var``                                                                                                                                                    
-Boolean operators              ``and([Var])``, ``or([Var])``         :class:`~cpmpy.expressions.core.Operator`, :func:`~cpmpy.expressions.core.Operator.is_bool()`                        
+Boolean operators              ``or([Var])``                         :class:`~cpmpy.expressions.core.Operator`, :func:`~cpmpy.expressions.core.Operator.is_bool()`                        
 Boolean implication            ``Var -> Var``                        :class:`~cpmpy.expressions.core.Operator`, :func:`~cpmpy.expressions.core.Operator.is_bool()`                                                                                
 Boolean equality               ``Var == Var``, ``Var == Constant``   :class:`~cpmpy.expressions.core.Comparison`                                                                          
 Global constraint (Boolean)    ``global([Var]*)``                    :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`, :func:`~cpmpy.expressions.core.Operator.is_bool()`                                           
@@ -36,7 +36,7 @@ Numeric inequality (>=,>,<,<=)   ``Numexpr >=< Var``                           :
 
 ==================================================  ======================================  ==============
 Operator (non-Boolean) with all args Var/constant   ``+``, ``*``, ``/``, ``mod``, ``wsum``  :class:`~cpmpy.expressions.core.Operator`, not :func:`~cpmpy.expressions.core.Operator.is_bool()`                      
-Global constraint (non-Boolean)                     ``Max``, ``Min``, ``Element``           :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`, not :func:`~cpmpy.expressions.core.Operator.is_bool()` 
+Global function                                     ``Max``, ``Element``, ``NValues``, ...   :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` 
 ==================================================  ======================================  ==============
 
 **wsum:**
@@ -92,6 +92,7 @@ import copy
 import math
 import builtins
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 
 from .cse import CSEMap
 from .normalize import toplevel_list, simplify_boolean
@@ -436,8 +437,10 @@ def normalized_boolexpr(expr, csemap=None):
             (rhs,rcons) = get_or_make_var(expr.args[1], csemap=csemap)
             return ((recurse_negation(lhs) | rhs), lcons+rcons)
         if expr.name == 'not':
-            flatvar, flatcons = get_or_make_var(expr.args[0], csemap=csemap)
-            return (~flatvar, flatcons)  # flatvar is var, so safe to just negate
+            if not isinstance(expr.args[0], GlobalConstraint):
+                raise ValueError(f"push_down_negation should have eliminated all `not` operators except ~GlobalConstraint,  but got {expr.args[0]} instead, please report on github.")
+            flatexpr, flatcons = normalized_boolexpr(expr.args[0], csemap=csemap)
+            return (~flatexpr, flatcons)
         if not expr.has_subexpr():
             return (expr, [])
         else:
