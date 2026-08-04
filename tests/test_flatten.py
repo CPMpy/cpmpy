@@ -76,7 +76,57 @@ class TestFlattenConstraint:
         assert "[(IV1 < 3) == (BV0)]" == str(flatten_constraint(e))
         e = ((a > 5) == (b < 3))
         assert len(flatten_constraint(e)) == 2
-    
+
+    def test_bool_comparisons(self):
+        """Boolean <=/>=/</>/!= rewrite to reification / half-reification / and."""
+        (a, b) = self.ivars[:2]
+        (x, y) = self.bvars[:2]
+
+        # top-level: boolexpr # boolvar
+        assert str(flatten_constraint((a > 5) != x)) == "[(IV0 > 5) == (~BV0)]"
+        assert str(flatten_constraint((a > 5) <= x)) == "[(IV0 > 5) -> (BV0)]"
+        assert str(flatten_constraint((a > 5) >= x)) == "[(BV0) -> (IV0 > 5)]"
+        assert str(flatten_constraint((a > 5) < x)) == "[IV0 <= 5, BV0]"
+        assert str(flatten_constraint((a > 5) > x)) == "[IV0 > 5, ~BV0]"
+
+        # swap when lhs is the var
+        assert str(flatten_constraint(x != (a > 5))) == "[(IV0 > 5) == (~BV0)]"
+        assert str(flatten_constraint(x <= (a > 5))) == "[(BV0) -> (IV0 > 5)]"
+        assert str(flatten_constraint(x >= (a > 5))) == "[(IV0 > 5) -> (BV0)]"
+
+        # nested (via normalized_boolexpr): half-reif becomes or of vars
+        assert str(normalized_boolexpr((a > 5) <= x)) == "((~BV3) or (BV0), [(IV0 >= 6) == (BV3)])"
+        assert str(normalized_boolexpr((a > 5) >= x)) == "((BV4) or (~BV0), [(IV0 >= 6) == (BV4)])"
+        assert str(normalized_boolexpr((a > 5) < x)) == "((~BV5) and (BV0), [(IV0 >= 6) == (BV5)])"
+        assert str(normalized_boolexpr((a > 5) > x)) == "((BV6) and (~BV0), [(IV0 >= 6) == (BV6)])"
+
+        # implication wrapping a bool comparison must stay flat-normal
+        flat = flatten_constraint(y.implies((a > 5) <= x))
+        assert str(flat) == "[(BV1) -> ((~BV7) or (BV0)), (IV0 >= 6) == (BV7)]"
+
+        # bool vs int still stays a numeric comparison
+        assert str(flatten_constraint((a + b == 2) <= b)) == \
+            "[(BV8) <= (IV1), ((IV0) + (IV1) == 2) == (BV8)]"
+
+    def test_bool_comparisons_both_sides(self):
+        """Both sides Boolean expressions (RHS reified, possibly CSE-canonicalized)."""
+        (a, b) = self.ivars[:2]
+
+        # b < 3 is stored as ~(b >= 3) via CSE canonicalization
+        assert str(flatten_constraint((a > 5) <= (b < 3))) == \
+            "[(IV0 > 5) -> (~BV3), (IV1 >= 3) == (BV3)]"
+        assert str(flatten_constraint((a > 5) >= (b < 3))) == \
+            "[(~BV4) -> (IV0 > 5), (IV1 >= 3) == (BV4)]"
+        assert str(flatten_constraint((a > 5) < (b < 3))) == \
+            "[IV0 <= 5, ~BV5, (IV1 >= 3) == (BV5)]"
+        assert str(flatten_constraint((a > 5) > (b < 3))) == \
+            "[IV0 > 5, BV6, (IV1 >= 3) == (BV6)]"
+        assert str(flatten_constraint((a > 5) != (b < 3))) == \
+            "[(IV0 > 5) == (BV7), (IV1 >= 3) == (BV7)]"
+        assert str(flatten_constraint((a > 5) == (b < 3))) == \
+            "[(IV0 > 5) == (~BV8), (IV1 >= 3) == (BV8)]"
+
+
 class TestFlattenExpr:
     def setup_method(self):
         _IntVarImpl.counter = 0
@@ -290,16 +340,16 @@ class TestFlattenExpr:
         assert  str(flatten_constraint( (a > 10) == 1 )) == "[IV0 > 10]"
         # assert  str(flatten_constraint( (a > 10) == 0 )) == "[IV0 <= 10]" -> part of push_down_negation now
         assert  str(flatten_constraint( (a > 10) == x )) == "[(IV0 > 10) == (BV0)]"
-        #self.assertEqual( str(flatten_constraint( x == (a > 10) )), "[(IV0 > 10) == (BV0)]" ) # TODO, make it do the swap (again)
+        assert  str(flatten_constraint( x == (a > 10) )) == "[(IV0 > 10) == (BV0)]"
         assert  str(flatten_constraint( (a >= 10) | (b + c >= 2) )) == "[(BV5) or (BV6), (IV0 >= 10) == (BV5), ((IV1) + (IV2) >= 2) == (BV6)]"
         assert  str(flatten_constraint( a > 10 )) == "[IV0 > 10]"
         assert  str(flatten_constraint( 10 > a )) == "[IV0 < 10]"# surprising
         assert  str(flatten_constraint( a+b > c )) == "[((IV0) + (IV1)) > (IV2)]"
-        #self.assertEqual( str(flatten_constraint( c < a+b )), "[((IV0) + (IV1)) > (IV2)]" ) # TODO, make it do the swap (again)
+        assert  str(flatten_constraint( c < a+b )) == "[((IV0) + (IV1)) > (IV2)]"
         assert  str(flatten_constraint( (a+b > c) == x|y )) == "[(((IV0) + (IV1)) > (IV2)) == (BV7), ((BV0) or (BV1)) == (BV7)]"
 
         assert  str(flatten_constraint( a + b == c )) == "[((IV0) + (IV1)) == (IV2)]"
-        #self.assertEqual( str(flatten_constraint( c != a + b )), "[((IV0) + (IV1)) != (IV2)]" ) # TODO, make it do the swap (again)
+        assert  str(flatten_constraint( c != a + b )) == "[((IV0) + (IV1)) != (IV2)]"
         assert  str(flatten_constraint( ((a > 5) == (b >= 3)) )) == "[(IV0 > 5) == (BV8), (IV1 >= 3) == (BV8)]"
 
         assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] == b )) == "[([1 2 3][IV0]) == (IV1)]"
