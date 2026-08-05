@@ -644,7 +644,7 @@ def xcsp3_cpmpy(
         added_natives = {
             "ortools": {
                 "no_overlap2d": globals.OrtNoOverlap2D,
-                "subcircuit": globals.OrtNoOverlap2D,
+                "subcircuit": globals.OrtSubcircuit,
                 "subcircuitwithstart": lambda args: globals.OrtSubcircuitWithStart(args[:-1], args[-1]),
             },
             "choco": {
