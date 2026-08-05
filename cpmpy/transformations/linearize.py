@@ -76,7 +76,7 @@ from .normalize import simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, ListLike, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, InDomain, Regular, Circuit, ShortTable
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_boolexpr, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
@@ -114,11 +114,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
             if cpm_expr.name == "and" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
+                newlist.append(Operator("sum", cpm_expr.args) >= len(cpm_expr.args))
 
             # disjunction
             elif cpm_expr.name == "or" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= 1)
+                newlist.append(Operator("sum", cpm_expr.args) >= 1)
 
             # reification
             elif cpm_expr.name == "->":
@@ -215,11 +215,14 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
             lhs, rhs = cpm_expr.args
 
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
-                # very special case, avoid writing as sum of 1 argument
+                # very special case, avoid writing as sum of 1 argument; write as disjunction of 1 arg instead
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
-                if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
-                    continue # skip or([BoolVal(True)])
+                if isinstance(new_expr[0], BoolVal):
+                    if new_expr[0].value() is True:
+                        continue # skip or([BoolVal(True)])
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap)  # don't wrap in or(BoolVal(False))
+                    continue
                 newlist.append(Operator("or", new_expr))
                 continue
 
@@ -485,7 +488,7 @@ def canonical_comparison(lst_of_expr: ListLike[Expression]) -> list[Expression]:
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
-                    lhs = lhs + lhs2
+                    lhs = Operator("sum", [lhs, lhs2])
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
 
@@ -607,8 +610,9 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         supported_reified = frozenset[str]()
 
     decompose_custom = get_linear_decompositions()
+    decompose_custom_positive = get_linear_positive_decompositions()
 
-    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
@@ -627,22 +631,39 @@ def decompose_linear_objective(obj: Expression,
 def get_linear_decompositions():
     """
         Implementation of custom linear decompositions for some global constraints.
-        Uses (var == val) in sums; no integer encoding.
 
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
+    # dispatch dynamically so subclasses with their own decompose_linear are respected
     return dict(
-        alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
-        table=Table.decompose_linear
+        alldifferent=lambda expr: expr.decompose_linear(),
+        element=lambda expr: expr.decompose_linear(), 
+        table=lambda expr: expr.decompose_linear(), 
+        short_table=lambda expr: expr.decompose(),
+        InDomain=lambda expr: expr.decompose_linear(),
+        regular=lambda expr: expr.decompose_linear(),
     )
-    # Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+def get_linear_positive_decompositions():
+    """
+        Implementation of custom linear decompositions for some global constraints, that are only valid in positive context.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    # dispatch dynamically so subclasses with their own decompose_linear_positive are respected
+    return dict(
+        regular=lambda expr: expr.decompose_linear_positive(),
+        circuit=lambda expr: expr.decompose_linear_positive(),
+    )
+
+
 
 
 def linearize_reified_variables(constraints:list[Expression], 
-                                min_values:int=3, 
-                                csemap:Optional[CSEMap]=None, 
+                                min_values:int=3,
+                                csemap:Optional[CSEMap]=None,
                                 ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and

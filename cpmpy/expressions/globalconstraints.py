@@ -145,7 +145,7 @@ import cpmpy as cp
 
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray, _NumVarImpl
 from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
 
 if TYPE_CHECKING:
@@ -169,6 +169,16 @@ class GlobalConstraint(Expression):
             bool: True, global constraints are Boolean
         """
         return True
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns whether the global constraint is satisfied under the current variable assignment.
+
+        Returns:
+            Optional[bool]: True or False when all variables within its scope are assigned;
+            None if any variable within its scope is unassigned.
+        """
+        raise NotImplementedError(f"`value` is not implemented for {self}")
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -216,16 +226,6 @@ class GlobalConstraint(Expression):
 
 
 # Global Constraints (with Boolean return type)
-def alldifferent(args):
-    """
-    .. deprecated:: 0.9.0
-          Please use :class:`AllDifferent` instead.
-    """
-    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in "
-                  "stable version", DeprecationWarning)
-    return AllDifferent(*args) # unfold list as individual arguments
-
-
 class AllDifferent(GlobalConstraint):
     """
     Enforces that all arguments have a different (distinct) value
@@ -330,17 +330,6 @@ class AllDifferentExcept0(AllDifferentExceptN):
         """
         super().__init__(flatlist(args), 0)
 
-
-def allequal(args):
-    """
-    .. deprecated:: 0.9.0
-          Please use :class:`AllEqual` instead.
-    """
-    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version",
-                  DeprecationWarning)
-    return AllEqual(*args) # unfold list as individual arguments
-
-
 class AllEqual(GlobalConstraint):
     """
     Enforces that all arguments have the same value
@@ -416,17 +405,6 @@ class AllEqualExceptN(GlobalConstraint):
         vals = [v for v in vals if v not in frozenset(exclude_vals)]
         return len(set(vals)) <= 1
 
-
-def circuit(args):
-    """
-    .. deprecated:: 0.9.0
-          Please use :class:`Circuit` instead.
-    """
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version",
-                  DeprecationWarning)
-    return Circuit(*args) # unfold list as individual arguments
-
-
 class Circuit(GlobalConstraint):
     """
     Enforces that the sequence of variables form a circuit, where x[i] = j means that node j is the successor of node i.
@@ -467,6 +445,35 @@ class Circuit(GlobalConstraint):
                  AllDifferent(succ)    # redundant constraint, strengthens decomposition
                 ]
         return value + nbc, toplevel
+
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Circuit global constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs.
+        This linear decomposition is only valid in positive context.
+        """
+
+        succ = self.args
+        n = len(succ)
+        order = cp.intvar(0, n - 1, shape=n)
+
+        constraining : list[Expression] = []
+        constraining.extend(x >= 0 for x in succ) # lower bound on successors
+        constraining.extend(x < n for x in succ)  # upper bound on successors
+        constraining.extend(cp.sum(succ[j] == i for j in range(n)) == 1 for i in range(n))  # each node i has exactly one predecessor
+        constraining.append(cp.AllDifferent(order))  # redundant constraint
+        constraining.append(order[0] == 0)
+
+        defining: list[Expression] = []
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    # forbid self-loops
+                    constraining.append(succ[i] != j)
+                if j != 0:
+                    # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
+                    defining.append((succ[i] == j) == (order[i] + 1 == order[j]))
+
+        return constraining, defining
 
     def value(self) -> Optional[bool]:
         """
@@ -562,7 +569,7 @@ class Table(GlobalConstraint):
         else:
             has_subexpr = False
             for x in array:  # C-style python
-                if x.has_subexpr():
+                if isinstance(x, Expression) and not isinstance(x, (_NumVarImpl, BoolVal)):
                     has_subexpr = True
                     break
 
@@ -592,6 +599,22 @@ class Table(GlobalConstraint):
         """
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the Table global constraint.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, tab = self.args
+        
+        row_selected = boolvar(shape=(len(tab),))
+        defining = []
+        for i, row in enumerate(tab):
+            subexpr = cp.all([x == v for x,v in zip(arr, row)])
+            defining.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return [cp.any(row_selected)], defining
 
     def _variable_ordering(self, heuristic:str="domain"):
         """
@@ -699,7 +722,7 @@ class ShortTable(GlobalConstraint):
         else:
             has_subexpr = False
             for x in array:  # C-style python
-                if x.has_subexpr():
+                if isinstance(x, Expression) and not isinstance(x, (_NumVarImpl, BoolVal)):
                     has_subexpr = True
                     break
 
@@ -726,6 +749,25 @@ class ShortTable(GlobalConstraint):
         """
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the ShortTable global constraint.
+
+        Similar to `element` from Gleb's paper: "Improved Linearization of Constraint
+        Programming Models"
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, tab = self.args
+
+        row_selected = boolvar(shape=(len(tab),))
+        defining = []
+        for i, row in enumerate(tab):
+            subexpr = cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR])
+            defining.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return [cp.sum(row_selected) == 1], defining
 
     def value(self) -> Optional[bool]:
         """
@@ -762,7 +804,7 @@ class NegativeTable(GlobalConstraint):
         else:
             has_subexpr = False
             for x in array:  # C-style python
-                if x.has_subexpr():
+                if isinstance(x, Expression) and not isinstance(x, (_NumVarImpl, BoolVal)):
                     has_subexpr = True
                     break
 
@@ -860,38 +902,151 @@ class Regular(GlobalConstraint):
         # normalize node_ids to be 0..n-1, allows for smaller domains
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
 
-    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        return self.decompose(complete=False)
+
+    def decompose(self, complete=True) -> tuple[list[Expression], list[Expression]]:
         """
-        Decomposition of the Regular global constraint. 
+        Decomposition of the Regular global constraint.
         Encodes the automaton by encoding the transition table into `class:cpmpy.expressions.globalconstraints.Table` constraints.
         Then enforces that the last state is accepting.
-        
+
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         # Decompose to transition table using Table constraints
-        
+
         arr, transitions, start, accepting = self.args
+        if len(accepting) == 0:
+            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
+
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
-        
+
         transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
 
-        # add a sink node for transitions that are not defined
-        sink = len(self.nodes)
-        transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
-        transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
+        if complete:
+            # add a sink node for transitions that are not defined. When the Regular constraint is in positive context, this is not needed
+            sink = len(self.nodes)
+            self.nodes.append(sink)
+            self.node_map[sink] = sink
+            transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
 
         # keep track of current state when traversing the array
-        state_vars = intvar(0, sink, shape=len(arr))
+        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining: list[Expression] = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]
+        cons: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
         # define the rest of the automaton using transition table
-        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
-        
-        # constraint is satisfied iff last state is accepting
-        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+        cons.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
+        # last state must be accepting
+        value : list[Expression] = [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])]
+        if complete:
+            # constraint is satisfied iff last state is accepting
+            return value, cons
+        else:
+            return value + cons, []
+
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
+        return self.decompose_linear(complete=False)
+
+    def decompose_linear(self, complete=True) -> tuple[list[Expression], list[Expression]]:
+        """
+        Deterministic Finite Automata (DFA) MIP decomposition using flow constraints based on
+        Côté et al. (2007): "Modeling the Regular Constraint with Integer Programming"
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+
+        """
+
+        arr, transitions, start, accepting = self.args
+
+        if len(accepting) == 0:
+            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
+
+        # Collect all nodes and all transition values in the DFA
+        nodes_set = set()
+        values_set = set()
+
+        for src, value, dst in transitions:
+            nodes_set.add(src)
+            nodes_set.add(dst)
+            values_set.add(value)
+
+        nodes = sorted(nodes_set)
+        values = sorted(values_set)
+
+        node_idx = {node: idx for idx, node in enumerate(nodes)}
+        value_idx = {value: idx for idx, value in enumerate(values)}
+
+        flow_in = defaultdict(list)
+        flow_out = defaultdict(list)
+
+        # Determine the flow in and out of each node based on the transitions
+        for src, value, dst in transitions:
+            id1 = node_idx[src]
+            id2 = node_idx[dst]
+            v = value_idx[value]
+            flow_out[id1].append((v, id2))
+            flow_in[id2].append((v, id1))
+
+        if complete:
+            # When no edge in a given node for a given value exists, add an edge to a new non-accepting sink node
+            snk = len(nodes)
+            for id1 in range(len(nodes)):
+                existing_values = {val for (val, _) in flow_out[id1]}
+                for v in range(len(values)):
+                    if v not in existing_values:
+                        flow_out[id1].append((v, snk))
+                        flow_in[snk].append((v, id1))
+
+            # The non-accepting sink node loops back to itself for all values
+            for v in range(len(values)):
+                flow_out[snk].append((v, snk))
+                flow_in[snk].append((v, snk))
+
+            nodes.append(snk)
+
+        defining = []
+        constraining = []
+
+        S = node_idx[start]
+        E = [node_idx[a] for a in accepting]
+        # Variable s[i,j,q] is true iff at position i in the array, we take the transition from node q with value j
+        s = cp.boolvar(shape=(len(arr), len(values), len(nodes)))
+        sf = cp.boolvar(shape=(len(E),))
+
+        # Start node has one unit of flow
+        for q in range(len(nodes)):
+            if q == S:
+                constraining.append(cp.sum(s[0, j, S] for j, _ in flow_out[S]) == 1)
+            else:
+                defining.append(cp.sum(s[0, j, q] for j in range(len(values))) == 0)
+
+        # Enforce flow constraints: flow in = flow out
+        for i in range(1, len(arr)):
+            for q in range(len(nodes)):
+                defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
+                defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) <= 1) # redundant constraint
+                defining.append(cp.sum(s[i, j, q] for (j, _) in flow_out[q]) <= 1) # redundant constraint
+
+        # Accepting end nodes have one unit of flow in total
+        for q in range(len(nodes)):
+            if q in E:
+                defining.append(cp.sum(s[-1, j, q_] for (j, q_) in flow_in[q]) == sf[E.index(q)])
+            else:
+                constraining.append(cp.sum(s[-1, j, q_] for (j, q_) in flow_in[q]) == 0)
+
+        constraining.append(cp.sum(sf) == 1)
+
+        # Channelling constraints between the flow variables and the direct encoding variables
+        for i in range(len(arr)):
+            for j in range(len(values)):
+                defining.append(cp.sum(s[i, j, q] for q in range(len(nodes))) == (arr[i] == values[j]))
+
+        return constraining, defining
+
 
     def value(self) -> Optional[bool]:
         """
@@ -940,7 +1095,9 @@ class MDD(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the input sequence
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
-            reduce (bool, default=True): Whether to reduce the MDD by merging nodes with equivalent suffixes, reducing the size of the MDD
+            reduce (bool, default=True): During decomposition, whether to reduce the MDD as a first decomposition step
+                by merging nodes with equivalent suffixes, reducing the size of the MDD
+
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -958,7 +1115,7 @@ class MDD(GlobalConstraint):
         for id1, v, id2 in transitions:
             self.mapping[id1][v] = id2
 
-        self.levels = {self.root_node: 0}
+        self.levels : dict[int | str, int] = {self.root_node: 0}
         current_nodes = [self.root_node]
         for level in range(len(array)):
             new_nodes = []
@@ -972,10 +1129,8 @@ class MDD(GlobalConstraint):
         sink_nodes = [node for node, level in self.levels.items() if level == len(array)]
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
-
-        # reduce the MDD if requested
-        if reduce:
-            self._reduce()
+        # store whether the MDD should be reduced during decomposition
+        self.reduce = reduce
 
     def _reduce(self):
         """
@@ -1011,28 +1166,54 @@ class MDD(GlobalConstraint):
                     self.mapping.pop(node, None)
                     self.levels.pop(node, None)
 
-
-
-    def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
+    def _get_complete_mdd(self, mapping : dict[int, dict[int, int]], levels: dict[int, int], sink_node: int
+                          ) -> tuple[dict[int, dict[int, int]], dict[int, int], set[tuple[int, int]]]:
         """
-        Auxiliary function that extends the MDD with invalid edges, which are directed to the sink node.
+        Auxiliary function that extends the MDD with invalid edges, which are directed to level-specific dummy nodes.
+        Any path reaching a dummy node is directed to the sink node level by level, for all subsequent variable assignments.
 
         Returns:
             tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
-            A tuple containing the extended mapping of the MDD and a set of invalid edges (source node, transition value) that are added to the MDD.
+            A tuple containing the extended mapping of the MDD and a set of invalid edges
+            (source node, transition value) that are added to the MDD.
         """
         arr = self.args[0]
-        invalid_edges = set()
-        extended_mapping = copy.deepcopy(self.mapping)
-        for id1 in self.mapping.keys():
-            level = self.levels[id1]
+        invalid_edges : set[tuple[int, int]] = set()
+        extended_mapping : dict[int , dict[int, int]] = copy.deepcopy(mapping)
+
+        n = len(arr)
+        levels = levels.copy()
+
+        next_id = len(levels) + 1
+
+        dummy_nodes: list[int] = [next_id + i for i in range(n - 1)]
+        dummy_nodes.append(sink_node)
+
+        necessary_levels = []
+        for id1 in list(extended_mapping.keys()):
+            level = levels[id1]
             domain = range(arr[level].lb, arr[level].ub + 1)
             for v in domain:
-                if v not in self.mapping[id1]:
-                    extended_mapping[id1][v] = self.sink_node
+                if v not in extended_mapping[id1]:
+                    extended_mapping[id1][v] = dummy_nodes[level]
+                    if level not in necessary_levels:
+                        necessary_levels.append(level)
                     invalid_edges.add((id1, v))
 
-        return extended_mapping, invalid_edges
+        if necessary_levels:
+            first_needed = min(necessary_levels)
+            # We iterate over all levels starting from the first level that needs a dummy node.
+            # This is done because invalid edges must be introduced layer by layer, so that the complete MDD admits a solution to the flow problem for all variable assignments.
+            for level in range(first_needed + 1, n):
+                dummy = dummy_nodes[level - 1]
+                levels[dummy] = level
+                next_dummy = dummy_nodes[level]
+                domain = range(arr[level].lb, arr[level].ub + 1)
+                for v in domain:
+                    extended_mapping[dummy][v] = next_dummy
+                    invalid_edges.add((dummy, v))
+
+        return extended_mapping, levels, invalid_edges
 
     def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
         return self.decompose(complete=False)
@@ -1051,28 +1232,43 @@ class MDD(GlobalConstraint):
         """
         arr = self.args[0]
 
+        # Reduce the MDD if requested
+        if self.reduce:
+            self._reduce()
+
+        node_map: dict[int | str, int] = {node: idx for idx, node in enumerate(self.levels)}
+        mapping: dict[int, dict[int, int]] = defaultdict(dict)
+
+        for src, src_edges in self.mapping.items():
+            for val, dst in src_edges.items():
+                mapping[node_map[src]][val] = node_map[dst]
+
+        levels: dict[int, int] = {node_map[node]: lvl for node, lvl in self.levels.items()}
+        sink_node : int = node_map[self.sink_node]
+
         if complete:
-        # MDD is extended with invalid edges, which are directed to the sink node
-            mapping, invalid_edges_set = self._get_complete_mdd()
+            complete_mapping, complete_levels, invalid_edges_set = self._get_complete_mdd(mapping, levels, sink_node)
+
+            mapping = complete_mapping
+            levels = complete_levels
             invalid_edges = frozenset(invalid_edges_set)
+
         else:
-            mapping = self.mapping
             invalid_edges = frozenset()
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
         # The default is an empty list, representing no ingoing / outgoing flow.
-        flow_in: dict[int | str, list[Expression]] = defaultdict(list)
-        flow_out: dict[int | str, list[Expression]] = defaultdict(list)
-
+        flow_in: dict[int, list[Expression]] = defaultdict(list)
+        flow_out: dict[int, list[Expression]] = defaultdict(list)
         # Used to link edge variables to direct encoding variables in a later step
-        edge_vars = defaultdict(list)
+        edge_vars : dict[tuple[int, int], list[Expression]] = defaultdict(list)
         invalid_edge_vars = []
 
         # Determine flow in and flow out for each node, and make a boolvar for each edge
         for id1, edges in mapping.items():
             for value, id2 in edges.items():
                 edge_var = cp.boolvar()
-                level = self.levels[id1]
+                level = levels[id1]
                 flow_out[id1].append(edge_var)
                 flow_in[id2].append(edge_var)
                 edge_vars[(level, value)].append(edge_var)
@@ -1080,32 +1276,37 @@ class MDD(GlobalConstraint):
                 if (id1, value) in invalid_edges:
                     invalid_edge_vars.append(edge_var)
 
-        defining = []
-        constraining = []
+        cons = []
+        value_cons = []
 
         # Enforce flow constraints: flow in = flow out, at most one activated in/out edge
-        for node, level in self.levels.items():
+        for node, level in levels.items():
             incoming = flow_in[node]
             outgoing = flow_out[node]
 
             if level == 0:
-                constraining.append(cp.sum(outgoing) == 1) # root
+                value_cons.append(cp.sum(outgoing) == 1) # root
             elif level == len(arr):
-                defining.append(cp.sum(incoming) == 1) # sink
+                cons.append(cp.sum(incoming) == 1) # sink
             else:
-                defining.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
-                defining.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
-                defining.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
+                cons.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
+                cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
+                cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
 
         # Enforce that when arr[i] == v, exactly one of the edges at level i with label v is true, otherwise none can be true
         for (level, value), vars_ in edge_vars.items():
-            defining.append(cp.sum(vars_) == (arr[level] == value))
+            cons.append(cp.sum(vars_) == (arr[level] == value))
 
-        constraining.append(cp.sum(invalid_edge_vars) == 0)
+        value_cons.append(cp.sum(invalid_edge_vars) == 0)
 
-        # When the MDD is extended to a complete MDD by means of invalid edges, there is always a solution to the flow problem.
-        # The only constraining constraints are therefore that the root flow is equal to 1, and that no invalid edge has any flow.
-        return constraining, defining
+        if complete:
+            # When the MDD is extended to a complete MDD by means of invalid edges, there is always a solution to the flow problem.
+            # The only value constraints are therefore that the root flow is equal to 1, and that no invalid edge has any flow.
+            return value_cons, cons
+        else:
+            # The MDD is not complete (i.e. does not admit a solution to the flow problem for all variable assignments).
+            # Therefore, all constraints must be considered value constraints, as they can all be violated by some variable assignment.
+            return value_cons + cons, []
 
 
     def value(self) -> Optional[bool]:
@@ -1205,7 +1406,8 @@ class InDomain(GlobalConstraint):
             arr = np.array(arr, dtype=int)
         assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
 
-        has_subexpr = expr.has_subexpr()
+        has_subexpr = not isinstance(expr, (_NumVarImpl, BoolVal))
+
         # args: tuple[Expression, np.ndarray]
         super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
 
@@ -1227,6 +1429,17 @@ class InDomain(GlobalConstraint):
         lb, ub = expr.get_bounds()
         arr_set = frozenset(arr)
         return [expr != val for val in range(lb, ub + 1) if val not in arr_set], []
+
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the InDomain global constraint.
+        Avoids != constraints and instead decomposes into a large disjunction.
+        If `expr` is a variable (the most common case), `cpmpy.transformations.linearize.linearize_reified_varvals` will then encode this variable with a direct encoding
+        """
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+        arr_set = frozenset(arr)
+        return [cp.any([expr == val for val in arr_set])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -2216,7 +2429,7 @@ class LexLess(GlobalConstraint):
         # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
         # until a strict inequality is encountered.
         defining = []
-        defining.extend(bvar == ((X <= Y) & ((X < Y) | bvar[1:])))  # vectorized expression, treat as list
+        defining.extend(bvar[:-1] == (X <= Y) & ((X < Y) | bvar[1:]))  # vectorized for all but the last
         # enforce the last element to be true iff (X[-1] < Y[-1]), enforcing strict lexicographic order
         defining.append(bvar[-1] == (X[-1] < Y[-1]))
         constraining = [bvar[0]]
@@ -2275,7 +2488,7 @@ class LexLessEq(GlobalConstraint):
 
         bvar = boolvar(shape=(len(X) + 1))
         defining = []
-        defining.extend(bvar == ((X <= Y) & ((X < Y) | bvar[1:])))  # vectorized expression, treat as list
+        defining.extend(bvar[:-1] == (X <= Y) & ((X < Y) | bvar[1:]))  # vectorized for all but the last
         defining.append(bvar[-1] == (X[-1] <= Y[-1]))
         constraining = [bvar[0]]
 

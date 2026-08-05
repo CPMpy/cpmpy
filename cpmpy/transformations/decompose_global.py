@@ -21,6 +21,7 @@ This allows to post the decomposed expression tree to the solver if it supports 
 
 import copy
 from typing import AbstractSet, Optional, Dict, Any, Callable, Protocol, cast, overload
+import warnings
 import numpy as np
 
 
@@ -43,7 +44,9 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       supported_reified: Optional[AbstractSet[str]] = None,
                       _toplevel=None, nested=False,
                       csemap: Optional[CSEMap] = None,
-                      decompose_custom: Optional[Dict[str, CustomDecomp]] = None) -> list[Expression]:
+                      decompose_custom: Optional[Dict[str, CustomDecomp]] = None,
+                      decompose_custom_positive: Optional[Dict[str, CustomDecomp]] = None,
+                      ) -> list[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -54,14 +57,26 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param supported_reified: a set of names of supported reified global constraints (those with Boolean return type only).
     :param _toplevel: DEPRECATED
     :param nested: DEPRECATED
-    :param csemap: a dictionary of 'expr: expr' mappings, for Common Subexpression Elimination
+    :param csemap: CSEMap object used to avoid decomposing the same global constraint twice
+    :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
+    :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
+
+    To decompose a global constraint in positive context:
+    1. Check `decompose_positive_custom`
+    2. Check `decompose_custom`
+    3. Call `global.decompose_positive()`
+
+    The assumption is that `decompose_custom` generally works better compared to the standard global decomposition,
+    even if the custom decomposition is not specialized for positive-only use.
 
     Supported numerical global functions remain in the expression tree as is. They can be rewritten using
     :func:`cpmpy.transformations.reification.reify_rewrite`
     E.g. ``bv -> NumExpr <comp> Var/Const`` will then be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
     """
-    assert _toplevel is None, "decompose_in_tree: argument '_toplevel' is deprecated, do not use/modify it"
-    assert nested is False, "decompose_in_tree: argument 'nested' is deprecated, do not use/modify it"
+    if _toplevel is not None:
+        warnings.warn("decompose_in_tree: argument '_toplevel' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+    if nested:
+        warnings.warn("decompose_in_tree: argument 'nested' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
 
     if supported is None:
         supported = frozenset[str]()
@@ -78,11 +93,17 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             if csemap is not None:
                 decomp = csemap.get_decomposition(expr)
                 if decomp is not None:
-                    assert decomp.name == "and", "decompose_in_tree: expected a conjunction but got {decomp}"
-                    newlist.extend(decomp.args)
+                    assert isinstance(decomp, Expression)
+                    if decomp.name == "and":
+                        newlist.extend(decomp.args)
+                    else:
+                        newlist.append(decomp)
                     continue
-            
-            if decompose_custom is not None and expr.name in decompose_custom: # do we also need a "decompose_custom_positive"?
+
+            # First see if a custom decomposition is provided for positive context, then for any context, otherwise use the default
+            if decompose_custom_positive is not None and expr.name in decompose_custom_positive:
+                exprs, toplevel_exprs = decompose_custom_positive[expr.name](expr)
+            elif decompose_custom is not None and expr.name in decompose_custom:
                 exprs, toplevel_exprs = decompose_custom[expr.name](expr)
             else:
                 exprs, toplevel_exprs = expr.decompose_positive()
@@ -92,8 +113,14 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 todolist.extend(toplevel_exprs)
             if len(exprs) > 0:
                 todolist.extend(exprs)
-                if csemap is not None:
-                    csemap.save_decomposition(expr, Operator("and", exprs))
+                # don't save toplevel decompositions to the csemap, 
+                # we currently don't have a way of distinguishing positive and negative in the csemap ... TODO
+                # if csemap is not None:
+                #     if len(exprs) == 1: # dont wrap in conjunction
+                #         csemap.save_decomposition(expr, exprs[0])
+                #     else:
+                #         csemap.save_decomposition(expr, Operator("and", exprs))
+        
         elif isinstance(expr, (bool, np.bool_)):
             # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
             changed = True
@@ -124,7 +151,13 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             decomposed_positive = False
             if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
                 changed = True
-                exprs, toplevel_exprs = expr.args[1].decompose_positive()
+                subexpr = expr.args[1]
+                if decompose_custom_positive is not None and subexpr.name in decompose_custom_positive:
+                    exprs, toplevel_exprs = decompose_custom_positive[subexpr.name](subexpr)
+                elif decompose_custom is not None and subexpr.name in decompose_custom:
+                    exprs, toplevel_exprs = decompose_custom[subexpr.name](subexpr)
+                else:
+                    exprs, toplevel_exprs = subexpr.decompose_positive()
                 if len(toplevel_exprs) > 0:
                     todolist.extend(toplevel_exprs)
                 expr = Operator("->", [expr.args[0], cpm_all(exprs)])   
@@ -227,6 +260,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     decomp = csemap.get_decomposition(arg)
                     if decomp is not None:
                         newargs.append(decomp)
+                        changed = True
                         continue
                 arg_orig = arg
 
@@ -247,7 +281,11 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     if len(rec_toplevel) > 0:
                         toplevel.extend(rec_toplevel)
 
-                if len(exprs) == 1:
+                if len(exprs) == 0:
+                    # empty decomposition (e.g. alldifferent over 0/1 elements)
+                    # is a trivially-true conjunction
+                    arg = BoolVal(True)
+                elif len(exprs) == 1:
                     arg = exprs[0]
                 else:
                     # replace arg by conjunction of decompose
@@ -310,7 +348,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                         rec_newargs = arg.args  # let's be sure its set
 
                     if arg.name == "not":  # not(global) or negation left by a decomposition
-                        assert len(rec_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
+                        assert len(rec_newargs) == 1, f"decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
                         if isinstance(rec_newargs[0], GlobalConstraint):
                             if rec_changed:
                                 changed = True
