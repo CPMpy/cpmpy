@@ -102,8 +102,8 @@ class TestNativeMus(TestMus):
         self.naive_func = mus_naive
 
 
+@pytest.mark.requires_solver("exact")
 class TestQuickXplain(TestMus):
-
     def setup_method(self):
         self.mus_func = quickxplain
         self.naive_func = quickxplain_naive
@@ -126,6 +126,7 @@ class TestQuickXplain(TestMus):
         subset2 = self.naive_func([d, c, b, a], hard)
         assert set(subset2) == {b, d}
 
+@pytest.mark.requires_solver("exact")
 class TestOptimalMUS(TestMus):
 
     def setup_method(self):
@@ -153,6 +154,7 @@ class TestOptimalMUS(TestMus):
         subset3 = self.naive_func([a, b, c, d], hard)
         assert set(subset3) == {b, d}
 
+@pytest.mark.requires_solver("exact")
 class TestOCUS(TestOptimalMUS):
 
     def setup_method(self):
@@ -180,7 +182,7 @@ class TestOCUS(TestOptimalMUS):
         pytest.raises(OCUSException, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
 
 
-
+@pytest.mark.requires_solver("exact")
 class TestMARCOMUS(TestMus):
 
     def test_php(self):
@@ -204,7 +206,6 @@ class TestMARCOMUS(TestMus):
 
 
 
-
 class TestMSS:
 
     def test_circular(self):
@@ -221,7 +222,6 @@ class TestMSS:
 
         assert len(mss(cons)) < len(cons)
         assert cons[4] in set(mss_opt(cons, weights=[1,1,1,1,5]))# weighted version
-
 
 class TestMCS:
 
