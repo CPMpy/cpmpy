@@ -695,6 +695,9 @@ class CPM_cplex(SolverInterface):
     def mus_native(cls, soft, hard=[]):
         """
         Compute a MUS using CPLEX's native Conflict Refiner (IIS).
+
+        More about the native Conflict Refiner:
+        https://www.ibm.com/docs/en/icos/22.1.0?topic=conflicts-more-about-conflict-refiner
         """
         from docplex.mp.conflict_refiner import ConflictRefiner, ConstraintsGroup
         from docplex.mp.constants import ConflictStatus
@@ -734,7 +737,6 @@ class CPM_cplex(SolverInterface):
         # constraints, so map each returned conflict element to its CPMpy source.
         conflict_statuses = {
             ConflictStatus.Member,
-            ConflictStatus.Possible_member,
         }
         mus_idxs = set()
         for conflict in refine_res.iter_conflicts():
