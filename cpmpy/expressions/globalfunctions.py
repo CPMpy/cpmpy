@@ -210,7 +210,7 @@ class Minimum(GlobalFunction):
     
     @property
     def args(self) -> tuple[int|Expression, ...]:
-        """ READ-ONLY, well-typed argument of this global function, no numpy ints"""
+        """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
     def value(self) -> Optional[int]:
@@ -272,7 +272,7 @@ class Maximum(GlobalFunction):
 
     @property
     def args(self) -> tuple[int|Expression, ...]:
-        """ READ-ONLY, well-typed argument of this global function, no numpy ints"""
+        """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
     def value(self) -> Optional[int]:
