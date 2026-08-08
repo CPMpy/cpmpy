@@ -404,10 +404,17 @@ class Multiplication(GlobalFunction):
         elif isinstance(y, (float, np.floating)):
             raise TypeError(f"Multiplication does not support float constants, got: {y}")
 
-        super().__init__("mul", (x, y))
+        # convert numpy integers to Python integers
+        args = npint2int((x, y))
+        super().__init__("mul", args)
         self.is_lhs_num = is_lhs_num
+    
+    @property
+    def args(self) -> tuple[int|Expression, int|Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
-    def update_args(self, args):
+    def update_args(self, args: Iterable[int|Expression], has_subexpr: Optional[bool] = None):
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
         """
@@ -418,15 +425,11 @@ class Multiplication(GlobalFunction):
         elif is_int(y):
             (x, y) = (y, x)
             is_lhs_num = True
-        elif isinstance(x, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {x}")
-        elif isinstance(y, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {y}")
 
-        super().update_args((x, y))
+        super().update_args(npint2int((x, y)), has_subexpr=has_subexpr)
         self.is_lhs_num = is_lhs_num
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         x, y = self.args
 
         if self.is_lhs_num:
@@ -434,22 +437,21 @@ class Multiplication(GlobalFunction):
 
         return "({}) * ({})".format(x, y)
 
-    def __neg__(self):
+    def __neg__(self) -> "Expression":
         """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
         if self.is_lhs_num:
             return Multiplication(-self.args[0], self.args[1])
         return super().__neg__()
 
     def value(self) -> Optional[int]:
-        x, y = argvals(self.args)
-        if x is None or y is None:
+        vals = argvals_intexpr(self.args)
+        if vals is None:
             return None
-        return x * y
+        return vals[0] * vals[1]
 
     def get_bounds(self) -> tuple[int, int]:
         """Bounds of the product from bounds of the factors."""
-        lb1, ub1 = get_bounds(self.args[0])
-        lb2, ub2 = get_bounds(self.args[1])
+        (lb1, lb2), (ub1, ub2) = get_bounds_intexpr(self.args)
         candidates = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
         return min(candidates), max(candidates)
 
@@ -469,7 +471,10 @@ class Multiplication(GlobalFunction):
         if self.is_lhs_num:
             # const*expr -> wsum([const], [expr])
             return Operator("wsum", ([a], [b])), []
-        a_bool, b_bool = is_boolexpr(a), is_boolexpr(b)
+
+        assert isinstance(a, Expression), f"Multiplication: expected arg1 Expression, got: {type(a)}"
+        assert isinstance(b, Expression), f"Multiplication: expected arg2 Expression, got: {type(b)}"
+        a_bool, b_bool = a.is_bool(), b.is_bool()
         if a_bool and b_bool:
             # bool*bool with 0/1 semantics is logical AND
             return Operator("and", [a, b]), []
@@ -477,7 +482,7 @@ class Multiplication(GlobalFunction):
         if a_bool or b_bool:
             # bool * int: z = bv*iv via (bv -> z==iv) & (~bv -> z==0)
             bv, iv = (a, b) if a_bool else (b, a)
-            lb_y, ub_y = get_bounds(iv)
+            lb_y, ub_y = iv.get_bounds()
             lb_z = min(0, lb_y)  # make sure it can take 0
             ub_z = max(0, ub_y)  # make sure it can take 0
             z = intvar(lb_z, ub_z)
@@ -485,13 +490,13 @@ class Multiplication(GlobalFunction):
                        recurse_negation(bv).implies(z == 0)]
 
         # let a be the one with the smallest domain, leading to the fewest auxiliariy variables
-        lb_a, ub_a = get_bounds(a)
-        lb_b, ub_b = get_bounds(b)
+        lb_a, ub_a = a.get_bounds()
+        lb_b, ub_b = b.get_bounds()
         if ub_b - lb_b + 1 < ub_a - lb_a + 1:
             a, b = b, a
             lb_a, lb_b = lb_b, lb_a
             ub_a, ub_b = ub_b, ub_a
-        dom_a = list[ExprLike](range(lb_a, ub_a + 1))
+        dom_a = list(range(lb_a, ub_a + 1))
 
         # int*int linear decomposition:
         # a*b == sum_v(v * (a==v)) * b  with 'v' in dom(a)
@@ -499,7 +504,7 @@ class Multiplication(GlobalFunction):
         #     == sum_v(v * z_v) and all_v( (a==v)->(z_v == b) & (a!=v)->(z_v == 0) )
 
         # encoding z_v == (a == v)*b via (a==v)->(z_v == b) & (a!=v)->(z_v == 0)
-        encoding = []
+        encoding: list[Expression] = []
         z_lb = min(0, lb_b) # make sure it can take 0
         z_ub = max(0, ub_b) # make sure it can take 0
         zs = cp.intvar(z_lb, z_ub, shape=(len(dom_a),))
