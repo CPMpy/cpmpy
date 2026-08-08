@@ -322,13 +322,18 @@ class Abs(GlobalFunction):
             expr (Expression): Expression of which to compute the absolute value
         """
         super().__init__("abs", (expr,))
+    
+    @property
+    def args(self) -> tuple[Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The absolute value of the argument, or None if the argument is not assigned
         """
-        varg = argval(self.args[0])
+        varg = self.args[0].value()
         if varg is None:
             return None
 
@@ -346,7 +351,7 @@ class Abs(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the expression representing the absolute value (may be the argument itself, its negation, or an auxiliary variable), and a list of constraints defining it (empty if no auxiliary variable is needed)
         """
         arg = self.args[0]
-        lb, ub = get_bounds(arg)
+        lb, ub = arg.get_bounds()
         if lb >= 0: # always positive
             return arg, []
         if ub <= 0: # always negative
@@ -362,7 +367,7 @@ class Abs(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the absolute value
         """
-        lb, ub = get_bounds(self.args[0])
+        lb, ub = self.args[0].get_bounds()
         if lb >= 0:
             return lb, ub
         if ub <= 0:
