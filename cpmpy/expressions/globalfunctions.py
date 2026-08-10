@@ -188,13 +188,16 @@ class GlobalFunction(Expression):
 
 class Minimum(GlobalFunction):
     """
-    Computes the minimum value of the arguments
+    Computes the minimum value of the arguments.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
+                (at least one required)
         """
         has_subexpr: Optional[bool] = None
 
@@ -206,6 +209,8 @@ class Minimum(GlobalFunction):
 
         # convert numpy integers to Python integers
         args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        if len(args) == 0:
+            raise ValueError('Minimum function must be given at least one argument')
         super().__init__("min", args, has_subexpr=has_subexpr)
     
     @property
@@ -250,13 +255,16 @@ class Minimum(GlobalFunction):
 
 class Maximum(GlobalFunction):
     """
-    Computes the maximum value of the arguments
+    Computes the maximum value of the arguments.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
+                (at least one required)
         """
         has_subexpr: Optional[bool] = None
 
@@ -268,6 +276,8 @@ class Maximum(GlobalFunction):
 
         # convert numpy integers to Python integers
         args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        if len(args) == 0:
+            raise ValueError('Maximum function must be given at least one argument')
         super().__init__("max", args, has_subexpr=has_subexpr)
 
     @property
@@ -774,6 +784,8 @@ class Element(GlobalFunction):
     Its return value will be the value of the array element at the index specified by the decision
     variable's value.
 
+    Requires a non-empty array (``arr`` arity >= 1).
+
     When you index into a :class:`NDVarArray <cpmpy.expressions.variables.NDVarArray>` (e.g. when creating a `Arr=boolvar(shape=...)` or
     `Arr=intvar(lb,ub, shape=...)` using :func:`boolvar() <cpmpy.expressions.variables.boolvar>` or :func:`intvar() <cpmpy.expressions.variables.intvar>`), or index into a list wrapped as `Arr = cpm_array(lst)` using :func:`cpm_array() <cpmpy.expressions.variables.cpm_array>`,
     then using standard Python indexing, e.g. `Arr[Idx]` with `Idx` an integer decision variable,
@@ -789,6 +801,7 @@ class Element(GlobalFunction):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to index into
+                (at least one required)
             idx (Expression): Integer expression for the index (not a Boolean expression)
         """
         assert isinstance(idx, Expression), f"Element(arr, idx) takes an integer expression as second argument, got {type(idx)}: {idx}"
@@ -1135,6 +1148,10 @@ class NValue(GlobalFunction):
     """
     The NValue global function counts the number of distinct values in an array.
 
+    Requires at least one argument in ``arr`` (arity >= 1). Empty arrays are rejected:
+    while mathematically the result would be 0, an empty NValue usually indicates a
+    construction mistake.
+
     For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 3] respectively,
     then `NValue([x1, x2, x3, x4])` returns 3 (the distinct values are 1, 2, and 3).
     """
@@ -1143,9 +1160,12 @@ class NValue(GlobalFunction):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
+                (at least one required)
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
+        if len(arr) == 0:
+            raise ValueError('NValue function must be given at least one argument')
         super().__init__("nvalue", tuple(arr))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -1196,6 +1216,10 @@ class NValueExcept(GlobalFunction):
     The NValueExcept global function counts the number of distinct values in an array,
     excluding a specified value.
 
+    Requires at least one argument in ``arr`` (arity >= 1). Empty arrays are rejected:
+    while mathematically the result would be 0, an empty NValueExcept usually indicates a
+    construction mistake.
+
     For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 0] respectively,
     then `NValueExcept([x1, x2, x3, x4], 0)` returns 2 (the distinct values are 1 and 2,
     excluding 0).
@@ -1205,10 +1229,13 @@ class NValueExcept(GlobalFunction):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
+                (at least one required)
             n (int | np.integer): Integer constant to exclude from the count
         """
         if not is_any_list(arr):
             raise ValueError("NValueExcept takes an array as input")
+        if len(arr) == 0:
+            raise ValueError('NValueExcept function must be given at least one argument')
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
         super().__init__("nvalue_except", (arr, n))
