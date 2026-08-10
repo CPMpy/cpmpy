@@ -61,7 +61,6 @@ class ScaledSudokuDataset(FileDataset):  # torch.utils.data.Dataset compatible
             ValueError: If the dataset directory does not exist and `download=False`,
                 or if the requested kind/size combination is not available.
         """
-        self.root = pathlib.Path(root)
         self.kind = kind
         self.size = size
 
@@ -70,10 +69,8 @@ class ScaledSudokuDataset(FileDataset):  # torch.utils.data.Dataset compatible
         if size not in self.SIZES:
             raise ValueError(f"Unknown size {size!r}. Must be any of {', '.join(self.SIZES)}")
 
-        dataset_dir = self.root / self.name / self.kind / self.size
-
         super().__init__(
-            dataset_dir=dataset_dir,
+            root=root, subdirs=(self.kind, self.size),
             transform=transform, target_transform=target_transform,
             download=download, extension=".sdk.txt",
             **kwargs

@@ -65,7 +65,6 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         """
 
         # Dataset-specific attributes
-        self.root = pathlib.Path(root)
         self.year = year
         self.track = track
 
@@ -75,10 +74,9 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         if not track:
             raise ValueError("Track must be specified, e.g. OPT-LIN, DEC-LIN, ...")
 
-        dataset_dir = pathlib.Path(dataset_dir) / str(year) / track if dataset_dir else self.root / self.name / str(year) / track
-
+        override = pathlib.Path(dataset_dir) / str(year) / track if dataset_dir is not None else None
         super().__init__(
-            dataset_dir=dataset_dir, 
+            root=root, subdirs=(str(year), track), dataset_dir=override,
             transform=transform, target_transform=target_transform, 
             download=download, extension=".wcnf.xz",
             **kwargs
