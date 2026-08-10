@@ -287,6 +287,9 @@ class CPM_pumpkin(SolverInterface):
         else: # wipe results
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            
+            if self.has_objective():
+                self.objective_value_ = None
 
         return has_sol
 
