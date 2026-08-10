@@ -62,6 +62,8 @@ def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[E
     Boolean constants are promoted to integers in numerical context (e.g. in wsum);
     integers are never converted to Booleans. 
 
+    Conjunctions and disjunctions that end up with a single argument are replaced by that argument.
+
     Arguments:
         lst_of_expr (list[Expression]): list of CPMpy expressions
         num_context (bool): whether the expressions are used as numeric arguments (default: False)
@@ -122,9 +124,14 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 elif newargs is not None:
                     newargs.append(a)
 
-            if changed:
-                if newargs is None: # when args where simplified recursively above
-                    newargs = list(args)
+            if newargs is None:
+                newargs = args
+
+            if len(newargs) == 0: # empty disjunction
+                return True, BoolVal(False)
+            elif len(newargs) == 1: # single argument, drop the operator
+                return True, newargs[0]
+            elif changed:
                 newexpr = copy.copy(expr)
                 newexpr.update_args(newargs)
                 return True, newexpr
@@ -142,9 +149,14 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 elif newargs is not None:
                     newargs.append(a)
 
-            if changed:
-                if newargs is None: # when args where simplified recursively above
-                    newargs = list(args)
+            if newargs is None: # when args where simplified recursively above
+                newargs = args
+
+            if len(newargs) == 0: # empty conjunction
+                return True, BoolVal(True)
+            elif len(newargs) == 1: # single argument, drop the operator
+                return True, newargs[0]
+            elif changed:
                 newexpr = copy.copy(expr)
                 newexpr.update_args(newargs)
                 return True, newexpr
