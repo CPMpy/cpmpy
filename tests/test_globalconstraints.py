@@ -663,6 +663,8 @@ class TestGlobal:
 
         if solver in ("gurobi", "cplex"):
             kwargs = dict(solution_limit=10) # all assignments = 8
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
         else:
             kwargs = dict()
 
