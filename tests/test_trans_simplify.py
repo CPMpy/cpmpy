@@ -37,6 +37,27 @@ class TestTransSimplify:
         expr = Operator("->", [False, self.bvs[0]])
         assert str(self.transform(expr)) == "[boolval(True)]"
 
+    def test_degenerate_bool_ops(self):
+        bv = self.bvs
+
+        # a single argument does not need the operator
+        assert str(simplify_boolean([Operator("or", [bv[0]])])) == "[bv[0]]"
+        assert str(simplify_boolean([Operator("and", [bv[0]])])) == "[bv[0]]"
+        # also when the other arguments are constants that get removed
+        assert str(simplify_boolean([Operator("or", [bv[0], False])])) == "[bv[0]]"
+        assert str(simplify_boolean([Operator("and", [bv[0], True])])) == "[bv[0]]"
+        # nothing left, so the identity element of the operator
+        assert str(simplify_boolean([Operator("or", [False, False])])) == "[boolval(False)]"
+        assert str(simplify_boolean([Operator("and", [True, True])])) == "[boolval(True)]"
+
+        # also in a nested context
+        assert str(self.transform(Operator("or", [bv[0]]) == bv[1])) == "[(bv[0]) == (bv[1])]"
+        assert str(self.transform(Operator("and", [bv[0]]).implies(bv[1]))) == "[(bv[0]) -> (bv[1])]"
+        assert str(self.transform(Operator("or", [Operator("and", [bv[0]]), bv[1]]))) == "[(bv[0]) or (bv[1])]"
+
+        # more than one argument is left untouched
+        assert str(simplify_boolean([Operator("or", [bv[0], bv[1]])])) == "[(bv[0]) or (bv[1])]"
+
     def test_bool_in_comp(self):
         expr = self.ivs[0] >= False
         assert str(self.transform(expr)) == '[iv[0] >= 0]'
