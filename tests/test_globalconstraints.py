@@ -1835,6 +1835,31 @@ class TestTypeChecks:
         assert cp.Model([cp.Circuit(x+2,2,0)]).solve()
         assert cp.Model([cp.Circuit(a,b)]).solve()
 
+    def test_minimal_arity(self):
+        """Globals that require a non-empty argument list must raise ValueError on empty input."""
+        pytest.raises(ValueError, cp.AllDifferent, [])
+        pytest.raises(ValueError, cp.AllDifferentExceptN, [], 0)
+        pytest.raises(ValueError, cp.AllDifferentExcept0, [])
+        pytest.raises(ValueError, cp.AllEqual, [])
+        pytest.raises(ValueError, cp.AllEqualExceptN, [], 0)
+        pytest.raises(ValueError, cp.Xor, [])
+        pytest.raises(ValueError, cp.Increasing, [])
+        pytest.raises(ValueError, cp.Decreasing, [])
+        pytest.raises(ValueError, cp.IncreasingStrict, [])
+        pytest.raises(ValueError, cp.DecreasingStrict, [])
+        pytest.raises(ValueError, cp.Circuit, [])
+        pytest.raises(ValueError, cp.Circuit, [cp.intvar(0, 1)])  # arity >= 2
+        pytest.raises(ValueError, cp.Regular, [], [("A", 0, "A")], "A", ["A"])
+        pytest.raises(ValueError, cp.MDD, [], [("A", 0, "B")])
+        pytest.raises(ValueError, cp.Minimum, [])
+        pytest.raises(ValueError, cp.Maximum, [])
+        pytest.raises(ValueError, cp.NValue, [])
+        pytest.raises(ValueError, cp.NValueExcept, [], 0)
+        from cpmpy.expressions.core import Operator
+        pytest.raises(ValueError, Operator, "and", [])
+        pytest.raises(ValueError, Operator, "or", [])
+        pytest.raises(ValueError, Operator, "sum", [])
+
     def test_multicicruit(self):
         c1 = cp.Circuit(cp.intvar(0,4, shape=5))
         c2 = cp.Circuit(cp.intvar(0,2, shape=3))
