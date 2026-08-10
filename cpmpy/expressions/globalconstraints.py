@@ -228,13 +228,16 @@ class GlobalConstraint(Expression):
 # Global Constraints (with Boolean return type)
 class AllDifferent(GlobalConstraint):
     """
-    Enforces that all arguments have a different (distinct) value
+    Enforces that all arguments have a different (distinct) value.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike|ListLike[ExprLike]):
         """
         Arguments:
             args (ExprLike|ListLike[ExprLike]): List of expressions or constants to be different from each other
+                (at least one required)
         """
         flatargs = flatlist(args)
         if len(flatargs) == 0:
@@ -276,6 +279,8 @@ class AllDifferentExceptN(GlobalConstraint):
     """
     Enforces that all arguments, except those equal to a value in n, have a different (distinct) value.
 
+    Requires at least one argument in ``arr`` (arity >= 1).
+
     Arguments:
         arr (Sequence[Expression]): List of expressions to be different from each other, except those equal to a value in n
         n (int or list[int]): Value or list of values that are excluded from satisfying the alldifferent condition
@@ -285,6 +290,7 @@ class AllDifferentExceptN(GlobalConstraint):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to a value in n
+                (at least one required)
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the distinctness constraint
         """
         flatarr = flatlist(arr)
@@ -327,22 +333,28 @@ class AllDifferentExceptN(GlobalConstraint):
 class AllDifferentExcept0(AllDifferentExceptN):
     """
     Enforces that all arguments, except those equal to 0, have a different (distinct) value.
+
+    Requires at least one argument (arity >= 1).
     """
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to 0
+                (at least one required)
         """
         super().__init__(flatlist(args), 0)
 
 class AllEqual(GlobalConstraint):
     """
-    Enforces that all arguments have the same value
+    Enforces that all arguments have the same value.
+
+    Requires at least one argument (arity >= 1).
     """
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to have the same value
+                (at least one required)
         """
         flatargs = flatlist(args)
         if len(flatargs) == 0:
@@ -373,12 +385,15 @@ class AllEqual(GlobalConstraint):
 class AllEqualExceptN(GlobalConstraint):
     """
     Enforces that all arguments, except those equal to a value in n, have the same value.
+
+    Requires at least one argument in ``arr`` (arity >= 1).
     """
 
     def __init__(self, arr: ListLike[ExprLike], n: int|np.integer|list[int|np.integer]):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to have the same value, except those equal to a value in n
+                (at least one required)
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the equality constraint
         """
         flatarr = flatlist(arr)
@@ -418,11 +433,14 @@ class AllEqualExceptN(GlobalConstraint):
 class Circuit(GlobalConstraint):
     """
     Enforces that the sequence of variables form a circuit, where x[i] = j means that node j is the successor of node i.
+
+    Requires at least two variables (arity >= 2).
     """
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants representing the successors of the nodes to form the circuit
+                (at least two required)
         """
         flatargs = flatlist(args)
         if len(flatargs) < 2:
@@ -867,6 +885,8 @@ class Regular(GlobalConstraint):
     Takes as input a sequence of variables and a automaton representation using a transition table.
     The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
 
+    Requires a non-empty input sequence (``array`` arity >= 1).
+
     The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
     The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
     An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
@@ -883,6 +903,7 @@ class Regular(GlobalConstraint):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
+                (at least one required)
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
             start (int | str): Starting node id
             accepting (ListLike[int | str]): List of accepting node ids
@@ -1085,6 +1106,8 @@ class MDD(GlobalConstraint):
     The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and where the first variable
     in the array takes the value of the first edge, the second from the second edge, etc., ending in the accepting sink node.
 
+    Requires a non-empty input sequence (``array`` arity >= 1).
+
     The transitions/edges are given by a `n x 3` matrix, or more precisely a list of `n` tuples `(node_id1, value, node_id2)`.
     A node_id is an integer or string representing a state in the MDD, and value is an integer representing the value of the variable in the sequence.
     If not given explicitly, the root node is the node_id1 of the first entry in the transition table (i.e., transitions[0][0]).
@@ -1105,6 +1128,7 @@ class MDD(GlobalConstraint):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
+                (at least one required)
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
             reduce (bool, default=True): During decomposition, whether to reduce the MDD as a first decomposition step
@@ -1483,13 +1507,16 @@ class Xor(GlobalConstraint):
     """
     Enforces the exclusive-or relation of the arguments.
     Supports n-ary xor-constraints, which are treated as cascaed binary xor-constraints.
-    Equivalent to `sum(args) % 2 == 1`
+    Equivalent to `sum(args) % 2 == 1`.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, arg_list: ListLike[BoolExprLike]):
         """
         Arguments:
             arg_list (ListLike[BoolExprLike]): List of expressions or constants, to be xor'ed
+                (at least one required)
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
@@ -2270,12 +2297,15 @@ class GlobalCardinalityCount(GlobalConstraint):
 class Increasing(GlobalConstraint):
     """
     Enforces that the expressions are assigned to (non-strictly) increasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to increasing values
+                (at least one required)
         """
         flatargs = flatlist(args)
         if len(flatargs) == 0:
@@ -2306,12 +2336,15 @@ class Increasing(GlobalConstraint):
 class Decreasing(GlobalConstraint):
     """
     Enforces that the expressions are assigned to (non-strictly) decreasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to decreasing values
+                (at least one required)
         """
         flatargs = flatlist(args)
         if len(flatargs) == 0:
@@ -2342,12 +2375,15 @@ class Decreasing(GlobalConstraint):
 class IncreasingStrict(GlobalConstraint):
     """
     Enforces that the expressions are assigned to strictly increasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly increasing values
+                (at least one required)
         """
         flatargs = flatlist(args)
         if len(flatargs) == 0:
@@ -2379,12 +2415,15 @@ class IncreasingStrict(GlobalConstraint):
 class DecreasingStrict(GlobalConstraint):
     """
     Enforces that the expressions are assigned to strictly decreasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly decreasing values
+                (at least one required)
         """
         flatargs = flatlist(args)
         if len(flatargs) == 0:
