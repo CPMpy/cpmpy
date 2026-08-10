@@ -57,28 +57,22 @@
 """
 from __future__ import annotations
 
-import math
 from collections.abc import Iterable
+import threading
 import warnings # for deprecation warning
 from functools import reduce
 from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from .core import Expression, ExprLike, ListLike, BoolVal
+from .core import Expression, ExprLike, BoolExprLike, ListLike, BoolVal
 from .utils import is_num, is_int, is_boolexpr, get_bounds
 
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
-
-def BoolVar(shape=1, name=None):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.boolvar` instead.
-    """
-    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
-    return boolvar(shape=shape, name=name)
+_VAR_NAME_CHECK_STATE = threading.local()
+_VAR_NAME_CHECK_STATE.strict = True # default to strict mode
 
 
 @overload
@@ -156,15 +150,6 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     r = NDVarArray(shape, dtype=object, buffer=data)
     r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
-
-
-def IntVar(lb, ub, shape=1, name=None):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.intvar` instead.
-    """
-    warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
-    return intvar(lb, ub, shape=shape, name=name)
 
 
 @overload
@@ -252,16 +237,8 @@ def intvar(lb: int, ub: int, shape: int|np.integer|tuple[int|np.integer, ...] = 
     r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
 
-def cparray(arr):
-    """
-    .. deprecated:: 0.9.0
-          Please use :func:`~cpmpy.expressions.variables.cpm_array` instead.
-    """
-    warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
-    return cpm_array(arr)
 
-
-def cpm_array(arr: ListLike[ExprLike]) -> NDVarArray:
+def cpm_array(arr: ListLike[ExprLike|Any]) -> NDVarArray:
     """
     N-dimensional wrapper, to wrap standard numpy arrays or lists.
 
@@ -510,36 +487,42 @@ class NDVarArray(np.ndarray):
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
 
-        # index is single expression: direct element
+        # index is single expression: direct element (1D only)
         if isinstance(index, Expression):
+            if self.ndim != 1:
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
             return cp.Element(self, index)
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
 
             if len(index) != self.ndim:
-                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
 
-            # find dimension of expression in index
-            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
-            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
-                # TODO can we do the same for more than one Expression? Not sure...
-                index  = list(index)
-                index.append(index.pop(expr_dim[0]))
+            # eliminate constant indices to reduce dimensionality
+            selector = []
+            new_indices = []
+            for idx in index:
+                if isinstance(idx, Expression):
+                    selector.append(slice(None))  # keep this axis (equivalent to `:` when used as index), to pass to element constraint
+                    new_indices.append(idx)
+                else:
+                    selector.append(idx)  # constant index
+            arr = self[tuple(selector)]
 
-                arr = np.moveaxis(self, expr_dim[0], -1)
-                return cp.Element(arr[(*index[:-1],)], index[-1])
+            if len(new_indices) == 1:
+                return cp.Element(arr, new_indices[0])
+            return cp.NDElement(arr, new_indices)
 
-
-            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
-            index = index[expr_dim[0]:]
-
-            # calculate index for flat array
-            flat_index = index[-1]
-            for dim, idx in enumerate(index[:-1]):
-                flat_index += idx * math.prod(arr.shape[dim+1:])
-            # using index expression as single var for flat array
-            return cp.Element(arr.flatten(), flat_index)
+        # vectorized indexing: arr[idx_array] -> [arr[idx0], arr[idx1], ...] (shape of index)
+        if isinstance(index, (list, np.ndarray)):
+            index_arr = np.asarray(index)
+            if any(isinstance(i, Expression) for i in index_arr.flat):
+                if self.ndim != 1:
+                    raise NotImplementedError("CPMpy does not support vectorized indexing into multi-dimensional arrays. If you really need this, please report on github.")
+                if any(isinstance(i, Expression) and i.is_bool() for i in index_arr.flat):
+                    raise TypeError("Boolean decision variables cannot be used as a mask (result length would depend on their values). Use integer decision variables as indices instead.")
+                return cpm_array([self[i] for i in index_arr.flat]).reshape(index_arr.shape)
 
         return super().__getitem__(index)
 
@@ -661,23 +644,39 @@ class NDVarArray(np.ndarray):
                np.asarray(ubs).reshape(self.shape)
 
     # VECTORIZED master function (delegate)
-    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str) -> NDVarArray:
+    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str, **kwargs) -> NDVarArray:
         """
-        Vectorized implementation of the given attribute (e.g. __eq__, __add__, etc.)
+        NumPy-broadcast ``other`` to ``self.shape``, then apply ``attr`` element-wise.
 
         Args:
             other (ExprLike|Iterable|Any): The other operand.
                 Typically an array/list of Expressions, or a single Expression, or a constant (or anything np compatible)
-            attr (str): The attribute to vectorize (e.g. __eq__, __add__, etc.)
+            attr (str): The attribute to vectorize (e.g. ``__eq__``, ``__add__``, ``implies``, etc.)
+            **kwargs: Extra keyword arguments passed to each element call (e.g. ``simplify`` for ``implies``).
 
         Returns:
             NDVarArray: The vectorized result.
         """
-        if not isinstance(other, Iterable):
-            other = [other]*len(self)
-        # this is a bit cryptic, but it calls 'attr' on s with o as arg
+        if not isinstance(other, np.ndarray):
+            other = np.asarray(other)
+        try:
+            broadcast_shape = np.broadcast_shapes(other.shape, self.shape)
+        except ValueError as e:
+            raise ValueError(
+                f"operands could not be broadcast together with shapes {self.shape} {other.shape}"
+            ) from e
+        if broadcast_shape != self.shape:
+            raise ValueError(
+                f"other with shape {other.shape} could not be broadcast to self with shape {self.shape}"
+            )
+        other = np.broadcast_to(other, self.shape)
         # s.__eq__(o) <-> getattr(s, '__eq__')(o)
-        return cpm_array([getattr(s,attr)(o) for s,o in zip(self, other)])
+        flat_res = cpm_array([
+            # unwrap numpy 'generic' scalar to is Python int item, so int <= np.int64 does not return NotImplemented
+            getattr(s, attr)(o.item() if isinstance(o, np.generic) else o, **kwargs)
+            for s, o in zip(self.flat, other.flat)])
+        # typing is wrong, reshape does return NDVarArray
+        return flat_res.reshape(self.shape) # type: ignore
 
     # VECTORIZED comparisons
     def __eq__(self, other):
@@ -773,8 +772,8 @@ class NDVarArray(np.ndarray):
     def __rxor__(self, other):
         return self._vectorized(other, '__rxor__')
 
-    def implies(self, other):
-        return self._vectorized(other, 'implies')
+    def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify=False) -> NDVarArray:
+        return self._vectorized(other, 'implies', simplify=simplify)
 
     #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False
@@ -829,8 +828,72 @@ def _genname(basename: Optional[str], idxs: tuple[int|np.integer, ...]) -> Optio
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
 
 def _is_invalid_name(name: Any) -> bool:
-    if isinstance(name, str):
-        return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
-    # rest invalid indeed
-    return True
+    """
+    Check if a variable name is invalid.
 
+    In 'strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX}.
+    In 'non-strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX} 
+    and the variables' counter is greater than the index, i.e. the name is already in use.
+
+    Toggle the strict mode with `_enable_strict_variable_name_check()` and `_disable_strict_variable_name_check()`,
+    or use the context manager `_ignore_strict_variable_name_check()`.
+    """
+    if name.startswith(_IV_PREFIX):
+        if _get_strict_variable_name_check():
+            return True
+        else:
+            id = int(name[len(_IV_PREFIX):])
+            if _IntVarImpl.counter > id:
+                warnings.warn("Creating a variable with a name that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
+            return False
+    
+    elif name.startswith(_BV_PREFIX):
+        if _get_strict_variable_name_check():
+            return True
+        else:
+            id = int(name[len(_BV_PREFIX):])
+            if _BoolVarImpl.counter > id:
+                warnings.warn("Creating a variable with a name that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
+            return False
+    
+    return False
+
+def _get_strict_variable_name_check():
+    return _VAR_NAME_CHECK_STATE.strict
+
+def _enable_strict_variable_name_check():
+    _VAR_NAME_CHECK_STATE.strict = True
+
+def _disable_strict_variable_name_check():
+    _VAR_NAME_CHECK_STATE.strict = False
+
+
+class _IgnoreStrictVariableNameCheck:
+    def __enter__(self):
+        depth = getattr(_VAR_NAME_CHECK_STATE, "ignore_check_depth", 0)
+        if depth > 0:
+            raise RuntimeError("_ignore_strict_variable_name_check() cannot be nested")
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = depth + 1
+        _disable_strict_variable_name_check()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = 0
+        _enable_strict_variable_name_check()
+        # _update_variable_counters() # TODO: add automatic support for this later (different PR)
+        return False  # propagate exceptions
+
+
+def _ignore_strict_variable_name_check():
+    """
+    Context manager to temporarily disable strict variable name check.
+
+    Example:
+
+        .. code-block:: python
+        
+            with _ignore_strict_variable_name_check():
+                ... create CPMpy model based on file contents here ...
+    """
+    if _IntVarImpl.counter > 0 or _BoolVarImpl.counter > 0:
+        warnings.warn("Loading a model whilst there are already variables created. This could lead to unexpected behavior due to variables with the same name being linked together.")
+    return _IgnoreStrictVariableNameCheck()

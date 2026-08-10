@@ -94,7 +94,6 @@ import copy
 import warnings
 from dataclasses import dataclass
 from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
-from frozendict import frozendict
 import numpy as np
 import cpmpy as cp
 
@@ -103,9 +102,10 @@ from ..exceptions import TypeError
 
 # Common typing helpers
 T = TypeVar("T")
-ListLike: TypeAlias = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
+ListLike: TypeAlias = Union[Sequence[T], np.ndarray]  # similar to is_any_list() check  (Sequence a bit more general than list/tuple)
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
-
+BoolExprLike: TypeAlias = Union["Expression", bool, np.bool_]  # subtype of ExprLike (bool subtype int)
+NestedBoolExprLike: TypeAlias = Union[BoolExprLike, ListLike["NestedBoolExprLike"]]  # single or (nested) ListLike of BoolExprLike
 
 class Expression(object):
     """
@@ -141,7 +141,7 @@ class Expression(object):
         """
         self.name = name
         if not isinstance(arg_list, tuple):
-            warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, updated the constructor!", UserWarning)
+            warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, update the constructor!", UserWarning)
             arg_list = tuple(arg_list)
         self._args = arg_list
         self._has_subexpr = has_subexpr
@@ -189,11 +189,11 @@ class Expression(object):
                 strargs.append(f"{arg}")
         return "{}({})".format(self.name, ",".join(strargs))
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.__repr__())
 
-    def has_subexpr(self):
-        """ Does it contains nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
+    def has_subexpr(self) -> bool:
+        """ Does it contain nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
             Results are cached for future calls and reset when the expression changes
@@ -233,38 +233,58 @@ class Expression(object):
         self._has_subexpr = False
         return False
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
             Default: yes
         """
         return True
 
-    def value(self):
-        return None # default
+    def value(self) -> Optional[int]:
+        raise NotImplementedError(f"`value` is not yet implemented for type {self}")
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         if self.is_bool():
-            return 0, 1 #default for boolean expressions
+            return 0, 1  # default for boolean expressions
         raise NotImplementedError(f"`get_bounds` is not implemented for type {self}")
 
-    # keep for backwards compatibility
-    def deepcopy(self, memodict={}):
-        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
-        return copy.deepcopy(self, memodict)
+    def implies(self, other: BoolExprLike, simplify: bool = False) -> "Expression":
+        """Implication constraint: ``self -> other``.
 
-    # implication constraint: self -> other
-    # Python does not offer relevant syntax...
-    # for double implication, use equivalence self == other
-    def implies(self, other):
-        # other constant
-        if is_true_cst(other):
-            return BoolVal(True)
-        if is_false_cst(other):
-            return ~self
-        return Operator('->', [self, other])
+        Python does not offer relevant syntax for implication, call this method instead.
+        For double reification (<->), use equivalence ``self == other``.
+
+        Args:
+            other (BoolExprLike): the right-hand-side of the implication
+            simplify (bool): if True, simplify by eliminating True/False constants (might remove expressions & their variables from user-view)
+
+        Returns:
+            Expression: the implication constraint or a BoolVal if simplified
+
+        Simplification rules:
+            - self -> True :: BoolVal(True)
+            - self -> False :: ~self (Boolean inversion)
+        """
+        if not simplify:
+            return Operator('->', (self, other))
+
+        if isinstance(other, Expression):
+            if isinstance(other, BoolVal):  # simplify
+                if other.args[0]:
+                    return BoolVal(True)
+                return self.__invert__()  # not self
+            return Operator('->', (self, other))
+        else:  # simplify
+            assert isinstance(other, bool) or isinstance(other, np.bool_), f"implies: other must be a boolean, got {other}"
+            if other:
+                return BoolVal(True)
+            return self.__invert__()  # not self
 
     # Comparisons
     def __eq__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__eq__(self)
         # BoolExpr == 1|true|0|false, common case, simply BoolExpr
         if self.is_bool() and is_num(other):
             if other is True or other == 1:
@@ -274,23 +294,47 @@ class Expression(object):
         return Comparison("==", self, other)
 
     def __ne__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__ne__(self)
         return Comparison("!=", self, other)
 
     def __lt__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__gt__(self)
         return Comparison("<", self, other)
 
     def __le__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__ge__(self)
         return Comparison("<=", self, other)
 
     def __gt__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__lt__(self)
         return Comparison(">", self, other)
 
     def __ge__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__le__(self)
         return Comparison(">=", self, other)
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__rand__(self)
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -301,6 +345,10 @@ class Expression(object):
         return Operator("and", [self, other])
 
     def __rand__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__and__(self)
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -311,6 +359,10 @@ class Expression(object):
         return Operator("and", [other, self])
 
     def __or__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__ror__(self)
         # some simple constant removal
         if is_false_cst(other):
             return self
@@ -321,6 +373,10 @@ class Expression(object):
         return Operator("or", [self, other])
 
     def __ror__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__or__(self)
         # some simple constant removal
         if is_false_cst(other):
             return self
@@ -331,6 +387,10 @@ class Expression(object):
         return Operator("or", [other, self])
 
     def __xor__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__rxor__(self)
         # some simple constant removal
         if is_true_cst(other):
             return ~self
@@ -339,6 +399,10 @@ class Expression(object):
         return cp.Xor([self, other])
 
     def __rxor__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__xor__(self)
         # some simple constant removal
         if is_true_cst(other):
             return ~self
@@ -349,23 +413,41 @@ class Expression(object):
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
     def __add__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__radd__(self)
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [self, other])
 
     def __radd__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__add__(self)
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [other, self])
 
-    # substraction
+    # subtraction
     def __sub__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__rsub__(self)
+        if isinstance(other, np.bool_):
+            other = int(other)  # unary - on np.bool_ is not allowed by numpy
         # if is_num(other) and other == 0:
         #     return self
         # return Operator("sub", [self, other])
         return self.__add__(-other)
 
     def __rsub__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__sub__(self)
         # if is_num(other) and other == 0:
         #     return -self
         # return Operator("sub", [other, self])
@@ -373,39 +455,63 @@ class Expression(object):
     
     # multiplication: use GlobalFunction Multiplication so it can be decomposed (e.g. to linear)
     def __mul__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__rmul__(self)
         if is_num(other) and other == 1:
             return self
         return cp.Multiplication(self, other)
 
     def __rmul__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__mul__(self)
         if is_num(other) and other == 1:
             return self
         return cp.Multiplication(other, self)
 
-    # matrix multipliciation TODO?
+    # matrix multiplication TODO?
     #object.__matmul__(self, other)
 
     # other mathematical ones
     def __truediv__(self, other):
-        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
+        warnings.warn("We only support floordivision, use // instead of /", SyntaxWarning)
         return self.__floordiv__(other)
 
     def __rtruediv__(self, other):
-        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
+        warnings.warn("We only support floordivision, use // instead of /", SyntaxWarning)
         return self.__rfloordiv__(other)
 
     def __floordiv__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__rfloordiv__(self)
         if is_num(other) and other == 1:
             return self
         return cp.Division(self, other)
 
     def __rfloordiv__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__floordiv__(self)
         return cp.Division(other, self)
 
     def __mod__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__rmod__(self)
         return cp.Modulo(self, other)
 
     def __rmod__(self, other):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
+            return other.__mod__(self)
         return cp.Modulo(other, self)
 
     def __pow__(self, other: Any, modulo: Optional[int] = None):
@@ -427,8 +533,8 @@ class Expression(object):
     def __neg__(self):
         if self.name == 'wsum':
             # negate the constant weights
-            return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
-        return Operator("-", [self])
+            return Operator(self.name, ([-a for a in self.args[0]], self.args[1]))
+        return Operator("-", (self,))
 
     def __pos__(self):
         return self
@@ -437,9 +543,9 @@ class Expression(object):
         return cp.Abs(self)
 
     def __invert__(self):
-        if not (is_boolexpr(self)):
+        if not (self.is_bool()):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
-        return Operator("not", [self])
+        return Operator("not", (self,))
 
     def __bool__(self) -> bool:
         raise ValueError(f"__bool__ should not be called on a CPMPy expression {self} as it will always return True\n"
@@ -452,7 +558,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg: bool|np.bool_) -> None:
-        arg = bool(arg)  # will raise ValueError if not a Boolean-able
+        arg = bool(arg)
         super(BoolVal, self).__init__("boolval", (arg,))
 
     def value(self) -> bool:
@@ -539,27 +645,37 @@ class BoolVal(Expression):
     
 
     def has_subexpr(self) -> bool:
-        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+        """ Does it contain nested Expressions (anything other than a _NumVarImpl or a constant)?
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other: ExprLike) -> Expression:
-        my_val: bool = self.args[0]
-        if isinstance(other, Expression):
-            assert other.is_bool(), "implies: other must be a boolean expression"
-            if my_val:  # T -> other :: other
-                return other
-            return Operator("->", [self, other])  # do not simplify to True, would remove other from user view
-        else:
-            # should we check whether it actually is bool and not int?
-            if my_val:  # T -> other :: other
-                return BoolVal(bool(other))
-            else:  # F -> other :: True
-                return BoolVal(True)
-            # note that this can return a BoolVal(True)
+    def implies(self, other: BoolExprLike, simplify: bool = False) -> Expression:
+        """Implication constraint: ``BoolVal -> other``.
 
+        Args:
+            other (BoolExprLike): the right-hand-side of the implication
+            simplify (bool): simplify the implication, even if it means `other` dissappears from user-view
+
+        Simplification rule:
+            - BoolVal(False) -> other :: BoolVal(True)
+        
+        Note: `BoolVal(True).implies(other)` will always return `other`
+
+        Returns:
+            Expression: the implication constraint or a BoolVal or other
+        """
+        if self.args[0]:  # True -> other
+            if not isinstance(other, Expression):
+                assert isinstance(other, bool) or isinstance(other, np.bool_), f"implies: other must be a boolean, got {other}"
+                return BoolVal(other)
+            return other
+        else:  # False -> other
+            if simplify:
+                return BoolVal(True)
+            else:
+                return Operator('->', (self, other))
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
@@ -612,7 +728,7 @@ class Operator(Expression):
     Convention for 2-ary operators: if one of the two is a constant,
     it is stored first (as expr[0]), this eases weighted sum detection
     """
-    allowed: Final = frozendict({
+    allowed: Final[dict[str, tuple[int, bool]]] = {
         #name: (arity, is_bool)       arity 0 = n-ary, min 2
         'and': (0, True),
         'or':  (0, True),
@@ -622,8 +738,8 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         '-':   (1, False), # -x
-    })
-    printmap: Final = frozendict({'sum': '+', 'sub': '-'})
+    }
+    printmap: Final[dict[str, str]] = {'sum': '+', 'sub': '-'}
 
     def __init__(self, name: str, arg_list: Sequence[ExprLike | ListLike[ExprLike]]) -> None:
         """
@@ -706,7 +822,7 @@ class Operator(Expression):
             return f"sum({self.args[0]} * {self.args[1]})"
 
         if len(self.args) == 1:
-            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 ommited in print
+            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 omitted in print
         elif len(self.args) == 2:  # infix printing of two arguments
             printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
             arg0, arg1 = self.args
@@ -793,7 +909,7 @@ def _wsum_should(arg) -> bool:
     True if the arg is already a wsum,
     or if it is a Multiplication with is_lhs_num
     (negation '-' does not mean it SHOULD be a wsum, because then
-     all substractions are transformed into less readable wsums)
+     all subtractions are transformed into less readable wsums)
     """
     name = getattr(arg, 'name', None)
     return name == 'wsum' or (name == 'mul' and arg.is_lhs_num)

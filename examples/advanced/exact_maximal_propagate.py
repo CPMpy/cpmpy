@@ -5,10 +5,11 @@ Solver-native implementation of the Maximal-Propagation algorithm as found in cp
 Can be used for finding the maximal consequence of a set of constraints under assumptions.
 """
 
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.expressions.variables import NegBoolView
 from cpmpy.solvers import CPM_exact
-from cpmpy.expressions.utils import is_any_list, is_num, flatlist
+from cpmpy.expressions.utils import flatlist
+from cpmpy.tools.explain.utils import make_assump_model
 
 
 class PropagationSolver(CPM_exact):
@@ -57,9 +58,6 @@ class PropagationSolver(CPM_exact):
 
 
 if __name__ == "__main__":
-    import cpmpy as cp
-    from cpmpy.tools.explain.utils import make_assump_model
-
     x = cp.intvar(1, 5, shape=5, name="x")
 
     c1 = cp.AllDifferent(x)
