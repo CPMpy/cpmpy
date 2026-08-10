@@ -265,7 +265,7 @@ class CPM_gcs(SolverInterface):
 
         # Verify proof, if requested
         if verify:
-
+            proof_is_valid = self.verify(time_limit=verify_time_limit, **veripb_args)
             # set time limit
             if verify_time_limit is not None:
                 if verify_time_limit <= 0:
@@ -509,7 +509,7 @@ class CPM_gcs(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
-    def verify(self, name=None, location=".", time_limit=None, display_output=False, veripb_args=[]):
+    def verify(self, time_limit=None, display_output=False, veripb_args=[]):
         """
         Verify a solver-produced proof using VeriPB.
 
@@ -526,17 +526,10 @@ class CPM_gcs(SolverInterface):
         if not which("veripb"):
             raise Exception("Unable to run VeriPB: check it is installed and on system path - see https://gitlab.com/MIAOresearch/software/VeriPB#installation.")
 
-        if name is None:
-            name = self.proof_name
-        
-        if name is None: # Still None?
-            raise ValueError("No proof to verify")
-        
         if not isinstance(veripb_args, list):
             raise ValueError("veripb_args should be a list")
         
-        opb_file = path.join(location, name +".opb")
-        pbp_file = path.join(location, name +".pbp")
+        opb_file, pbp_file, _varmap = self.get_proof_files()
 
         if not path.isfile(opb_file):
             raise FileNotFoundError("Can't find " + opb_file)
