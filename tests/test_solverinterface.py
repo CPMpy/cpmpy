@@ -353,9 +353,9 @@ def test_solveall_basic(solver):
         if solver == "pysdd": # pysdd doesn't support solution_limit
             total = model.solveAll(solver=solver,display=count_solution)
         elif solver == "hexaly":  # set time limit, hexaly cannot prove UNSAT at last call
-            total = solver.solveAll(display=count_solution, solution_limit=10, time_limit=3)
+            total = model.solveAll(display=count_solution, solution_limit=10, time_limit=3)
         else:
-            total = solver.solveAll(display=count_solution, solution_limit=10)
+            total = model.solveAll(display=count_solution, solution_limit=10)
         
         assert total == 3  # Should find all 3 solutions
         assert solution_count == 3
