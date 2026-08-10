@@ -236,7 +236,10 @@ class AllDifferent(GlobalConstraint):
         Arguments:
             args (ExprLike|ListLike[ExprLike]): List of expressions or constants to be different from each other
         """
-        super().__init__("alldifferent", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('AllDifferent constraint must be given at least one argument')
+        super().__init__("alldifferent", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -285,6 +288,8 @@ class AllDifferentExceptN(GlobalConstraint):
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the distinctness constraint
         """
         flatarr = flatlist(arr)
+        if len(flatarr) == 0:
+            raise ValueError('AllDifferentExceptN constraint must be given at least one argument')
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
@@ -339,7 +344,10 @@ class AllEqual(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to have the same value
         """
-        super().__init__("allequal", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('AllEqual constraint must be given at least one argument')
+        super().__init__("allequal", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -374,6 +382,8 @@ class AllEqualExceptN(GlobalConstraint):
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the equality constraint
         """
         flatarr = flatlist(arr)
+        if len(flatarr) == 0:
+            raise ValueError('AllEqualExceptN constraint must be given at least one argument')
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
@@ -878,6 +888,8 @@ class Regular(GlobalConstraint):
             accepting (ListLike[int | str]): List of accepting node ids
         """
         array = flatlist(array)
+        if len(array) == 0:
+            raise ValueError('Regular constraint must be given at least one argument in array')
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
         
@@ -1100,6 +1112,8 @@ class MDD(GlobalConstraint):
 
         """
         array = flatlist(array)
+        if len(array) == 0:
+            raise ValueError('MDD constraint must be given at least one argument in array')
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
 
@@ -1479,6 +1493,8 @@ class Xor(GlobalConstraint):
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
+        if len(arg_list) == 0:
+            raise ValueError('Xor constraint must be given at least one argument')
         # convention for commutative binary operators:
         # swap if right is constant and left is not
         arg_list = list(arg_list)
@@ -2261,7 +2277,10 @@ class Increasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to increasing values
         """
-        super().__init__("increasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('Increasing constraint must be given at least one argument')
+        super().__init__("increasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2294,7 +2313,10 @@ class Decreasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to decreasing values
         """
-        super().__init__("decreasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('Decreasing constraint must be given at least one argument')
+        super().__init__("decreasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2327,7 +2349,10 @@ class IncreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly increasing values
         """
-        super().__init__("strictly_increasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('IncreasingStrict constraint must be given at least one argument')
+        super().__init__("strictly_increasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2361,7 +2386,10 @@ class DecreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly decreasing values
         """
-        super().__init__("strictly_decreasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('DecreasingStrict constraint must be given at least one argument')
+        super().__init__("strictly_decreasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
