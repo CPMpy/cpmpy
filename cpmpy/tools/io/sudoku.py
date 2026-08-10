@@ -106,9 +106,7 @@ def parse_sudoku(instance: Union[str, os.PathLike, TextIO], open: Callable = bui
     box_height = int(match.group("box_height"))
 
     if box_width * box_height != size:
-        raise ValueError(
-            f"Box {box_width}x{box_height} is incompatible with grid size {size}"
-        )
+        raise ValueError(f"Box {box_width}x{box_height} is incompatible with grid size {size}")
 
     body = lines[1:]
     if len(body) != size:

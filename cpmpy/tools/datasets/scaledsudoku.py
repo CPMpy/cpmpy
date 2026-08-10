@@ -20,7 +20,7 @@ class ScaledSudokuDataset(FileDataset):  # torch.utils.data.Dataset compatible
     Scaled Sudoku Dataset in a PyTorch compatible format.
 
     - Origin: https://github.com/zayenz/scaled-sudoku-instances
-    - Reference: Mikael Z. Lagerkvist. 'Scaling Sudoku as a Constraint Problem.', ModRef 2026.
+    - Citation: Mikael Z. Lagerkvist. 'Scaling Sudoku as a Constraint Problem.', ModRef 2026.
       https://2026.modref.org/papers/ModRef2026-07-Scaling-Sudoku.pdf
 
     Instances are available as unique-solution ``base`` puzzles and as easier
@@ -98,51 +98,20 @@ class ScaledSudokuDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
-        Extract metadata from the matching ``.sdk.json`` sidecar when available.
+        Expose the matching ``.sdk.json`` sidecar as instance metadata.
+
+        The full sidecar is returned as-is (solution grid, hardness, provenance,
+        …). The corpus ``id`` field is stored as ``source_id`` so it does not
+        overwrite CPMpy's instance path ``id``.
         """
         result: dict[str, Any] = {}
         sidecar_path = file.with_suffix(".json")  # puzzle-....sdk.txt -> puzzle-....sdk.json
-        try:
-            if sidecar_path.exists():
-                with open(sidecar_path, "r") as f:
-                    sidecar = json.load(f)
-
-                result["source_id"] = sidecar.get("id")
-                if "clues_count" in sidecar:
-                    result["clues_count"] = sidecar["clues_count"]
-
-                size_info = sidecar.get("size") or {}
-                if "order" in size_info:
-                    result["order"] = size_info["order"]
-                if "box_width" in size_info:
-                    result["box_width"] = size_info["box_width"]
-                if "box_height" in size_info:
-                    result["box_height"] = size_info["box_height"]
-
-                hardness = sidecar.get("hardness") or {}
-                if "level" in hardness:
-                    result["hardness"] = hardness["level"]
-
-                minimality = sidecar.get("minimality") or {}
-                if "is_minimal" in minimality:
-                    result["is_minimal"] = minimality["is_minimal"]
-
-                identity = sidecar.get("identity") or {}
-                if "solution_hash" in identity:
-                    result["solution_hash"] = identity["solution_hash"]
-
-                provenance = sidecar.get("provenance") or {}
-                if "kind" in provenance:
-                    result["provenance_kind"] = provenance["kind"]
-            else:
-                # Fall back to parsing the puzzle header only
-                data = self.parse(file)
-                result["order"] = data["size"]
-                result["box_width"] = data["box_width"]
-                result["box_height"] = data["box_height"]
-                result["clues_count"] = int((data["grid"] != 0).sum())
-        except Exception:
-            pass
+        with open(sidecar_path, "r") as f:
+            sidecar = json.load(f)
+        # Pass through every sidecar field; rename id to avoid clashing
+        # with the dataset's path-based instance id.
+        for key, value in sidecar.items():
+            result["source_id" if key == "id" else key] = value
         return result
 
     def download(self):
