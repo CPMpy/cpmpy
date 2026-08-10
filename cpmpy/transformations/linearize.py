@@ -72,15 +72,15 @@ from .cse import CSEMap
 
 from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
-from .normalize import toplevel_list, simplify_boolean
+from .normalize import simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
+from ..expressions.core import Comparison, Expression, ListLike, Operator, BoolVal
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, InDomain, Regular, Circuit, ShortTable
 from ..expressions.globalfunctions import GlobalFunction, Element
-from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
+from ..expressions.utils import is_boolexpr, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
-from .int2bool import _encode_int_var
+from .int2bool import IntVarEnc, _encode_int_var
 
 
 
@@ -114,11 +114,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
             if cpm_expr.name == "and" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
+                newlist.append(Operator("sum", cpm_expr.args) >= len(cpm_expr.args))
 
             # disjunction
             elif cpm_expr.name == "or" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= 1)
+                newlist.append(Operator("sum", cpm_expr.args) >= 1)
 
             # reification
             elif cpm_expr.name == "->":
@@ -206,15 +206,23 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
                                  "`cpmpy.transformations.decompose_global.decompose_in_tree() first")
 
-            [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
+            (cpm_expr,) = canonical_comparison((cpm_expr,))  # just transforms the constraint, not introducing new ones
+            if isinstance(cpm_expr, BoolVal):
+                # it was a trivial comparison
+                newlist.append(cpm_expr)
+                continue
+
             lhs, rhs = cpm_expr.args
 
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
-                # very special case, avoid writing as sum of 1 argument
+                # very special case, avoid writing as sum of 1 argument; write as disjunction of 1 arg instead
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
-                if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
-                    continue # skip or([BoolVal(True)])
+                if isinstance(new_expr[0], BoolVal):
+                    if new_expr[0].value() is True:
+                        continue # skip or([BoolVal(True)])
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap)  # don't wrap in or(BoolVal(False))
+                    continue
                 newlist.append(Operator("or", new_expr))
                 continue
 
@@ -428,7 +436,7 @@ def only_positive_bv_wsum_const(cpm_expr):
         raise ValueError(f"unexpected expression, should be sum, wsum or var but got {cpm_expr}")
 
 
-def canonical_comparison(lst_of_expr):
+def canonical_comparison(lst_of_expr: ListLike[Expression]) -> list[Expression]:
     """
         Canonicalize a comparison expression.
         Transforms linear expressions, or a reification thereof into canonical form by:
@@ -438,27 +446,25 @@ def canonical_comparison(lst_of_expr):
         Expects the input constraints to be flat. Only apply after applying :func:`flatten_constraint`
     """
 
-    lst_of_expr = toplevel_list(lst_of_expr) # ensure it is a list
-
     newlist = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == '->':    # half reification of comparison
             lhs, rhs = cpm_expr.args
             if isinstance(rhs, Comparison):
-                rhs = canonical_comparison(rhs)[0]
+                (rhs,) = canonical_comparison((rhs,))
                 newlist.append(lhs.implies(rhs))
             elif isinstance(lhs, Comparison):
-                lhs = canonical_comparison(lhs)[0]
+                (lhs,) = canonical_comparison((lhs,))
                 newlist.append(lhs.implies(rhs))
             else:
                 newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            if isinstance(lhs, Comparison) and (is_bool(rhs) or isinstance(rhs, Expression) and rhs.is_bool()):
+            if isinstance(lhs, Comparison) and is_boolexpr(rhs):
                 assert cpm_expr.name == "==", "Expected a reification of a comparison here, but got {}".format(cpm_expr.name)
-                lhs = canonical_comparison(lhs)[0]
+                (lhs,) = canonical_comparison((lhs,))
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum", "sub"}):
                 if lhs.name == "sub":
                     lhs = Operator("wsum", [[1,-1],lhs.args])
@@ -482,7 +488,7 @@ def canonical_comparison(lst_of_expr):
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
-                    lhs = lhs + lhs2
+                    lhs = Operator("sum", [lhs, lhs2])
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
 
@@ -497,7 +503,11 @@ def canonical_comparison(lst_of_expr):
                                 rhs -= arg
                             else:
                                 new_args.append(arg)
-                        lhs = Operator("sum", new_args)
+                        if len(new_args) == 0: # edge case where all args are constants...
+                            newlist.append(cp.BoolVal(eval_comparison(cpm_expr.name, 0, rhs)))
+                            continue
+                        else:
+                            lhs = Operator("sum", new_args)
 
                     elif lhs.name == "wsum":
                         new_weights, new_args = [], []
@@ -507,7 +517,11 @@ def canonical_comparison(lst_of_expr):
                             else:
                                 new_weights.append(w)
                                 new_args.append(arg)
-                        lhs = Operator("wsum", [new_weights, new_args])
+                        if len(new_args) == 0: # edge case where all args are constants...
+                            newlist.append(cp.BoolVal(eval_comparison(cpm_expr.name, 0, rhs)))
+                            continue
+                        else:
+                            lhs = Operator("wsum", [new_weights, new_args])
                     else:
                         raise ValueError(f"lhs should be sum or wsum, but got {lhs}")
                 else:
@@ -596,8 +610,9 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         supported_reified = frozenset[str]()
 
     decompose_custom = get_linear_decompositions()
+    decompose_custom_positive = get_linear_positive_decompositions()
 
-    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
@@ -616,50 +631,95 @@ def decompose_linear_objective(obj: Expression,
 def get_linear_decompositions():
     """
         Implementation of custom linear decompositions for some global constraints.
-        Uses (var == val) in sums; no integer encoding.
 
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
+    # dispatch dynamically so subclasses with their own decompose_linear are respected
     return dict(
-        alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
+        alldifferent=lambda expr: expr.decompose_linear(),
+        element=lambda expr: expr.decompose_linear(), 
+        table=lambda expr: expr.decompose_linear(), 
+        short_table=lambda expr: expr.decompose(),
+        InDomain=lambda expr: expr.decompose_linear(),
+        regular=lambda expr: expr.decompose_linear(),
     )
-    # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
-
-def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
+def get_linear_positive_decompositions():
     """
-    Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
-    has at least min_values such reifications: remove those implications and add
-    the 'direct' encoding of x.
+        Implementation of custom linear decompositions for some global constraints, that are only valid in positive context.
 
-    If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
-    If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
-    (the domain constraint) is posted; the solver can then choose to eliminate the
-    vars, or post the wsums itself anyway.
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    # dispatch dynamically so subclasses with their own decompose_linear_positive are respected
+    return dict(
+        regular=lambda expr: expr.decompose_linear_positive(),
+        circuit=lambda expr: expr.decompose_linear_positive(),
+    )
+
+
+
+
+def linearize_reified_variables(constraints:list[Expression], 
+                                min_values:int=3,
+                                csemap:Optional[CSEMap]=None,
+                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
+    """
+    Replace reified (BV <-> (x == val)) implications with direct encoding and
+    reified (BV <-> (x >= val)) implications with order encoding when a variable
+    has at least min_values such reifications: remove those implications and add
+    the corresponding encoding of x.
+
+    If ivarmap is None, both consistency constraints and channeling constraints are posted.
+    If ivarmap is not None, the encoding is added to ivarmap and only (the domain constraint) is posted; 
+    the solver can then choose to eliminate the variables, or post the channeling constraints itself anyway.
+
+    If both BV <-> (x == val) and BV <-> (x >= val) are present, choose the
+    encoding type that occurs most often for that variable. Ties prefer the
+    direct encoding.
+    (TODO: add both encodings and channel between them?)
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
+    assert min_values > 0
+    
     # this transformation can only be done if there is a csemap
     if csemap is None:
         return constraints
 
-    var_vals = csemap.get_reified_varvals()
-    
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
-    toplevel = []
-    bv_map = {}  # bv -> (var, val)
-    for var, vals in var_vals.items():
-        # check if we should linearize the reified variables
-        lb, ub = var.lb, var.ub
-        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
-        if len(vals) < min_values:
-            continue  # do not encode
 
+    var_vals, var_bounds = csemap.get_reified_varvalbounds()
+
+    # decide the encoding to use for each variable
+    var_encodings = dict() # var -> (encoding, vals)
+    candidate_vars = list(var_vals) + [var for var in var_bounds if var not in var_vals]
+    for var in candidate_vars:
+        lb, ub = var.lb, var.ub
+        if var.name in my_ivarmap:
+            continue
+
+        direct_vals = [(val, bv) for val, bv in var_vals.get(var, []) if lb <= val <= ub]  # only the valid values, in bounds!
+        order_vals = [(val, bv) for val, bv in var_bounds.get(var, []) if lb < val <= ub]  # only the valid values, exclude lb
+
+        if len(direct_vals) >= len(order_vals):
+            encoding, vals = "direct", direct_vals
+        else:
+            encoding, vals = "order", order_vals
+
+        if len(vals) >= min_values:
+            var_encodings[var] = (encoding, vals)
+    
+    
+    bv_map = {}  # (bv, encoding) -> (var, val)
+    toplevel = []
+
+    for var, (encoding, vals) in var_encodings.items():
+        
         # encode the values
-        enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
+        enc, domain_constraint = _encode_int_var(my_ivarmap, var, encoding, csemap=csemap)
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
@@ -673,24 +733,33 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         
         # store the bvs that no longer need to be reified
         for val, bv in vals:
-            bv_map[bv] = (var, val)
+            bv_map[(bv, encoding)] = (var, val)
 
     if len(bv_map) > 0:
         # Now clean up and remove the '(var == val) == bv' constraints:
         newcons = []
         for con in constraints:
-            if con.name == '==' and con.args[0].name == '==':
-                # potential '(var == val) == bv'
-                lhs,bv = con.args
-                if bv in bv_map:
-                    (var, val) = bv_map[bv]
+            if con.name == '==': # its a reification
+                lhs, bv = con.args
+                if con.args[0].name == '==' and (bv, "direct") in bv_map:
+                    # potential '(var == val) == bv'
+                    var, val = bv_map[(bv, "direct")]
+                    (lhs_var, lhs_val) = lhs.args
+                    if lhs_val == val and lhs_var == var:
+                        continue  # do not keep
+                
+                if con.args[0].name == '>=' and (bv, "order") in bv_map:
+                    # potential '(var >= val) == bv'
+                    var, val = bv_map[(bv, "order")]
                     (lhs_var, lhs_val) = lhs.args
                     if lhs_val == val and lhs_var == var:
                         continue  # do not keep
             newcons.append(con)
-        constraints = newcons
-
-    return constraints + toplevel
+        
+        return newcons + toplevel
+    
+    assert len(toplevel) == 0, "cannot have toplevel constraints if len(bv_map) == 0"
+    return constraints
 
 
 def _extract_var_from_lhs(lhs):

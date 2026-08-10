@@ -10,6 +10,8 @@ List of tools
 
     explain
     dimacs
+    datasets
+    io
     maximal_propagate
     tune_solver
     xcsp3
