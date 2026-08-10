@@ -333,11 +333,11 @@ class Abs(GlobalFunction):
         Returns:
             Optional[int]: The absolute value of the argument, or None if the argument is not assigned
         """
-        varg = self.args[0].value()
-        if varg is None:
+        val = self.args[0].value()
+        if val is None:
             return None
 
-        return abs(varg)
+        return abs(val)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -393,24 +393,26 @@ class Multiplication(GlobalFunction):
 
         Normalizes so a constant is first when one factor is numeric (sets .is_lhs_num).
         """
+        if not isinstance(y, Expression):
+            (x, y) = (y, x)
+            if not isinstance(y, Expression):
+                raise TypeError(f"Multiplication: expected at least one of the args to be an Expression, got: {type(y), type(x)}")
+
         is_lhs_num = False
         if is_int(x):
             is_lhs_num = True
-        elif is_int(y):
-            (x, y) = (y, x)
-            is_lhs_num = True
-        elif isinstance(x, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {x}")
-        elif isinstance(y, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {y}")
-
-        # convert numpy integers to Python integers
-        args = npint2int((x, y))
+            if not isinstance(x, int):
+                x = int(x)  # type: ignore  # it can't see we're removing the np.integers
+        else:
+            if not isinstance(x, Expression):
+                raise TypeError(f"Multiplication does not support float constants, got: {type(x)}")
+        
+        args: tuple[int|Expression, Expression] = (x, y)
         super().__init__("mul", args)
         self.is_lhs_num = is_lhs_num
     
     @property
-    def args(self) -> tuple[int|Expression, int|Expression]:
+    def args(self) -> tuple[int|Expression, Expression]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
@@ -420,13 +422,15 @@ class Multiplication(GlobalFunction):
         """
         x, y = args
         is_lhs_num = False
-        if is_int(x):
+        if isinstance(x, int):
             is_lhs_num = True
-        elif is_int(y):
+        elif isinstance(y, int):
             (x, y) = (y, x)
             is_lhs_num = True
+        if not isinstance(y, Expression):
+            raise TypeError(f"Multiplication: expected at least one of the args to be an Expression, got: {type(y), type(x)}")
 
-        super().update_args(npint2int((x, y)), has_subexpr=has_subexpr)
+        super().update_args((x, y), has_subexpr=has_subexpr)
         self.is_lhs_num = is_lhs_num
 
     def __repr__(self) -> str:
@@ -444,15 +448,27 @@ class Multiplication(GlobalFunction):
         return super().__neg__()
 
     def value(self) -> Optional[int]:
-        vals = argvals_intexpr(self.args)
-        if vals is None:
+        x, y = self.args
+        val_y = y.value()
+        if val_y is None:
             return None
-        return vals[0] * vals[1]
+
+        if isinstance(x, int):
+            return x * val_y
+        val_x = x.value()
+        if val_x is None:
+            return None
+        return val_x * val_y
 
     def get_bounds(self) -> tuple[int, int]:
         """Bounds of the product from bounds of the factors."""
-        (lb1, lb2), (ub1, ub2) = get_bounds_intexpr(self.args)
-        candidates = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
+        x, y = self.args
+        lb_y, ub_y = y.get_bounds()
+        if isinstance(x, int):
+            candidates = [x*lb_y, x*ub_y]
+        else:
+            lb_x, ub_x = x.get_bounds()
+            candidates = [lb_x * lb_y, lb_x * ub_y, ub_x * lb_y, ub_x * ub_y]
         return min(candidates), max(candidates)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -465,21 +481,20 @@ class Multiplication(GlobalFunction):
         - If both int: take the factor with smallest domain, encode it with one bool per value, then
           decompose into b_i*other_int constraints and sum(i*z_i)
         """
-        from cpmpy.transformations.negation import recurse_negation
-
-        a, b = self.args[0], self.args[1]
-        if self.is_lhs_num:
+        a, b = self.args
+        if isinstance(a, int):
             # const*expr -> wsum([const], [expr])
             return Operator("wsum", ([a], [b])), []
+        # else: a is Expression
 
-        assert isinstance(a, Expression), f"Multiplication: expected arg1 Expression, got: {type(a)}"
-        assert isinstance(b, Expression), f"Multiplication: expected arg2 Expression, got: {type(b)}"
         a_bool, b_bool = a.is_bool(), b.is_bool()
         if a_bool and b_bool:
             # bool*bool with 0/1 semantics is logical AND
             return Operator("and", [a, b]), []
 
         if a_bool or b_bool:
+            from cpmpy.transformations.negation import recurse_negation
+
             # bool * int: z = bv*iv via (bv -> z==iv) & (~bv -> z==0)
             bv, iv = (a, b) if a_bool else (b, a)
             lb_y, ub_y = iv.get_bounds()
@@ -505,9 +520,9 @@ class Multiplication(GlobalFunction):
 
         # encoding z_v == (a == v)*b via (a==v)->(z_v == b) & (a!=v)->(z_v == 0)
         encoding: list[Expression] = []
-        z_lb = min(0, lb_b) # make sure it can take 0
-        z_ub = max(0, ub_b) # make sure it can take 0
-        zs = cp.intvar(z_lb, z_ub, shape=(len(dom_a),))
+        lb_z = min(0, lb_b) # make sure it can take 0
+        ub_z = max(0, ub_b) # make sure it can take 0
+        zs = cp.intvar(lb_z, ub_z, shape=(len(dom_a),))
         for v, z_v in zip(dom_a, zs):
             encoding.append((a == v).implies(z_v == b))
             encoding.append((a != v).implies(z_v == 0))
