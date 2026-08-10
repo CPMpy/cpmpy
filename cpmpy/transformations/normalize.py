@@ -125,7 +125,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                     newargs.append(a)
 
             if newargs is None:
-                newargs = args
+                newargs = list(args)
 
             if len(newargs) == 0: # empty disjunction
                 return True, BoolVal(False)
@@ -150,7 +150,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                     newargs.append(a)
 
             if newargs is None: # when args where simplified recursively above
-                newargs = args
+                newargs = list(args)
 
             if len(newargs) == 0: # empty conjunction
                 return True, BoolVal(True)
