@@ -1,82 +1,126 @@
 """
-  Meta-transformation for obtaining a CNF from a list of constraints.
-
-  Converts the logical constraints into disjuctions using the tseitin transform,
-  including flattening global constraints that are :func:`~cpmpy.expressions.core.Expression.is_bool()` and not in `supported`.
-
-  .. note::
-    The transformation is no longer used by the SAT solvers, and may be outdated.
-    Check :meth:`CPM_pysat.transform <cpmpy.solvers.pysat.CPM_pysat.transform>` for an up-to-date alternative.
-  
-  Other constraints are copied verbatim so this transformation
-  can also be used in non-pure CNF settings.
-
-  The implementation first converts the list of constraints
-  to **Flat Normal Form**, this already flattens subexpressions using
-  auxiliary variables.
-
-  What is then left to do is to tseitin encode the following into CNF:
-
-  - ``BV`` with BV a ``BoolVar`` (or ``NegBoolView``)
-  - ``or([BV])`` constraint
-  - ``and([BV])`` constraint
-  - ``BE != BV``  with ``BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV``
-  - ``BE == BV``
-  - ``BE -> BV``
-  - ``BV -> BE``
+Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of literals, i.e. Boolean variables or their negation, e.g. from `x xor y` to `(x or ~y) and (~x or y)`) using a back-end encoding library and its transformation pipeline.
 """
-from ..expressions.core import Operator
-from ..expressions.variables import _BoolVarImpl
-from .reification import only_implies
-from .flatten_model import flatten_constraint
 
-def to_cnf(constraints, csemap=None):
+import cpmpy as cp
+from ..solvers.pindakaas import CPM_pindakaas
+
+from cpmpy.expressions.variables import NegBoolView, _IntVarImpl
+
+from cpmpy.transformations.negation import push_down_negation_objective
+from cpmpy.transformations.safening import safen_objective
+from cpmpy.transformations.flatten_model import flatten_objective
+from cpmpy.transformations.linearize import decompose_linear_objective, only_positive_coefficients_
+from cpmpy.transformations.int2bool import _encode_lin_expr
+from cpmpy.transformations.cse import CSEMap
+
+
+def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     """
-        Converts all logical constraints into **Conjunctive Normal Form**
+    Converts all constraints into **Conjunctive Normal Form**
 
-        Arguments:
-            constraints:    list[Expression] or Operator
-            supported:      (frozen)set of global constraint names that do not need to be decomposed
+    Arguments:
+        constraints:    list[Expression] or Operator
+        csemap:         `dict()` used for CSE
+        ivarmap:        `dict()` used to map integer variables to their encoding (usefull for finding the values of the now-encoded integer variables)
+        encoding:       the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
+    Returns:
+        Equivalent CPMpy constraints in CNF, and the updated `ivarmap`
     """
-    fnf = flatten_constraint(constraints, csemap=csemap)
-    fnf = only_implies(fnf, csemap=csemap)
-    return flat2cnf(fnf)
+    if not CPM_pindakaas.supported():
+        raise ImportError(f"Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use the `to_cnf` transformation")
 
-def flat2cnf(constraints):
+    import pindakaas as pdk
+
+    slv = CPM_pindakaas()
+    slv.encoding = encoding
+
+    if ivarmap is not None:
+        slv.ivarmap = ivarmap
+    if csemap is not None:
+        slv._csemap = csemap
+
+    # the encoded constraints (i.e. `PB`s) will be added to this `pdk.CNF` object
+    slv.pdk_solver = pdk.CNF()
+
+    # add, transform, and encode constraints into CNF/clauses
+    slv += constraints
+
+    # now we read the pdk.CNF back to cpmpy constraints by mapping from `pdk.Lit` to CPMpy lit
+    cpmpy_vars = {str(slv.solver_var(x).var()): x for x in slv._int2bool_user_vars()}
+
+    # if a user variable `x` does not occur in any clause, it should be added as `x | ~x`
+    free_vars = set(cpmpy_vars.values())
+
+    def to_cpmpy_clause(clause):
+        """Lazily convert `pdk.CNF` to CPMpy."""
+        for lit in clause:
+            x = str(lit.var())
+            if x not in cpmpy_vars:
+                cpmpy_vars[x] = cp.boolvar()
+            elif cpmpy_vars[x] in free_vars:  # cpmpy_vars[x] is only in free_vars if it existed before
+                free_vars.remove(cpmpy_vars[x])
+            yield ~cpmpy_vars[x] if lit.is_negated() else cpmpy_vars[x]
+
+    clauses = []
+    clauses += (cp.any(to_cpmpy_clause(clause)) for clause in slv.pdk_solver.clauses())
+    clauses += ((x | ~x) for x in free_vars)  # add free variables so they are "known" by the CNF
+
+    return clauses
+
+def to_cnf_objective(expr, encoding="auto", csemap=None, ivarmap=None, supported=frozenset(), supported_reified=frozenset()):
     """
-        Converts from **Flat Normal Form** all logical constraints into **Conjunctive Normal Form**,
-        including flattening global constraints that are :func:`~cpmpy.expressions.core.Expression.is_bool()` and not in `supported`.
+    Transform objective into weighted Boolean literals plus helper constraints.
 
-        What is now left to do is to tseitin encode:
+    Arguments:
+        encoding: the encoding used for `int2bool`
+        csemap: optional shared CSE cache (populated in-place)
+        ivarmap: optional shared integer variable encoding dict (populated in-place)
+        supported: supported global constraints for objective decomposition
+        supported_reified: supported reified global constraints for objective decomposition
 
-        - ``BV`` with BV a ``BoolVar`` (or ``NegBoolView``)
-        - ``or([BV])`` constraint
-        - ``and([BV])`` constraint
-        - ``BE != BV``  with ``BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV``
-        - ``BE == BV``
-        - ``BE -> BV``
-        - ``BV -> BE``
-
-        We do it in a principled way for each of the cases. (in)equalities
-        get transformed into implications, everything is modular.
-
-        Arguments:
-            constraints: list[Expression] or Operator
+    Returns:
+        (weights, xs, const, extra_cons)
     """
-    cnf = []
-    for expr in constraints:
-        # BE -> BE
-        if expr.name == '->':
-            a0,a1 = expr.args
+    if csemap is None:
+        csemap = CSEMap()
+    if ivarmap is None:
+        ivarmap = dict()
+    obj, safe_cons = safen_objective(expr)
+    obj = push_down_negation_objective(obj)
+    obj, decomp_cons = decompose_linear_objective(
+        obj,
+        supported=supported,
+        supported_reified=supported_reified,
+        csemap=csemap,
+    )
+    obj, flat_cons = flatten_objective(obj, csemap=csemap)
 
-            # BoolVar() -> BoolVar()
-            if isinstance(a1, _BoolVarImpl) or \
-                    (isinstance(a1, Operator) and a1.name == 'or'):
-                cnf.append(~a0 | a1)
-                continue
+    weights, xs, const = [], [], 0
+    # we assume obj is a var, a sum or a wsum (over int and bool vars)
+    if isinstance(obj, _IntVarImpl) or isinstance(obj, NegBoolView):  # includes _BoolVarImpl
+        weights = [1]
+        xs = [obj]
+    elif obj.name == "sum":
+        xs = obj.args
+        weights = [1] * len(xs)
+    elif obj.name == "wsum":
+        weights, xs = obj.args
+    else:
+        raise NotImplementedError(f"DIMACS: Non supported objective {obj} (yet?)")
 
-        # all other cases added as is...
-        # TODO: we should raise here? is not really CNF...
-        cnf.append(expr)
+    terms, enc_cons, k = _encode_lin_expr(ivarmap, xs, weights, encoding, csemap=csemap)
+    const += k
 
-    return cnf
+    extra_cons = safe_cons + decomp_cons + flat_cons + enc_cons
+
+    # remove terms with coefficient 0 (`only_positive_coefficients_` may return them and RC2 does not accept them)
+    terms = [(w, x) for w, x in terms if w != 0]
+    if len(terms) == 0:
+        return [], [], const, extra_cons
+
+    ws, xs = zip(*terms)  # unzip
+    new_weights, new_xs, k = only_positive_coefficients_(ws, xs)
+    const += k
+
+    return list(new_weights), list(new_xs), const, extra_cons

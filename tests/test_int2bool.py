@@ -1,14 +1,18 @@
 import pytest
+import itertools
+from typing import cast
 
+import cpmpy as cp
+
+from cpmpy import SolverLookup
+from cpmpy.expressions.core import BoolVal, Comparison, Expression, Operator
+from cpmpy.expressions.utils import argvals
+from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, intvar
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.expressions.core import Comparison, Operator, BoolVal
-from cpmpy.expressions.utils import argvals
-from cpmpy.model import Model
-from cpmpy import SolverLookup
-
-from cpmpy.transformations.int2bool import int2bool
-from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl, intvar, boolvar
+from cpmpy.transformations.int2bool import int2bool, IntVarEnc
+from utils import skip_on_missing_pblib
 
 
 # add some small but non-trivial integer variables (i.e. non-zero lower bounds, domain size not a power of two)
@@ -21,14 +25,6 @@ q = boolvar(name="q")
 
 c = intvar(2, 2, name="c")
 
-SOLVERS = [
-    "pindakaas",
-    "pysat",
-]
-SOLVERS = [
-    (name, solver) for name, solver in SolverLookup.base_solvers() if name in SOLVERS and solver.supported()
-]
-
 CONSTRAINTS = [
     # BoolVal(True),  # TODO or tools problem
     BoolVal(False),
@@ -36,7 +32,7 @@ CONSTRAINTS = [
     ~p,
     p.implies(q),
 ] + [
-    con if antecedent is True else antecedent.implies(con)
+    con if antecedent is True else cast(Expression, antecedent).implies(con)
     for cmp in (
         ">=",
         "<=",
@@ -54,6 +50,7 @@ CONSTRAINTS = [
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),  # where ub(lhs)<rhs
         Comparison(cmp, Operator("wsum", [[2, 3], [x, p]]), 5),  # mix int and bool terms
+        Comparison(cmp, Operator("wsum", [[3], [q]]), 2),
         Comparison(
             cmp,
             Operator(
@@ -89,8 +86,6 @@ def setup():
 
 
 class TestTransInt2Bool:
-    import importlib
-    import itertools
 
     def idfn(val):
         if isinstance(val, tuple):
@@ -99,35 +94,38 @@ class TestTransInt2Bool:
         else:
             return f"{val}"
 
+    @pytest.mark.requires_solver("pindakaas", "pysat")
     @pytest.mark.parametrize(
-        ("solver", "constraint", "encoding"),
-        itertools.product(SOLVERS, CONSTRAINTS, ENCODINGS),
+        ("constraint", "encoding"),
+        itertools.product(CONSTRAINTS, ENCODINGS),
         ids=idfn,
     )
+    @skip_on_missing_pblib()
     def test_transforms(self, solver, constraint, encoding, setup):
-        user_vars = set(get_variables(constraint))
+        user_vars = tuple(get_variables(constraint))
         ivarmap = dict()
-        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding)
+        csemap = CSEMap()
+        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=csemap)
 
         cons_sols = []
         flat_sols = []
 
         # "Trusted" solver (not using int2bool)
-        Model(constraint).solveAll(
+        cp.Model(constraint).solveAll(
             solver="ortools",
             display=lambda: cons_sols.append(tuple(argvals(user_vars))),
         )
         cons_sols = sorted(cons_sols)
-        name, solver_class = solver
-        solver = solver_class()
+        solver = SolverLookup().get(solver)
         solver.encoding = encoding
+        solver._csemap = csemap
+        solver.ivarmap = ivarmap
         for c in flat:
             solver.add(c)
 
-        # unfortunately, some tricky edge cases where trivial constraints remove their variables by using the above `add` method
-        # this only happens in this test set-up
-        # to fix this, we add user variables which may have been removed!
-        solver.user_vars |= user_vars
+        # ensure all user vars are known to the CNF solver
+        for x in user_vars:
+            solver.add(x == x)
 
         solver.ivarmap = ivarmap
         solver.solveAll(display=lambda: flat_sols.append(tuple(argvals(user_vars))))

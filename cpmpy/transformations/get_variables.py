@@ -8,8 +8,7 @@ import numpy as np
 import cpmpy as cp
 
 from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray
-from ..expressions.utils import is_any_list
+from ..expressions.variables import _NumVarImpl, NegBoolView
 
 def get_variables_model(model):
     """
@@ -26,9 +25,6 @@ def get_variables_model(model):
     return vars_ + [x for x in get_variables(model.objective_) if not x in seen]
 
 
-def vars_expr(expr):
-    warnings.warn("Deprecated, use get_variables() instead, will be removed in stable version", DeprecationWarning)
-    return get_variables(expr)
 def get_variables(expr, collect=None):
     """
         Get variables of an expression
@@ -45,17 +41,15 @@ def get_variables(expr, collect=None):
                         # this is just a view, return the actual variable
                         e = e._bv
                     append(e)
-                elif isinstance(e, NDVarArray):  # sometimes does not have a .name
-                    if e.dtype == object:
-                        extract(e.flat, append)
-                    # else: all const, skip
                 elif e.name == "wsum":
                     extract(e.args[1], append)  # skip data in arg0
                 elif e.name == "table":
                     extract(e.args[0], append)  # skip data in arg1
                 else:
                     extract(e.args, append)
-            elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            elif isinstance(e, np.ndarray) and e.dtype == object:
+                extract(e.flat, append)
+            elif isinstance(e, (list, tuple, np.flatiter)):
                 extract(e, append)
 
     if collect is not None:
@@ -96,12 +90,3 @@ def print_variables(expr_or_model):
     print("Variables:")
     for var in vars_:
         print(f"    {var}: {var.lb}..{var.ub}")
-
-
-# https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
-def _uniquify(seq):
-    warnings.warn("Deprecated, copy inline if used, will be removed in stable version", DeprecationWarning)
-    seen = set()
-    seen_add = seen.add
-    return [x for x in seq if not (x in seen or seen_add(x))]
-

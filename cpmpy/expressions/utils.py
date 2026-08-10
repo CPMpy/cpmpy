@@ -28,14 +28,26 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
+from __future__ import annotations  # treat annotations lazy (as string)
 
 import cpmpy as cp
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final
 from cpmpy.exceptions import IncompleteFunctionError
 
+if TYPE_CHECKING:
+    # only import for type checking
+    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression
+    from cpmpy.expressions.variables import NDVarArray
+
+NP_TYPES: Final = frozenset({
+    np.int8, np.int16, np.int32, np.int64,
+    np.uint8, np.uint16, np.uint32, np.uint64,
+    np.bool_
+})
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
@@ -91,7 +103,7 @@ def is_pure_list(arg):
     return isinstance(arg, (list, tuple))
 
 
-def is_any_list(arg):
+def is_any_list(arg) -> TypeGuard[list | tuple | np.ndarray]:
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))
@@ -129,7 +141,7 @@ def argval(a):
         try:
             val = a.value()
         except IncompleteFunctionError as e:
-            if a.is_bool():
+            if isinstance(a, cp.expressions.core.Expression) and a.is_bool():
                 return False
             else:
                 raise e
@@ -146,6 +158,18 @@ def argvals(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
+def argvals_intexpr(lst: Iterable[int|Expression]) -> Optional[list[int]]:
+    """ A well-typed helper function to get the values of a list of int|Expression, or None if any expression is not assigned """
+    vals: list[int] = []
+    for e in lst:
+        if isinstance(e, int):
+            vals.append(e)
+        else:  # Expression
+            v = e.value()
+            if v is None:
+                return None
+            vals.append(v)
+    return vals
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -191,44 +215,92 @@ def get_bounds(expr):
     # from cpmpy.expressions.core import Expression
     # from cpmpy.expressions.variables import cpm_array
 
-    if isinstance(expr, cp.expressions.core.Expression):
+    if isinstance(expr, (cp.expressions.core.Expression, cp.expressions.variables.NDVarArray)):
         return expr.get_bounds()
     elif is_any_list(expr):
         lbs, ubs = zip(*[get_bounds(e) for e in expr])
-        return list(lbs), list(ubs) # return list as NDVarArray is covered above
+        return list(lbs), list(ubs)
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
 
-def implies(expr, other):
-    """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
-    if isinstance(expr, cp.expressions.core.Expression):
-        return expr.implies(other)
-    elif is_true_cst(expr):
-        return other
-    elif is_false_cst(expr):
+def get_bounds_intexpr(lst: Iterable[int|Expression]) -> tuple[list[int], list[int]]:
+    """ A well-typed helper function to get the bounds of a list of int|Expression's """
+    lbs: list[int] = []
+    ubs: list[int] = []
+    for e in lst:
+        if isinstance(e, int):
+            lbs.append(e)
+            ubs.append(e)
+        else:  # Expression
+            (lb, ub) = e.get_bounds()
+            lbs.append(lb)
+            ubs.append(ub)
+    return lbs, ubs
+
+# first two are declarations for typing purposes only
+@overload
+def implies(expr: NDVarArray, other: BoolExprLike, simplify: bool = False) -> NDVarArray: ...
+@overload
+def implies(expr: Expression|bool|np.bool_, other: BoolExprLike, simplify: bool = False) -> Expression: ...
+
+def implies(expr: NDVarArray|BoolExprLike, other: BoolExprLike, simplify: bool = False) -> NDVarArray|Expression:
+    """Implication constraint: ``self -> other``.
+
+    Like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe when 'expr' is not an Expression
+
+    Args:
+        expr (NDVarArray|BoolExprLike): the left-hand-side of the implication
+        other (BoolExprLike): the right-hand-side of the implication
+        simplify (bool): if True, simplify by eliminating True/False constants (might remove expressions & their variables from user-view)
+
+    Returns:
+        Expression: the implication constraint or a BoolVal if simplified
+
+    Simplification rules:
+        - Expr -> True :: BoolVal(True)  (by expr.implies())
+        - Expr -> False :: ~Expr         (by expr.implies())
+        - True -> other :: other
+        - False -> other :: BoolVal(True)
+    """
+    if isinstance(expr, (cp.expressions.core.Expression, cp.expressions.variables.NDVarArray)):
+        # both implement .implies()
+        return expr.implies(other, simplify=simplify)
+    elif is_true_cst(expr):  # True -> other :: other
+        if isinstance(other, cp.expressions.core.Expression):
+            return other
+        else:
+            return cp.BoolVal(other)
+    elif is_false_cst(expr):  # False -> other :: BoolVal(True)
         return cp.BoolVal(True)
     else:
-        return expr.implies(other)
+        raise ValueError(f"implies: expr must be an Expression or a boolean, got {type(expr)}")
 
 # Specific stuff for scheduling constraints
 
-def get_nonneg_args(args):
+def get_nonneg_args(args, condition=None):
     """
         Replace arguments with negative lowerbound with their nonnegative counterpart
+        arguments:
+            - args: list of expressions
+            - condition: list of boolean expressions, indicating whether the argument is present or not (e.g., optional tasks)
     """
+    if condition is None:
+        condition = [True] * len(args)
+    assert len(args) == len(condition), f"Args and is_present must have the same length but got {len(args)} and {len(condition)}"
+
     lbs, ubs = zip(*[get_bounds(arg) for arg in args])
     new_args = []
     cons = []
-    for lb, ub, arg in zip(lbs, ubs, args):
+    for lb, ub, arg, cond in zip(lbs, ubs, args, condition):
         if lb < 0:
             if ub >= 0:
                 iv = cp.intvar(0, ub)
             else: # ub < 0  
                 iv = cp.intvar(0,0)
-            cons.append(arg == iv) # will always be False if ub < 0
+            cons.append(implies(cond, arg == iv)) # will always be False if ub < 0
             new_args.append(iv)
         else:
             new_args.append(arg)
@@ -241,3 +313,10 @@ def is_star(arg):
         Check if arg is star as used in the ShortTable global constraint
     """
     return isinstance(arg, type(STAR)) and arg == STAR
+
+
+def npint2int(iter: Iterable[ExprLike]) -> tuple[int|Expression, ...]:
+    """Convert numpy values in iterable to Python integers, return as tuple."""
+    return tuple(int(el) if type(el) in NP_TYPES else el for el in iter)  # type: ignore  # it can't see we're removing the np.integers
+     
+

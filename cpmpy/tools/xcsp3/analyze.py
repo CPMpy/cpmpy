@@ -29,7 +29,7 @@ import ast
 from pathlib import Path
 import re
 import matplotlib
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 import numpy as np
 import matplotlib.pyplot as plt
 

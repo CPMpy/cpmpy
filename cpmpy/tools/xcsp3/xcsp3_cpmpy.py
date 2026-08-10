@@ -46,7 +46,7 @@ from __future__ import annotations
 import argparse
 import lzma
 import warnings
-import psutil
+import psutil  # type: ignore[import-untyped]
 import signal
 import time
 import sys, os
