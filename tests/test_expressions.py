@@ -3,10 +3,13 @@ import pytest
 import cpmpy as cp
 import numpy as np
 
-from cpmpy.expressions import *
+from cpmpy.expressions.variables import boolvar, intvar, cpm_array
+from cpmpy.expressions.globalfunctions import Maximum, Abs
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
+
+from cpmpy.exceptions import MinizincNameException, NotSupportedError, TypeError as CPMpyTypeError
 
 from utils import inclusive_range
 
@@ -91,6 +94,10 @@ class TestWeightedSum:
         expr2 = 3 + self.ivs[0] * 4
         assert isinstance(expr2, Operator)
         assert expr2.name == 'sum'
+        expr3 = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
+        assert isinstance(expr3, Operator)
+        assert expr3.name == 'sum'
+
 
     def test_weightedadd_iv(self):
 
@@ -127,11 +134,6 @@ class TestWeightedSum:
         assert isinstance(expr4, Operator)
         assert expr4.name == 'wsum'
 
-    def test_weightedadd_int(self):
-        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
-        assert isinstance(expr, Operator)
-        assert expr.name == 'sum'
-
     def test_weightedadd_sub(self):
         expr = self.ivs[0] * 4 - 5 * self.ivs[1]
         assert isinstance(expr, Operator)
@@ -164,6 +166,18 @@ class TestWeightedSum:
         expr3 = sum(x for x in self.ivs)
         assert(str(expr1) == str(expr2))
         assert(str(expr1) == str(expr3))
+
+    def test_reject_float_coefficients(self):
+        m = cp.Model()
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        with pytest.raises(CPMpyTypeError, match="float constants"):
+            m.add(0.7 * x + 0.8 * y >= 1)
+
+    def test_floatsum_objective_only(self):
+        x = cp.boolvar(name="x")
+        fs = cp.FloatSum([0.5], [x])
+        with pytest.raises(CPMpyTypeError, match="cannot be used as an expression"):
+            _ = fs >= 1
 
 class TestMul:
 
@@ -223,10 +237,6 @@ class TestMul:
         expr = x * 3
         assert expr.is_lhs_num is True
         assert expr.args[0] == 3 and expr.args[1] is x
-        # real coeff: 0.3 * x -> is_lhs_num True (for objectives)
-        expr = 0.3 * x
-        assert expr.is_lhs_num is True
-        assert expr.args[0] == 0.3 and expr.args[1] is x
         # var * var -> no constant, is_lhs_num False
         y = cp.intvar(0, 5, name="y")
         expr = x * y
@@ -240,10 +250,125 @@ class TestMul:
         prod = x * a
 
         assert isinstance(prod, NDVarArray)
-        for expr in prod.args:
+        for expr in prod:
             assert isinstance(expr, Expression) or expr == 0
 
+class TestNDVarArrayBroadcast:
+
+    def test_numpy_array_mul(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        w = np.array([1, 2, 3, 4])
+        expr = x * w
+        ref = np.multiply(x, w)
+        assert expr.shape == ref.shape
+        for idx in np.ndindex(expr.shape):
+            assert str(expr[idx]) == str(ref[idx])
+
+    def test_numpy_scalar_mul(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        expr = x * 2
+        ref = np.multiply(x, 2)
+        for idx in np.ndindex(expr.shape):
+            assert str(expr[idx]) == str(ref[idx])
+
+    def test_numpy_expr_mul(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        e = cp.boolvar() | cp.boolvar()
+        expr = x * e
+        ref = np.multiply(x, e)
+        assert expr.shape == ref.shape
+        for idx in np.ndindex(expr.shape):
+            assert str(expr[idx]) == str(ref[idx])
+
+    def test_incompatible_broadcast_raises(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        with pytest.raises(ValueError, match="broadcast"):
+            x * np.array([1, 2])
+
+
+class TestNDVarArrayVectorizedIndex:
+
+    def test_index_with_ivar_array(self):
+        arr = intvar(0, 10, shape=5, name="arr")
+        idx = intvar(0, 4, shape=3, name="idx")
+        expr = arr[idx]
+        assert isinstance(expr, NDVarArray)
+        assert expr.shape == (3,)
+        for i in range(3):
+            assert isinstance(expr[i], cp.Element)
+            assert expr[i].args[1] is idx[i]
+
+    def test_index_with_ivar_list(self):
+        arr = intvar(0, 10, shape=5, name="arr")
+        i0, i1 = intvar(0, 4, name="i0"), intvar(0, 4, name="i1")
+        expr = arr[[i0, i1]]
+        assert isinstance(expr, NDVarArray)
+        assert expr.shape == (2,)
+        assert expr[0].args[1] is i0 and expr[1].args[1] is i1
+
+    def test_index_preserves_shape(self):
+        arr = intvar(0, 10, shape=5, name="arr")
+        idx = intvar(0, 4, shape=(2, 2), name="idx")
+        expr = arr[idx]
+        assert expr.shape == (2, 2)
+        assert all(isinstance(e, cp.Element) for e in expr.flat)
+
+    def test_index_mixed_const_and_ivar(self):
+        arr = intvar(0, 10, shape=5, name="arr")
+        i = intvar(0, 4, name="i")
+        expr = arr[[0, i, 2]]
+        assert expr.shape == (3,)
+        assert expr[0] is arr[0]
+        assert isinstance(expr[1], cp.Element)
+        assert expr[2] is arr[2]
+
+    def test_bool_mask_raises(self):
+        arr = intvar(0, 10, shape=5, name="arr")
+        b = cp.boolvar(shape=5, name="b")
+        with pytest.raises(TypeError, match="mask"):
+            arr[b]
+
+    def test_vectorized_index_solves(self):
+        arr = cpm_array([10, 20, 30, 40])
+        idx = intvar(0, 3, shape=2, name="idx")
+        m = cp.Model(arr[idx] == [20, 40], idx[0] != idx[1])
+        assert m.solve()
+        assert sorted(idx.value().tolist()) == [1, 3]
+
+
 class TestArrayExpressions:
+
+    def test_scalar_expr_with_ndarray(self):
+        x = intvar(0, 5, shape=3, name=tuple("abc"))
+        y = intvar(0, 5, name="y")
+        xy, yx = x * y, y * x
+        assert isinstance(xy, NDVarArray) and isinstance(yx, NDVarArray)
+        for i in range(3):
+            assert set(xy[i].args) == set(yx[i].args)
+            assert set((x + y)[i].args) == set((y + x)[i].args)
+        assert str(x == y) == str(y == x)
+
+    def test_scalar_expr_left_of_ndarray_mul(self):
+        # y * x must broadcast element-wise, not wrap the whole array in one Multiplication
+        from cpmpy.expressions.globalfunctions import Multiplication
+
+        x = intvar(0, 10, shape=3, name=tuple("abc"))
+        y = intvar(0, 10, name="y")
+        assert isinstance(x * y, NDVarArray)
+        yx = y * x
+        assert isinstance(yx, NDVarArray)
+        assert not isinstance(yx, Multiplication)
+        assert yx.shape == (3,)
+        assert all(a is y or b is y for a, b in (e.args for e in yx))
+
+    def test_scalar_expr_with_numpy_array(self):
+        e = sum(cp.boolvar(3))
+        y = np.array([1, 2, 3])
+        ey, ye = e * y, y * e
+        assert isinstance(ey, NDVarArray)
+        assert ey.shape == ye.shape == (3,)
+        for a, b in zip(ey, ye):
+            assert str(a) == str(b)
 
     def test_sum(self):
         x = intvar(0,5,shape=10, name="x")
@@ -256,7 +381,7 @@ class TestArrayExpressions:
         y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.sum(axis=0))
         model.solve()
-        res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
+        res = x.value().sum(axis=0)
         assert all(y.value() == res)
 
     def test_prod(self):
@@ -269,9 +394,9 @@ class TestArrayExpressions:
             res *= v.value()
         assert y.value() == res
         # with axis arg
-        x = intvar(0,5,shape=(10,10), name="x")
-        y = intvar(0, 1000, shape=10, name="y")
-        model = cp.Model(y == x.prod(axis=0))
+        x = intvar(0,5,shape=(10,4), name="x")
+        y = intvar(0, 200, shape=10, name="y")
+        model = cp.Model(y == x.prod(axis=1))  # y[i] = product(x[i,:])
         model.solve()
         for i,vv in enumerate(x):
             res = 1
@@ -290,7 +415,7 @@ class TestArrayExpressions:
         y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.max(axis=0))
         model.solve()
-        res = np.array([max(x[i, ...].value()) for i in range(len(y))])
+        res = x.value().max(axis=0)
         assert all(y.value() == res)
 
     def test_min(self):
@@ -304,7 +429,7 @@ class TestArrayExpressions:
         y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.min(axis=0))
         model.solve()
-        res = np.array([min(x[i, ...].value()) for i in range(len(y))])
+        res = x.value().min(axis=0)
         assert all(y.value() == res)
 
     def test_any(self):
@@ -319,7 +444,7 @@ class TestArrayExpressions:
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.any(axis=0))
         model.solve()
-        res = np.array([cpm_any(x[i, ...].value()) for i in range(len(y))])
+        res = x.value().any(axis=0)
         assert all(y.value() == res)
         
 
@@ -335,7 +460,7 @@ class TestArrayExpressions:
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.all(axis=0))
         model.solve()
-        res = np.array([cpm_all(x[i, ...].value()) for i in range(len(y))])
+        res = x.value().all(axis=0)
         assert all(y.value() == res)
 
     def test_multidim(self):
@@ -491,11 +616,9 @@ class TestBounds:
         assert int == type(cp.sum(x[0]).value())
         assert int == type(cp.sum(x).value())
         assert int == type(cp.sum([1,2,3] * x[0]).value())
-        assert float == type(cp.sum([0.1,0.2,0.3] * x[0]).value())
         
         # also numpy should be converted to Python native when callig value()
         assert int == type(cp.sum(np.array([1, 2, 3]) * x[0]).value())
-        assert float == type(cp.sum(np.array([0.1,0.2,0.3]) * x[0]).value())
         
         # test binary operators
         a,b = x[0,[0,1]]
@@ -586,7 +709,7 @@ class TestNullifyingArguments:
 
     def test_num(self):
         funcs = ["__add__", "__radd__", "__sub__", "__rsub__", "__mul__", "__rmul__",
-                 "__truediv__", "__rtruediv__", "__floordiv__", "__rfloordiv__",
+                 "__floordiv__", "__rfloordiv__",
                  "__mod__", "__rmod__"]
 
         for func in funcs:
@@ -596,6 +719,14 @@ class TestNullifyingArguments:
 
             expr = getattr(self.x, func)(0)
             assert get_variables(expr) == [self.x]
+
+        with pytest.warns(SyntaxWarning, match="We only support floordivision"):
+            expr = self.x / 1
+        assert get_variables(expr) == [self.x]
+
+        with pytest.warns(SyntaxWarning, match="We only support floordivision"):
+            expr = 1 / self.x
+        assert get_variables(expr) == [self.x]
 
 
 

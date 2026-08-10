@@ -44,14 +44,14 @@
     ==============
 """
 from functools import reduce
-from typing import Optional, List
+from typing import Iterable, Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.core import Expression, BoolVal, NestedBoolExprLike
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_bool, argval, argvals
+from ..expressions.utils import is_bool, is_int, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -135,7 +135,7 @@ class CPM_pysdd(SolverInterface):
         """
         return self.pysdd_root
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
+    def solve(self, time_limit:Optional[float]=None):
         """
             See if an arbitrary model exists
 
@@ -249,40 +249,44 @@ class CPM_pysdd(SolverInterface):
                 # fill in variable values
                 for i, cpm_var in enumerate(self.user_vars):
                     cpm_var._value = sol[i]
-
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+                self.print_display(display)
         
         return len(projected_sols)
 
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            # just a view, get actual var identifier, return -id
-            return -self.solver_var(cpm_var._bv)
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
 
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                # make new var, add at end (what is best here??)
-                self.pysdd_manager.add_var_after_last()
-                n = self.pysdd_manager.var_count()
-                revar = self.pysdd_manager.vars[n]
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: just a view, get actual var identifier, return -id
+                    revar = -self.solver_var(cpm_var._bv)
+                else:
+                    # make new var, add at end (what is best here??)
+                    self.pysdd_manager.add_var_after_last()
+                    n = self.pysdd_manager.var_count()
+                    revar = self.pysdd_manager.vars[n]
             else:
                 raise NotImplementedError(f"CPM_pysdd: non-Boolean variable {cpm_var} not supported")
-            self._varmap[cpm_var] = revar
+            
+            self._varmap[name] = revar
+            return revar
 
-        return self._varmap[cpm_var]
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
 
-    def transform(self, cpm_expr):
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
+
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -293,14 +297,15 @@ class CPM_pysdd(SolverInterface):
 
             For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -308,7 +313,7 @@ class CPM_pysdd(SolverInterface):
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pysdd":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -321,10 +326,11 @@ class CPM_pysdd(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
 
         newvars = get_variables(cpm_expr)

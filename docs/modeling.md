@@ -28,19 +28,19 @@ CPMpy does not enforce hard version upper limits on its dependencies. For settin
 
 ## Using the library
 
-To conveniently use CPMpy in your Python project, include it as follows:
-```python
-from cpmpy import *
-```
-This will overload the built-in `any()`, `all()`, `min()`, `max()`, `sum()` functions, such that they create CPMpy expressions when used on decision variables (see below). This convenience comes at the cost of some overhead for all uses of these functions in your code (even when no CPMpy decision variables are involved).
-
-You can also import it as a package, which does not overload the Python built-ins:
+We recommend that you import it as a package, to avoid overloading the Python built-ins and having side-effects in the rest of your code:
 ```python
 import cpmpy as cp
 ```
-The build-in operators can now be accessed through the package (for example `cp.any()`) without overloading Python's defaults.
 
-We will use the latter in this document.
+The Python built-ins we overload are `all()`, `any()`, `max()`, `min()`, `sum()`, `abs()`, such that they create CPMpy expressions when used on decision variables (see below). With the impove import, they can be accessed as `cp.any()`, `cp.sum()` etc.
+
+You can also import all CPMpy expressions and overloaded functions as follows:
+```python
+from cpmpy import *
+```
+This makes the code 'look' more like a native language (you can write `sum()` instead of `cp.sum()`), but it comes at the cost of some overhead for all uses of these Python built-ins when they don't involve expressions.
+
 
 ## Decision variables
 
@@ -104,10 +104,10 @@ m = cp.Model(
 )
 
 # Adding more constraints
-m += (y - z != x)
-m += (x + y + z <= 15)
+m.add(y - z != x)
+m.add(x + y + z <= 15)
 # you can also add a list of constraints, which is interpreted as a conjunction of constraints
-m += [v <= 9 for v in [x,y,z]]
+m.add([v <= 9 for v in [x,y,z]])
 
 print(f"The model contains {len(m.constraints)} constraints")
 print(m)  # pretty printing of the model, very useful for debugging
@@ -278,8 +278,42 @@ m = cp.Model(
 )
 ```
 
-Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `some_cpm_array.sum()` and `.min()`/`.max()` (including the axis= argument), so these are safe to use.
+### NumPy operations
 
+CPMpy's arrays of decision variables are subclasses of `numpy.ndarray`, so many NumPy operations work on them. The rule of thumb is that an operation is supported when its **result shape is known at modeling time**. Element-wise operators (`+,-,*,//,%`, comparisons, `&|^~`), aggregations (`sum/min/max/...`), reshaping (`reshape`, transpose, slicing, ...) and dot products like `np.dot(x,w)` all fall in this category:
+
+```python
+import cpmpy as cp
+import numpy as np
+
+x = cp.intvar(0, 10, shape=3)
+w = np.array([1, 2, 3])
+M = cp.intvar(0, 10, shape=(2, 3))
+
+x + w          # element-wise
+M + w          # broadcasts w over the rows of M
+M.sum(axis=0)  # vector of column sums
+M.T            # transpose
+np.dot(x, w)   # dot-product
+```
+
+Binary operators follow NumPy broadcasting: the other operand is broadcast to the shape of the CPMpy array. So `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. One limitation compared to plain NumPy is that the result always keeps the shape of the CPMpy array — e.g. a `(3,1)` array plus a length-3 vector does not expand to `(3,3)`.
+
+What does **not** work are operations whose result depends on the (still unknown) values of the decision variables. In particular, you cannot use Boolean decision variables as a mask, because the length of the result would depend on how many are `True`:
+
+```python
+import cpmpy as cp
+import numpy as np
+
+b = cp.boolvar(shape=10)
+# np.arange(10)[b]  # IndexError
+```
+
+Because of our overloading of `+,-,*,//` some NumPy functions like `np.sum(x)` will also create a CPMpy expression. This is not guaranteed for all NumPy functions though — `np.equal(x, y)` for example returns a plain Boolean array, not constraints. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `x.sum()`, `.min()`, `.max()`, `.any()` and `.all()` (including the `axis=` argument), so these are safe to use.
+
+Also note that `np.concatenate` / `stack` / `hstack` / `vstack` return a plain `ndarray`, so wrap the result with `cp.cpm_array(...)` before doing further CPMpy operations on it.
+
+If you encounter a NumPy operation that you think should work, but doesn't, please reach out to us on GitHub! We are keen to improve NumPy compatibility.
 
 ### Global constraints
 
@@ -363,9 +397,21 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 # example output -- arr: [2 1 3 4], idx: 0, val: 2
 ```
 
-The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
+The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`. Indexing with an array of integer decision variables is also supported (vectorized): `arr[idx_array]` creates an array of `Element` expressions, one per index.
 
-This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** in our `cpm_array()` or call `Element()` directly:
+```python
+import cpmpy as cp
+
+arr = cp.intvar(1, 10, shape=5)
+idx = cp.intvar(0, 4, shape=3)
+
+m = cp.Model(
+    cp.AllDifferent(idx),
+    arr[idx] == [1, 2, 3]  # equivalent to: [arr[idx[0]] == 1, arr[idx[1]] == 2, arr[idx[2]] == 3]
+)
+```
+
+This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** using `cp.cpm_array()`
 
 ```python
 import numpy as np
@@ -375,13 +421,13 @@ arr = np.arange(4)  # array([0, 1, 2, 3])
 idx = cp.intvar(0,len(arr))  # indexing is offset 0
 
 m = cp.Model()
-#m += (arr[idx] == 2)             # does not work, numpy does not know what to do
+#m.add(arr[idx] == 2)             # does not work, numpy does not know what to do
 # IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
 
 cparr = cp.cpm_array(arr)         # wrap in CPMpy array
-m += (cparr[idx] == 2)            # works
+m.add(cparr[idx] == 2)            # works
 
-m += (cp.Element(arr, idx) == 2)  # also works, identical to above
+m.add(cp.Element(arr, idx) == 2)  # also works, identical to above
 
 m.solve()
 print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
@@ -397,6 +443,23 @@ If a model has no objective function specified, then it represents a satisfactio
 
 Any CPMpy expression can be added as objective function. Solvers are especially good in optimizing linear functions or the minimum/maximum of a set of expressions. Other (non-linear) expressions are supported too, just give it a try.
 
+### Float coefficients (advanced)
+
+CPMpy constraints and model objectives use integer (and boolean) expressions. For a weighted sum with **float coefficients**, some solvers also support [`FloatSum`](api/expressions/globalfunctions.html#cpmpy.expressions.globalfunctions.FloatSum) as argument to minimize/maximize, FLOBJ capability in the [supported solvers](index.rst#supported-solvers) table.
+
+This is for advanced users only, e.g. `solver.objective_value()` is always integer, so you must keep the floatsum and call `FloatSum.value()` to get the float objective value.
+
+```python
+import cpmpy as cp
+
+x, y, z = cp.boolvar(3)
+fs = cp.FloatSum([0.3, 0.4, 0.5], [x, y, z], const=0.8)  # 0.3x + 0.4y + 0.5z + 0.8
+s = cp.SolverLookup.get("ortools")
+s.maximize(fs)
+assert s.solve()
+print(fs.value())  # s.objective_value() is None here
+```
+
 ```python
 import cpmpy as cp
 m = cp.Model()
@@ -406,9 +469,9 @@ b = cp.boolvar(name="b")
 x = cp.intvar(1,10, shape=3, name="x")
 
 # Constraints
-m += (x[0] == 1)
-m += cp.AllDifferent(x)
-m += b.implies(x[1] + x[2] > 5)
+m.add(x[0] == 1)
+m.add(cp.AllDifferent(x))
+m.add(b.implies(x[1] + x[2] > 5))
 
 # Objective function (optional)
 m.maximize(cp.sum(x) + 100*b)
@@ -505,7 +568,7 @@ print(m)
 s = cp.SolverLookup.get("ortools") # will be explained later
 # feed the constraints one-by-one 
 for c in m.constraints:
-    s += c  # add the constraints incrementally until you hit the error
+    s.add(c)  # add the constraints incrementally until you hit the error
 ```
 
 If that is not sufficient or you want to debug an unexpected (non)solution, have a look at our detailed [Debugging guide](./how_to_debug.md).
@@ -605,6 +668,101 @@ For solvers other than "ortools", you will need to **install additional package(
     ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
 ```
 
+## Input and output
+
+CPMpy can read and write several common constraint programming and optimization formats, such as OPB, DIMACS/CNF/WCNF, XCSP3, and SCIP-compatible formats like MPS and LP. Additionally, it can read application-specific formats, such as JSPLIB for job-shop scheduling, RCPSP for resource-constrained project scheduling, and Nurse rostering instances.
+
+The generic `load()` and `write()` helpers choose the right parser or writer based on the file extension when possible, or you can pass the format explicitly.
+
+```python
+import cpmpy as cp
+from cpmpy.tools.io import load, write
+
+# Load an instance from a file
+model = load("ft06.jsp", format="jsplib")
+
+# Or write your own model to a file/string
+x = cp.boolvar(shape=3, name="x")
+model = cp.Model(cp.sum(x) >= 2)
+
+opb_text = write(model, format="opb")   # returns a string
+write(model, "model.opb")               # writes to file, format from extension
+```
+
+For raw instance strings, pass `format=` explicitly. Format-specific helpers such as `load_opb()`, `write_opb()`, `load_dimacs()` and `write_dimacs()` are also available when you want direct access to one parser or writer.
+
+Because all loaders return a CPMpy `Model`, you can also use CPMpy as a small translation layer between formats. This is useful when working with datasets: load each benchmark instance once, then export it to the format expected by another tool or solver.
+
+```python
+from pathlib import Path
+from cpmpy.tools.datasets import XCSP3Dataset
+from cpmpy.tools.io import load, write
+
+dataset = XCSP3Dataset(year=2024, track="CSP", download=True)
+
+for instance_file, metadata in dataset:
+    model = load(instance_file, format="xcsp3")
+    out_file = Path("converted") / f"{metadata['name']}.opb"
+    write(model, out_file, format="opb")
+```
+
+See the [I/O API documentation](./api/tools/io.rst) for the available formats and options.
+
+(modeling-datasets)=
+## Datasets
+
+When experimenting with models or comparing solvers, it is useful to benchmark them against standard problem collections from the community. CPMpy datasets provide a small, PyTorch-style interface for downloading benchmark instances, iterating over them, and accessing their metadata.
+
+For example, the XCSP3 dataset gives access to instances from the XCSP3 competitions:
+
+```python
+from cpmpy.tools.datasets import XCSP3Dataset
+
+dataset = XCSP3Dataset(year=2024, track="CSP", download=True)
+
+instance_file, metadata = dataset[0]
+print(instance_file)
+print(metadata["name"], metadata["categories"])
+
+for instance_file, metadata in dataset:
+    print("Instance:", metadata["name"])
+```
+
+The dataset interface supports PyTorch-style transforms. You can pass a CPMpy loader as
+the `transform` argument so that iterating over the dataset immediately returns CPMpy
+models instead of file paths:
+
+```python
+from functools import partial
+from cpmpy.tools.datasets import XCSP3Dataset
+from cpmpy.tools.io import load_xcsp3
+
+dataset = XCSP3Dataset(
+    year=2024,
+    track="CSP",
+    download=True,
+    transform=load_xcsp3
+)
+
+for model, metadata in dataset:
+    print("Solving", metadata["name"])
+    model.solve()
+```
+
+If CPMpy does not yet provide the dataset you need, you can still use the same interface by creating your own dataset class on top of {class}`~cpmpy.tools.datasets.core.Dataset` with minimal effort. 
+
+For a local directory of instance files, the convenience function `from_files()` is often enough:
+
+```python
+from cpmpy.tools.datasets.core import from_files
+
+dataset = from_files("./my_instances/", extension=".txt")
+
+for instance_file, metadata in dataset:
+    print(metadata["name"], instance_file)
+```
+
+See the [datasets API documentation](./api/tools/datasets.rst) for the available datasets and the full dataset interface.
 
 ## Model versus solver interface
 
@@ -624,7 +782,7 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
 s = cp.SolverLookup.get("ortools")
 # we are operating on the ortools interface here
-s += (cp.sum(x) <= 5)
+s.add(cp.sum(x) <= 5)
 s.solve()
 print(s.status())
 ```
@@ -664,7 +822,7 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
 s = cp.SolverLookup.get("ortools")
 # we are operating on the ortools interface here
-s += (cp.sum(x) <= 5)
+s.add(cp.sum(x) <= 5)
 s.solve()
 print(s.ort_solver.NumBranches())
 ```
@@ -678,7 +836,7 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
 s = cp.SolverLookup.get("minizinc")
 # we are operating on the minizinc interface here
-s += (cp.sum(x) <= 5)
+s.add(cp.sum(x) <= 5)
 s.solve()
 print(s.mzn_result.statistics)
 print(s.mzn_result.statistics['nodes']) # if we are only interested in the nb of search nodes
@@ -693,12 +851,13 @@ This has two potential benefits for incremental solving, whereby you add more co
   2) if the solver itself is incremental then it can reuse any information from call to call, as the state of the native solver object is kept between solver calls and can therefore rely on information derived during a previous `.solve()` call.
 
 ```python
-s = SolverLookup.get("gurobi")
+import cpmpy as cp
+s = cp.SolverLookup.get("gurobi")
 
-s += sum(ivar) <= 5 
+s.add(cp.sum(ivar) <= 5)
 s.solve()
 
-s += sum(ivar) == 3
+s.add(cp.sum(ivar) == 3)
 # the underlying gurobi instance is reused, only the new constraint is added to it.
 # gurobi is an incremental solver and will look for solutions starting from the previous one.
 s.solve()
@@ -718,14 +877,14 @@ import cpmpy as cp
 x = cp.intvar(1,5, shape=5, name="x")
 
 c1 = cp.AllDifferent(x)
-c2 = x[0] == cp.min(x)
-c3 = x[-1] == 1 # this one makes it UNSAT
+c2 = (x[0] == cp.min(x))
+c3 = (x[-1] == 1) # this one makes it UNSAT
 
 cp.Model([c1,c2,c3]).solve() # Will be UNSAT
 
 s = cp.SolverLookup.get("exact") # OR-tools, PySAT and Exact support solving under assumptions
 assump = cp.boolvar(shape=3, name="assump")
-s += assump.implies([c1,c2,c3]) # assump[0] -> c1, assump[1] -> c2, assump[2] -> c3
+s.add(assump.implies([c1,c2,c3])) # assump[0] -> c1, assump[1] -> c2, assump[2] -> c3
 
 # Underlying solver state will be kept inbetween solve-calls
 s.solve(assumptions=assump[0,1]) # Will be SAT
@@ -744,7 +903,7 @@ We sometimes add solver-specific functions to the CPMpy interface, for convenien
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 s = cp.SolverLookup.get("ortools")
-s += cp.sum(x) <= 5
+s.add(cp.sum(x) <= 5)
 # we are operating on an ortools' interface here
 s.solution_hint(x, [1,2,3])
 s.solve()
@@ -769,8 +928,8 @@ import cpmpy as cp
 iv = cp.intvar(1,9, shape=3)
 
 s =  cp.SolverLookup.get("ortools")
-s += cp.AllDifferent(iv)
-s += cp.DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OR-Tools
+s.add(cp.AllDifferent(iv))
+s.add(cp.DirectConstraint("AddAllDifferent", iv))  # a DirectConstraint equivalent to the above for OR-Tools
 ```
 
 This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the arguments to the native solver variable.
@@ -790,8 +949,8 @@ trans_tabl = [ # corresponds to regex 0* 1+ 0+
     (1, 0, 2),
     (2, 0, 2)
 ]
-s += cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
-                         novar=[1, 2, 3])  # optional, what arguments not to scan for vars
+s.add(cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                          novar=[1, 2, 3])  # optional, what arguments not to scan for vars
 ```
 
 A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
@@ -812,7 +971,7 @@ iv = cp.intvar(1,9, shape=3)
 
 s = cp.SolverLookup.get("ortools")
 
-s += AllDifferent(iv)  # the traditional way, equivalent to:
+s.add(AllDifferent(iv))  # the traditional way, equivalent to:
 s.native_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API (OR-Tools' python library), has to be with native variables
 ```
 

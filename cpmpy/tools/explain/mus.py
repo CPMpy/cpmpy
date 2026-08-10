@@ -1,9 +1,12 @@
 """
-    Re-impementation of MUS-computation techniques in CPMPy
+    Re-implementation of MUS-computation techniques in CPMPy
 
     - Deletion-based MUS
     - QuickXplain
     - Optimal MUS
+    - Native MUS for given solvers:
+        - Exact: deletion-based MUS extraction
+        - Gurobi: IIS-based MUS extraction
 """
 import warnings
 import numpy as np
@@ -59,6 +62,20 @@ def mus(soft, hard=[], solver="ortools"):
             core = set(s.get_core())
 
     return [dmap[avar] for avar in core]
+
+def mus_native(soft, hard=[], solver="exact"):
+    """
+    Compute a MUS using a solver's native MUS extractor.
+
+    :param soft: soft constraints, list of expressions
+    :param hard: hard constraints, optional, list of expressions
+    :param solver: which solver to use (`exact` or `gurobi`)
+    """
+    
+    # get solver class
+    solver_class = cp.SolverLookup.lookup(solver)
+    
+    return solver_class.mus_native(soft, hard)
 
 
 def quickxplain(soft, hard=[], solver="ortools"):
@@ -329,7 +346,4 @@ def optimal_mus_naive(soft, hard=[], weights=None, solver="ortools", hs_solver="
         Naive implementation of `optimal_mus` without assumption variables and incremental solving
     """
     return ocus_naive(soft, hard, weights, meta_constraint=True, solver=solver, hs_solver=hs_solver)
-
-   
-
 

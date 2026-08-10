@@ -1,7 +1,6 @@
 import unittest
 import pytest
 import cpmpy as cp
-from cpmpy import *
 from cpmpy.solvers.rc2 import CPM_rc2
 
 # Check if RC2 is available
