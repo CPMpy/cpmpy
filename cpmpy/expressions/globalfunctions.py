@@ -812,7 +812,8 @@ class Element(GlobalFunction):
                 raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         elif is_any_list(arr) and any(is_any_list(el) for el in arr):
             raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
-        assert len(arr) > 0, "Element: array should not be empty"
+        if len(arr) == 0:
+            raise ValueError('Element function must be given at least one argument')
 
         super().__init__("element", (arr, idx))
 
