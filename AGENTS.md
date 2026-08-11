@@ -2,6 +2,8 @@
 
 Guidance for AI agents working in this repository. Prefer matching existing code over inventing new conventions. When unsure, ask.
 
+Longer human docs: `docs/developers.md`, `docs/adding_solver.md`, `tests/README.md` (also `docs/testing.md`). Prefer those over inventing process; this file is the short agent-oriented subset.
+
 ## Environment
 
 Use this checkout’s development interpreter (conda/venv already configured for the machine).
@@ -20,6 +22,7 @@ CPMpy is a constraint modeling library (`import cpmpy as cp`). Typical flow: use
 | Transformations | `cpmpy/transformations/` | Copy-on-write rewrites |
 | Solvers | `cpmpy/solvers/` | `CPM_<name>` interfaces |
 | Tools | `cpmpy/tools/` | Use CPMpy; not part of the core |
+| CLI | `cpmpy/cli.py` | `cpmpy version` and related entry points |
 | Tests | `tests/` | pytest |
 | Docs | `docs/` | Sphinx; publishes to readthedocs |
 | Examples | `examples/` | Extra examples welcome; also `tests/test_examples.py` |
@@ -29,9 +32,9 @@ Public API is re-exported from `cpmpy/__init__.py`. Prefer `import cpmpy as cp` 
 
 ### Import map (library work)
 
-- Variables: `cpmpy.expressions.variables` (`boolvar`, `intvar`, `NegBoolView`, …)
-- Core expr: `cpmpy.expressions.core` (`Expression`, `Comparison`, `Operator`, …)
-- Globals: `globalconstraints.py` / `globalfunctions.py`
+- Variables: `cpmpy.expressions.variables` (`boolvar`, `intvar`, `cpm_array`, `NegBoolView`, …). Names with a leading `_` (e.g. `_BoolVarImpl`) are private — do not use them from outside the package.
+- Core expr: `cpmpy.expressions.core` (`Expression`, `Comparison`, `Operator`, `BoolVal`, …)
+- Globals: `globalconstraints.py` / `globalfunctions.py` (each global should implement `decompose()`; solvers may still post some natively via `supported_global_constraints`)
 - Builtins: `python_builtins.py` (`cp.sum`, `cp.all`, …)
 - Helpers: `expressions.utils` (`is_int`, `is_any_list`, `eval_comparison`, …)
 - Solvers: `SolverInterface` / `SolverLookup` in `solvers/`
@@ -39,7 +42,9 @@ Public API is re-exported from `cpmpy/__init__.py`. Prefer `import cpmpy as cp` 
 
 ### Transformation waterfall (solver-facing)
 
-Transformations are **copy-on-write** (return new expressions; never mutate inputs). There is no single global pipeline: each solver’s `transform()` chains only what it needs. Lower-level solvers typically reuse the early steps of higher-level ones (the “waterfall”). Always read the target solver’s `transform()` — do not invent an order from the `transformations/` module list.
+Transformations are **copy-on-write** (return new expressions; never mutate inputs). There is no single global pipeline: each solver’s `transform()` chains only what it needs. Lower-level solvers typically reuse the early steps of higher-level ones (the “waterfall”). Always read the target solver’s `transform()` — do not invent an order from the `transformations/` module list. The autosummary order in `cpmpy/transformations/__init__.py` is **illustrative, not normative**.
+
+Solver interfaces are **eager**: `add()` immediately calls `transform()` and posts the result to the backend (this is what enables incremental use). Transformation helpers are **stateless functions** (expressions in → expressions out). The usual exception is **CSE**: the solver owns a `csemap` dict and passes it into transforms that support it — see `docs/adding_solver.md`.
 
 Canonical examples:
 
@@ -53,12 +58,15 @@ Canonical examples:
 
 Shared early pattern across many solvers: normalize → safen → push negations → decompose unsupported globals → flatten; then solver-specific reification / comparison / linearize / int2bool steps.
 
+New solvers: copy `solvers/TEMPLATE.py`, follow `docs/adding_solver.md` (including registration in `SolverLookup.base_solvers()`, `solvers/__init__.py`, docs, and CI where applicable).
+
 ## Scope of changes
 
 - Prefer small, focused diffs. No drive-by refactors.
-- Only documentation changes land directly on `master`; everything else goes through a PR.
+- Base PRs on current `master`. Only documentation changes land directly on `master`; everything else goes through a PR.
 - PRs must pass the test suite and mypy (`mypy cpmpy tests`, see `.github/workflows/python-linting.yml`). Bugfixes should include a regression test (typically the bug-report case).
 - WIP PRs are fine — most changes go through at least one review iteration.
+- If something should be usable as `cp.*`, re-export it from `cpmpy/__init__.py`. User-facing behavior changes should update Sphinx docs under `docs/` as well.
 - Do not git commit unless the user asks.
 
 ## Code style
@@ -78,6 +86,7 @@ CPMpy-specific:
 
 Public functions and methods should have type hints on arguments and return values (`docs/developers.md`). Keep hints accurate (`Optional[...]` when `None` is allowed); do not paper over with overly broad types or unnecessary `# type: ignore` / `cast`.
 
+- Prefer typing public surfaces and anything mypy already covers; match neighboring code density — do not mass-annotate unrelated private helpers in the same PR.
 - Prefer existing expression aliases where they fit (`NestedBoolExprLike`, `ExprLike`, … from `cpmpy.expressions.core`).
 - Modern builtins are fine (`list[...]`, `dict[...]`); many modules also use `from __future__ import annotations`.
 - Changes must keep `mypy` clean (`mypy.ini`). CI runs `mypy cpmpy tests`. Locally: `python -m mypy cpmpy tests`.
@@ -106,7 +115,7 @@ Returns:
 - Document defaults as ``(default: ...)``.
 - Include argument/return types in the docstring when possible (in addition to signature annotations).
 
-## Modeling reminders (examples / tests / user code)
+## Modeling reminders (for tests / examples only)
 
 ```python
 import cpmpy as cp
@@ -133,9 +142,9 @@ Full suite docs: `tests/README.md` (also included as `docs/testing.md`). Follow 
 |--------|------------------|
 | Model | `test_model.py` |
 | Expressions / ops | `test_expressions.py`, `test_builtins.py`, `test_variables.py` |
-| Globals | `test_globalconstraints.py` |
+| Globals (constraints & functions) | `test_globalconstraints.py`, also `test_constraints.py` |
 | Solve constraints | `test_constraints.py` |
-| Transformations | `test_trans_*.py`, `test_transf_*.py`, `test_flatten.py`, … |
+| Transformations | `test_trans_*.py`, `test_transf_*.py`, `test_flatten.py`, `test_cse.py`, … |
 | Solver high-level | `test_solvers.py` |
 | Solver low-level API | `test_solverinterface.py` |
 | `solveAll` | `test_solveAll.py` |
@@ -175,6 +184,7 @@ Use the fixtures/markers from `tests/conftest.py` — do not hardcode skip logic
 - **`@pytest.mark.requires_dependency("package")`** — optional Python package.
 - **`@pytest.mark.generate_constraints.with_args(generator)`** — parametrise `constraint` (see `test_constraints.py`).
 - **`@pytest.mark.depends_on_solver`** — indirect solver dependence.
+- **`@pytest.mark.dataset_download`** — needs network dataset downloads; skipped unless `--include-datasets` is passed.
 
 Examples:
 
@@ -203,12 +213,12 @@ python -m pytest tests/ --ignore=tests/test_examples.py
 python -m pytest tests/test_model.py -n auto
 python -m pytest tests/ --solver=ortools  # run tests with ortools as solver
 python -m pytest tests/ --solver=all      # run tests with every installed solver
-python -m pytest tests/ --solver=None     # no solver-parametrised tests
+python -m pytest tests/ --solver=None     # literal string None: skip solver-parametrised tests
 ```
 
 **Always** pass `--ignore=tests/test_examples.py` in agent runs unless the user explicitly wants examples exercised.
 
-`--solver` currently mainly affects a subset (notably `test_constraints.py` / interface-style tests); default without the flag uses OR-Tools for non-specific tests and still runs installed solver-specific tests.
+`--solver` currently mainly affects a subset (notably `test_constraints.py`, `test_solverinterface.py`, `test_solvers_solhint.py`). Omitting `--solver` is not the same as `--solver=None`: default without the flag uses OR-Tools for non-specific tests and still runs installed solver-specific tests.
 
 Type check (required for CI): `python -m mypy cpmpy tests` (see `mypy.ini`).
 
@@ -222,4 +232,4 @@ When reviewing or before finishing a change:
 - [ ] Docstrings and accurate type hints on public surfaces; `mypy cpmpy tests` clean
 - [ ] Style: extend/append, explicit None/len checks
 - [ ] Tests updated; bugfix has a regression test
-- [ ] Pytest on test suite must pass
+- [ ] Relevant pytest tests pass
