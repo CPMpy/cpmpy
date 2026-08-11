@@ -646,6 +646,7 @@ class CPM_gcs(SolverInterface):
             # Normal comparison     
             elif isinstance(con, Comparison):
                 lhs = con.args[0]
+                assert isinstance(lhs, Expression)  # typing doesn't know its normalized
                 rhs = con.args[1]
 
                 # Due to only_numexpr_equality we can only have '!=', "<=", etc.
