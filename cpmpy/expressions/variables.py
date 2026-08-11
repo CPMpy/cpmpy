@@ -550,12 +550,10 @@ class NDVarArray(np.ndarray):
 
     def __array_ufunc__(self, ufunc: np.ufunc, method: str, *inputs: Any, **kwargs: Any) -> Any:
         """
-        NumPy ufunc entry point for symbolic element-wise ops.
-
-        Supported ``__call__`` ufuncs map to :mod:`operator` and build Expression trees
-        via :meth:`_elementwise`. Unsupported ufuncs raise :class:`TypeError` (never
-        fall through to object-dtype ufuncs that boolify comparisons).
+            overwrite numpy ufuncs: map supported ones to operators element-wise
+            (``out=`` supported for in-place ops like ``+=``; other kwargs raise)
         """
+        out = kwargs.pop("out", None)
         if kwargs:
             raise TypeError(
                 f"NDVarArray does not support ufunc keyword arguments {sorted(kwargs)}; "
@@ -572,14 +570,26 @@ class NDVarArray(np.ndarray):
             raise TypeError(
                 f"NDVarArray does not support np.{ufunc.__name__}; use Python operators or cp.*"
             )
-        return self._elementwise(op, *inputs)
+        result = self._elementwise(op, *inputs)
+        if out is None:
+            return result
+        # NumPy always passes out as a tuple into __array_ufunc__
+        if not isinstance(out, tuple) or len(out) != 1 or out[0] is None:
+            raise TypeError(
+                f"NDVarArray only supports a single out= array for np.{ufunc.__name__}"
+            )
+        dest = out[0]
+        np.copyto(dest, result)
+        if isinstance(dest, NDVarArray):
+            dest._has_subexpr = None  # cells may now hold non-var Expressions
+        return dest
 
     def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
             overwrite np.sum(NDVarArray) as people might use it
         """
-        if out is not None or dtype is not None or keepdims:
-            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
+        if out is not None or dtype is not None or keepdims or kwargs:
+            raise NotImplementedError("out/dtype/keepdims and other kwargs not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want the sum over the whole array
             return cp.sum(self)
@@ -591,8 +601,8 @@ class NDVarArray(np.ndarray):
         """
             overwrite np.prod(NDVarArray) as people might use it
         """
-        if out is not None or dtype is not None or keepdims:
-            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
+        if out is not None or dtype is not None or keepdims or kwargs:
+            raise NotImplementedError("out/dtype/keepdims and other kwargs not supported for NDVarArray operators")
 
         if axis is None:  # simple case where we want the product over the whole array
             return reduce(lambda a, b: a * b, self.flatten())
@@ -605,8 +615,8 @@ class NDVarArray(np.ndarray):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        if out is not None or dtype is not None or keepdims:
-            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
+        if out is not None or dtype is not None or keepdims or kwargs:
+            raise NotImplementedError("out/dtype/keepdims and other kwargs not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want the maximum over the whole array
             return cp.max(self)
@@ -617,8 +627,8 @@ class NDVarArray(np.ndarray):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        if out is not None or dtype is not None or keepdims:
-            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
+        if out is not None or dtype is not None or keepdims or kwargs:
+            raise NotImplementedError("out/dtype/keepdims and other kwargs not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want the minimum over the whole array
             return cp.min(self)
@@ -632,8 +642,8 @@ class NDVarArray(np.ndarray):
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
-        if out is not None or dtype is not None or keepdims:
-            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
+        if out is not None or dtype is not None or keepdims or kwargs:
+            raise NotImplementedError("out/dtype/keepdims and other kwargs not supported for NDVarArray operators")
 
         if axis is None:    # simple case where we want a disjunction over the whole array
             return cp.any(self)
@@ -648,8 +658,8 @@ class NDVarArray(np.ndarray):
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .all() in an array not consisting only of bools")
 
-        if out is not None or dtype is not None or keepdims:
-            raise NotImplementedError("out/dtype/keepdims not supported for NDVarArray operators")
+        if out is not None or dtype is not None or keepdims or kwargs:
+            raise NotImplementedError("out/dtype/keepdims and other kwargs not supported for NDVarArray operators")
 
         if axis is None:  # simple case where we want a conjunction over the whole array
             return cp.all(self)
