@@ -52,7 +52,7 @@ from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.utils import is_num, is_int, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -725,8 +725,8 @@ class CPM_cpo(SolverInterface):
         Compute a MUS using CP Optimizer's native conflict refiner.
 
         CP Optimizer refines conflicts over native constraints. A CPMpy soft
-        constraint may expand to several native ones. In that case we post them under an 
-        indicator and only expose the indicator as soft to the refiner.
+        constraint may expand to several native ones. In that case we post them
+        as one ``logical_and``, which the refiner treats as a single member.
         """
         soft_cons = toplevel_list(soft, merge_and=False)
         s = cls()
@@ -744,16 +744,10 @@ class CPM_cpo(SolverInterface):
                 # Globals such as Cumulative may return a list of native exprs.
                 native_soft.extend(cpo_expr if is_any_list(cpo_expr) else [cpo_expr])
 
-            if len(native_soft) == 1:
-                s.cpo_model.add(native_soft[0])
-                native_to_soft_idx[native_soft[0]] = i
-            else:
-                # Guard expanded natives, only the indicator is soft for the MUS.
-                indicator = s._cpo_expr(boolvar(name=f"cpo_mus[{i}]"), boolexpr=True)
-                for native_con in native_soft:
-                    s.cpo_model.add(dom.if_then(indicator, native_con))
-                s.cpo_model.add(indicator)
-                native_to_soft_idx[indicator] = i
+            # Keep multi-native softs atomic: the refiner does not split &&.
+            soft_native = native_soft[0] if len(native_soft) == 1 else dom.logical_and(native_soft)
+            s.cpo_model.add(soft_native)
+            native_to_soft_idx[soft_native] = i
 
         refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
         assert refine_res.is_conflict(), "MUS: model must be UNSAT"
