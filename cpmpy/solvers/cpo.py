@@ -727,14 +727,16 @@ class CPM_cpo(SolverInterface):
         CP Optimizer refines conflicts over native constraints. A CPMpy soft
         constraint may expand to several native ones. In that case we post them
         as one ``logical_and``, which the refiner treats as a single member.
+        CP Optimizer does not actually support hard constraints so the parameter can not be used.
         """
         soft_cons = toplevel_list(soft, merge_and=False)
         s = cls()
         dom = s.get_docp().modeler
 
-        # Hard constraints may appear in the conflict, but are never returned.
-        for cpm_con in s.transform(hard):
-            s.cpo_model.add(s._cpo_expr(cpm_con, boolexpr=True))
+        # Check that there are no hard constraints
+        if len(hard) != 0:
+            raise ValueError("CP Optimizer does not support hard constraints for MUS extraction. " \
+            "Please only use soft constraints or a different solver.")
 
         native_to_soft_idx = {}
         for i, soft_con in enumerate(soft_cons):
