@@ -402,10 +402,10 @@ class Multiplication(GlobalFunction):
         if is_int(x):
             is_lhs_num = True
             if not isinstance(x, int):
-                x = int(x)  # type: ignore  # it can't see we're removing the np.integers
+                x = int(x)
         else:
             if not isinstance(x, Expression):
-                raise TypeError(f"Multiplication does not support float constants, got: {type(x)}")
+                raise TypeError(f"Multiplication only supports integers or Expressions, but got {x} of type {type(x)}")
         
         args: tuple[int|Expression, Expression] = (x, y)
         super().__init__("mul", args)
