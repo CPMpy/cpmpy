@@ -590,7 +590,7 @@ class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
 
-    Requires a non-empty ``array`` (arity >= 1), i.e. a table with at least one row.
+    Requires a non-empty ``array`` of variables (arity >= 1).
     """
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
@@ -747,7 +747,7 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
 
-    Requires a non-empty ``array`` (arity >= 1), i.e. a table with at least one row.
+    Requires a non-empty ``array`` of variables (arity >= 1).
     """
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
@@ -836,7 +836,7 @@ class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
 
-    Requires a non-empty ``array`` (arity >= 1), i.e. a table with at least one row.
+    Requires a non-empty ``array`` of variables (arity >= 1).
     """
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
