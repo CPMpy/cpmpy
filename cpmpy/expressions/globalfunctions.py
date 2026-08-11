@@ -87,7 +87,7 @@
 import sys
 import warnings  # for deprecation warning
 import math
-from typing import Optional, Iterable, NoReturn, Final, cast
+from typing import Any, Optional, Iterable, NoReturn, Final, cast
 import numpy as np
 import cpmpy as cp
 
@@ -416,7 +416,7 @@ class Multiplication(GlobalFunction):
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
-    def update_args(self, args: Iterable[int|Expression], has_subexpr: Optional[bool] = None):
+    def update_args(self, args: Iterable[Any], has_subexpr: Optional[bool] = None):
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
         """
@@ -441,7 +441,7 @@ class Multiplication(GlobalFunction):
 
         return "({}) * ({})".format(x, y)
 
-    def __neg__(self) -> "Expression":
+    def __neg__(self):
         """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
         if self.is_lhs_num:
             return Multiplication(-self.args[0], self.args[1])
