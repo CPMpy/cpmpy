@@ -4,7 +4,8 @@ Guidance for AI agents working in this repository. Prefer matching existing code
 
 ## Environment
 
-Use the project's development Python (venv/conda — whatever is already set up for this checkout). Prefer `python -m pip` and `python -m pytest` so tools run in the same environment.
+Use this checkout’s development interpreter (conda/venv already configured for the machine).
+Prefer `python -m pip` / `python -m pytest` / `python -m mypy` so tools share that env.
 
 ## What this repo is
 
@@ -119,8 +120,8 @@ assert m.solve()
 - Integers only (no floats/fractions).
 - Use CPMpy builtins for vectorized ops (`cp.sum`, `cp.any`, …).
 - Prefer global constraints/functions when they fit.
-- Index non-CPMpy arrays via `cp.cpm_array(...)[idx]`.
-- Solvers: `cp.SolverLookup.get(name, model=None)` / `solvernames()`.
+- To index non-NDVarArrays with an expression, use `cp.cpm_array(...)[idx]`.
+- Solvers: `cp.SolverLookup.get(name, model=None)`; list installed/ready ones with `cp.SolverLookup.supported()` (`solvernames()` is deprecated); overview via `cpmpy version` CLI.
 
 ## Writing tests
 
@@ -130,10 +131,10 @@ Full suite docs: `tests/README.md` (also included as `docs/testing.md`). Follow 
 
 | Change | Typical file(s) |
 |--------|------------------|
-| Model / I/O | `test_model.py` |
+| Model | `test_model.py` |
 | Expressions / ops | `test_expressions.py`, `test_builtins.py`, `test_variables.py` |
 | Globals | `test_globalconstraints.py` |
-| Flat / solve constraints | `test_constraints.py` |
+| Solve constraints | `test_constraints.py` |
 | Transformations | `test_trans_*.py`, `test_transf_*.py`, `test_flatten.py`, … |
 | Solver high-level | `test_solvers.py` |
 | Solver low-level API | `test_solverinterface.py` |
@@ -167,9 +168,9 @@ def test_basic_model():
 
 ### Solver fixtures and markers
 
-Use the fixtures/markers from `tests/conftest.py` — do not hardcode skip logic for “solver not installed” when a marker already covers it.
+Use the fixtures/markers from `tests/conftest.py` — do not hardcode skip logic for “solver not installed” when a marker already covers it. Related skip helpers also live in `tests/utils.py` (e.g. `skip_on_missing_pblib`); prefer a `conftest` marker when it fits, otherwise reuse those helpers instead of inventing new skip logic.
 
-- **`solver` fixture** — for tests that should run under `--solver=…` parametrisation. Declare a `solver` parameter (function) or `@pytest.mark.usefixtures("solver")` and use `self.solver` (class).
+- **`solver` fixture** — for tests that should run under `--solver=…` parametrisation. A `solver` argument is enough for pytest to inject it (functions, or methods on a class). Prefer also marking with `@pytest.mark.usefixtures("solver")` so the dependency is explicit; on classes that use `self.solver`, that mark is required unless every method takes a `solver` argument.
 - **`@pytest.mark.requires_solver("name", …)`** — only those solvers; **must** declare a `solver` parameter. Skipped if not installed.
 - **`@pytest.mark.requires_dependency("package")`** — optional Python package.
 - **`@pytest.mark.generate_constraints.with_args(generator)`** — parametrise `constraint` (see `test_constraints.py`).
@@ -186,6 +187,11 @@ def test_with_any_selected_solver(solver):
 @pytest.mark.requires_solver("cplex")
 def test_cplex_only(solver):
     ...
+
+@pytest.mark.usefixtures("solver")
+class TestMyFeature:
+    def test_with_solver(self):
+        assert cp.Model(cp.boolvar()).solve(solver=self.solver)
 ```
 
 Make tests solver-agnostic when the behavior is only part of the modeling-side of things; use `solver` fixtures for all tests that require a solver-call. Prefer patterns already used in the neighboring test file.
@@ -195,9 +201,9 @@ Make tests solver-agnostic when the behavior is only part of the modeling-side o
 ```sh
 python -m pytest tests/ --ignore=tests/test_examples.py
 python -m pytest tests/test_model.py -n auto
-python -m pytest tests/ --solver=ortools
-python -m pytest tests/ --solver=all
-python -m pytest tests/ --solver=None   # no solver-parametrised tests
+python -m pytest tests/ --solver=ortools  # run tests with ortools as solver
+python -m pytest tests/ --solver=all      # run tests with every installed solver
+python -m pytest tests/ --solver=None     # no solver-parametrised tests
 ```
 
 **Always** pass `--ignore=tests/test_examples.py` in agent runs unless the user explicitly wants examples exercised.
@@ -216,4 +222,4 @@ When reviewing or before finishing a change:
 - [ ] Docstrings and accurate type hints on public surfaces; `mypy cpmpy tests` clean
 - [ ] Style: extend/append, explicit None/len checks
 - [ ] Tests updated; bugfix has a regression test
-- [ ] Relevant pytest subset green
+- [ ] Pytest on test suite must pass
