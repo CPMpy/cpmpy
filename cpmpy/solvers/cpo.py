@@ -724,68 +724,46 @@ class CPM_cpo(SolverInterface):
         """
         Compute a MUS using CP Optimizer's native conflict refiner.
 
-        CP Optimizer refines conflicts over native constraints. CPMpy constraints
-        can transform to several native constraints, so each soft constraint is
-        represented by a single indicator constraint. The actual soft constraint
-        is posted as hard constraint guarded by that indicator.
+        CP Optimizer refines conflicts over native constraints. A CPMpy soft
+        constraint may expand to several native ones. In that case we post them under an 
+        indicator and only expose the indicator as soft to the refiner.
         """
         soft_cons = toplevel_list(soft, merge_and=False)
         s = cls()
-
-        def add_cpo_expr(cpo_expr):
-            """Add one native expression and return the top-level expressions added."""
-            before = len(s.cpo_model.get_all_expressions())
-            s.cpo_model.add(cpo_expr)
-            return [expr for expr, _ in s.cpo_model.get_all_expressions()[before:]]
-
-        def flat_cpo_exprs(cpo_expr):
-            """Flatten nested lists of native expressions produced by globals."""
-            if is_any_list(cpo_expr):
-                for subexpr in cpo_expr:
-                    yield from flat_cpo_exprs(subexpr)
-            else:
-                yield cpo_expr
-
-        # Add hard constraints. They may appear in the conflict, but they are
-        # required by definition and are therefore not returned as part of the MUS.
-        for cpm_con in s.transform(hard):
-            add_cpo_expr(s._cpo_expr(cpm_con))
-
         dom = s.get_docp().modeler
+
+        # Hard constraints may appear in the conflict, but are never returned.
+        for cpm_con in s.transform(hard):
+            s.cpo_model.add(s._cpo_expr(cpm_con, boolexpr=True))
+
         native_to_soft_idx = {}
-        assumptions = boolvar(shape=len(soft_cons), name="cpo_mus")
-        for i, (assumption, soft_con) in enumerate(zip(assumptions, soft_cons)):
+        for i, soft_con in enumerate(soft_cons):
             native_soft = []
             for cpm_con in s.transform(soft_con):
-                native_soft.extend(flat_cpo_exprs(s._cpo_expr(cpm_con)))
+                cpo_expr = s._cpo_expr(cpm_con, boolexpr=True)
+                # Globals such as Cumulative may return a list of native exprs.
+                native_soft.extend(cpo_expr if is_any_list(cpo_expr) else [cpo_expr])
 
             if len(native_soft) == 1:
-                # Simple case: one CPMpy soft constraint is one native CPO
-                # constraint, so no indicator is needed.
-                for native_con in add_cpo_expr(native_soft[0]):
-                    native_to_soft_idx[native_con] = i
+                s.cpo_model.add(native_soft[0])
+                native_to_soft_idx[native_soft[0]] = i
             else:
-                # Expanded case: guard the native CPO constraints by an
-                # indicator, and expose only the indicator as the soft
-                # representative to the conflict refiner.
-                indicator = s.solver_var(assumption)
+                # Guard expanded natives, only the indicator is soft for the MUS.
+                indicator = s._cpo_expr(boolvar(name=f"cpo_mus[{i}]"), boolexpr=True)
                 for native_con in native_soft:
-                    add_cpo_expr(dom.if_then(indicator, native_con))
-
-                for cpm_con in s.transform(assumption):
-                    for native_con in add_cpo_expr(s._cpo_expr(cpm_con)):
-                        native_to_soft_idx[native_con] = i
+                    s.cpo_model.add(dom.if_then(indicator, native_con))
+                s.cpo_model.add(indicator)
+                native_to_soft_idx[indicator] = i
 
         refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
         assert refine_res.is_conflict(), "MUS: model must be UNSAT"
 
-        mus_idxs = set()
-        conflict_cons = refine_res.get_member_constraints() + refine_res.get_possible_constraints()
-        for native_con in conflict_cons:
-            soft_idx = native_to_soft_idx.get(native_con)
-            if soft_idx is not None:
-                mus_idxs.add(soft_idx)
-
+        mus_idxs = {
+            native_to_soft_idx[native_con]
+            for native_con in (refine_res.get_member_constraints()
+                               + refine_res.get_possible_constraints())
+            if native_con in native_to_soft_idx
+        }
         return [soft_cons[i] for i in mus_idxs]
 
 
