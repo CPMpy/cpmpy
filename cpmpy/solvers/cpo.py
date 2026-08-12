@@ -728,6 +728,9 @@ class CPM_cpo(SolverInterface):
         constraint may expand to several native ones. In that case we post them
         as one ``logical_and``, which the refiner treats as a single member.
         CP Optimizer does not actually support hard constraints so the parameter can not be used.
+
+        For more information see the actual documentation of CPO: 
+        https://www.ibm.com/docs/en/cofz/12.10.0?topic=concepts-conflict-refiner-in-cp-optimizer
         """
         soft_cons = toplevel_list(soft, merge_and=False)
         s = cls()
