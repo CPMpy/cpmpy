@@ -702,6 +702,10 @@ class CPM_pumpkin(SolverInterface):
         if self.pum_solver.is_inconsistent() is False: # otherwise, not guaranteed all variables are known
             self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
 
+        
+    def verify(self, verifier, verifier_args: list[str] = [], time_limit: Optional[float] = None, display_output: bool = False) -> bool:
+        raise NotSupportedError("Pumpkin does not support external proof verification, only through the MiniZinc interface.")
+
     def get_proof_files(self) -> tuple[str]:
         """
         Returns the path where the proof is stored.
