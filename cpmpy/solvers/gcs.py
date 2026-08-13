@@ -72,12 +72,6 @@ from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
 
-# For proof file handling and verifying
-import sys
-from os import path
-from shutil import which
-import subprocess
-
 class CPM_gcs(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API.
@@ -663,67 +657,31 @@ class CPM_gcs(SolverInterface):
     __add__ = add  # avoid redirect in superclass
 
 
-    def verify(self, time_limit:Optional[float]=None, display_output:bool=False, veripb_args:list[str]=[]):
+    def verify(self, verifier: str = "veripb", verifier_args: list[str] = [], time_limit: Optional[float] = None, display_output: bool = False):
         """
-        Verify the last solver-generated proof using VeriPB.
+        Verify the last solver-generated proof using an external checker.
         Proof files are retrieved through the get_proof_files helper.
 
         Saves a `verify_status` attribute to the solver instance with the result and statistics of the verification run as a dictionary.
-        Keys:
-            - "result": True if the proof is valid, False otherwise.
-            - "veripb_args": List of command line arguments that were passed to veripb.
-            - "error_message": Error message from VeriPB if the proof is invalid.
-            - "timeout": True if the verification timed out, False otherwise.
-            - "runtime": Time taken for verification.
-        
-        Requires that the 'veripb' tool is installed and on system path. 
-        See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions.
+        See :func:`verify_prooflog` for more details.
 
         Arguments:
-            - time_limit (float):       time limit for verification (ignored if verify=False) 
-            - veripb_args (list[str]):  list of command line arguments to pass to veripb e.g. ``--trace --useColor`` (run ``veripb --help`` for a full list)
-            - display_output (bool):    whether to print the output from VeriPB
-        
+            - verifier (str):           name or path of the proof checker executable (must be on the system path if a name) (default: veripb)
+            - time_limit (float):       time limit for verification (default: None)
+            - display_output (bool):    whether to print the output from the checker (default: False)
+            - verifier_args (list[str]):  extra command line arguments to pass to the checker (default: [])
+
         Returns:
             bool: True if the proof is valid, False otherwise.
         """
-        if not which("veripb"):
-            raise Exception("Unable to run VeriPB: check it is installed and on system path - see https://gitlab.com/MIAOresearch/software/VeriPB#installation.")
-        
+        from ..tools.verify import verify_prooflog # avoid circular import
+
         opb_file, pbp_file, _varmap = self.get_proof_files()
-
-        if not path.isfile(opb_file):
-            raise FileNotFoundError("Can't find " + opb_file)
-        if not path.isfile(pbp_file):
-            raise FileNotFoundError("Can't find " + pbp_file)
-
-        # sanitize arguments
-        veripb_args = ["--"+arg if not arg.startswith("--") else arg for arg in veripb_args if arg]
-
-        self.verify_status = dict(verifypb_args=veripb_args)
-        try:
-            t0  = time.time()
-            result = subprocess.run(["veripb"] + veripb_args + [opb_file, pbp_file], 
-                                     timeout=time_limit,
-                                     capture_output=True,
-                                     text=True
-                                     )
-            if display_output:
-                if result.stdout:
-                    print(result.stdout, end="")
-                if result.stderr:
-                    print(result.stderr, end="", file=sys.stderr)
-        except subprocess.TimeoutExpired:
-            self.verify_status["result"] = False
-            self.verify_status["runtime"] = time.time() - t0
-            return False
-
-        self.verify_status["runtime"] = time.time() - t0
-        self.verify_status['result'] = result.returncode == 0
-        if result.returncode != 0:
-            self.verify_status["error_message"] = result.stderr
-
-        return self.verify_status['result']
+        self.verify_status = verify_prooflog(verifier, [opb_file, pbp_file],
+                                          time_limit=time_limit,
+                                          display_output=display_output,
+                                          verifier_args=verifier_args)
+        return self.verify_status["result"]
 
     def get_proof_files(self) -> tuple[str,str,str]:
         """
