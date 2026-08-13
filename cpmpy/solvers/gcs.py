@@ -50,6 +50,7 @@
 
         CPM_gcs
 """
+import os
 import time
 import warnings
 from typing import Optional, Callable, Iterable, Any
@@ -188,14 +189,22 @@ class CPM_gcs(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
+        if self._proof is not None:
+            proof_location, proof_name = os.path.split(self._proof)
+            if proof_location == "":
+                proof_location = "."
+        else:
+            proof_name = None
+            proof_location = None
+
         # call the solver, with parameters    
         self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
             timeout=time_limit,
             callback=callback,
             prove=self._proof is not None,
-            proof_name=self._proof,
-            proof_location=".",
+            proof_name=proof_name,
+            proof_location=proof_location,
             **kwargs)
 
         # new status, translate runtime

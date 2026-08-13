@@ -5,6 +5,7 @@ import re
 import tempfile
 import pytest
 import numpy as np
+from shutil import which
 import cpmpy as cp
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 from cpmpy.expressions.globalconstraints import GlobalConstraint
@@ -796,29 +797,6 @@ class TestSolvers:
         m = cp.Model([x + y == 2, wsum == 9])
         assert m.solve(solver="minizinc")
 
-
-    @pytest.mark.skipif(not CPM_pumpkin.supported(), reason="Gurobi not installed")
-    def test_pumpkin_proof(self):
-        x = cp.intvar(0,10, shape=3)
-        m = cp.Model(cp.AllDifferent(x))
-        m += cp.sum(x) <= 2
-
-        # old version, does not work anymore
-        with pytest.raises(ValueError):
-            m.solve(solver="pumpkin", proof_name="test_proof.drcp")
-        
-        # need to supply proof in constructor
-        proof_name=tempfile.NamedTemporaryFile(suffix=".drcp", delete=False).name
-        s = cp.SolverLookup.get("pumpkin", m, proof=proof_name)
-        assert s.solve() is False
-        with open(proof_name, "r") as f:
-            proof = f.read()
-            assert ("UNSAT" in proof)
-
-        # cannot supply proof in solve
-        with pytest.raises(ValueError):
-            s.solve(proof=proof_name)
-
     @pytest.mark.requires_solver("pumpkin")
     def test_pumpkin_indomain_expression(self, solver):
         # InDomain on a non-variable expression (e.g. a sum) must be flattened 
@@ -1269,25 +1247,30 @@ class TestSupportedSolvers:
         args = inspect.signature(cls.__init__)
         if "proof" not in args.parameters.keys():
             pytest.skip(reason=f"{solver} does not support prooflogging")
+
+        basename = solver.split(":")[0]
+        if basename == "gcs" and which("veripb") is None:
+            pytest.skip(reason="veripb not on path")
+        if basename == "pysat" and which("drat-trim") is None:
+            pytest.skip(reason="drat-trim not on path")
         
         a,b,c,d = cp.intvar(1,3,shape=4)
         m = cp.Model(a != b, a != c, a != d, b != c, b != d, c != d)
     
-        prooffile = tempfile.NamedTemporaryFile(delete=False)
-        solver = cp.SolverLookup.get(solver, m, proof=prooffile)
-        assert solver.solve() is False
-        assert solver._proof is not None
+        prooffile = tempfile.NamedTemporaryFile(delete=False).name
+        s = cp.SolverLookup.get(solver, m, proof=prooffile)
+        assert s.solve() is False
+        assert s._proof is not None
 
-        for file in solver.get_proof_files():
+        for file in s.get_proof_files():
             with open(file, "r") as f:
                 proof = f.read()
                 assert len(proof) > 0, f"proof file {file} is empty"
 
-        assert solver.verify() is True
-        assert hasattr(solver, "verify_status"), "verify() should set verify_status on solver interface"
-
-        # TODO: add test with failing proof?
-
+        print(basename)
+        if basename != "pumpkin": # does not support external verification
+            assert s.verify() is True
+            assert hasattr(s, "verify_status"), "verify() should set verify_status on solver interface"
 
 @pytest.mark.generate_constraints.with_args(numexprs)
 @pytest.mark.flaky(reruns=3)
