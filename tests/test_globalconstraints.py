@@ -1256,7 +1256,11 @@ class TestGlobal:
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
 
-    def test_optional_cumulative(self):
+    @pytest.mark.usefixtures("solver")
+    def test_optional_cumulative(self, solver):
+        if solver in ("pysat", "pysdd", "pindakaas", "rc2"):
+            pytest.skip(f"{solver} does not support integer variables")
+
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 3, 2]
         end = cp.intvar(0, 10, shape=4, name="end")
@@ -1264,45 +1268,71 @@ class TestGlobal:
         is_present = cp.boolvar(shape=4)
         capacity = 10
         expr = cp.CumulativeOptional(start, duration, end, demand, capacity, is_present)
-        assert cp.Model(expr).solve()
+        assert cp.Model(expr).solve(solver=solver)
         assert expr.value()
         assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
         # also test decomposition
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr.decompose()).solve(solver=solver)
         assert expr.value()
         assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
 
+        # also test without end times
+        expr = cp.CumulativeOptional(start, duration, demand=demand, capacity=capacity, is_present=is_present)
+        assert cp.Model(expr).solve(solver=solver)
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+
+        # absent tasks consume none of the resource, so they can overlap freely
+        expr = cp.CumulativeOptional(start, duration, end, demand, capacity, [False, True, False, False])
+        assert cp.Model(expr, cp.all(start == start[0])).solve(solver=solver)
+        assert expr.value()
+
         # weird cases, allow negative duration or demand when task is not present
         expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, False])
-        assert cp.Model(expr).solve()
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr).solve(solver=solver)
+        assert cp.Model(expr.decompose()).solve(solver=solver)
 
         expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, True])
-        assert cp.Model(expr).solve() is False
-        assert cp.Model(expr.decompose()).solve() is False
+        assert cp.Model(expr).solve(solver=solver) is False
+        assert cp.Model(expr.decompose()).solve(solver=solver) is False
 
         expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, False])
-        assert cp.Model(expr).solve()
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr).solve(solver=solver)
+        assert cp.Model(expr.decompose()).solve(solver=solver)
 
         expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, True])
-        assert cp.Model(expr).solve() is False
-        assert cp.Model(expr.decompose()).solve() is False
+        assert cp.Model(expr).solve(solver=solver) is False
+        assert cp.Model(expr.decompose()).solve(solver=solver) is False
 
 
-    def test_optional_no_overlap(self):
+    @pytest.mark.usefixtures("solver")
+    def test_optional_no_overlap(self, solver):
+        if solver in ("pysat", "pysdd", "pindakaas", "rc2"):
+            pytest.skip(f"{solver} does not support integer variables")
+
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 6, 2]
         end = cp.intvar(0, 10, shape=4, name="end")
         is_present = cp.boolvar(shape=4)
         expr = cp.NoOverlapOptional(start, duration, end, is_present)
-        assert cp.Model(expr, cp.any(is_present)).solve()
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver)
         assert expr.value()
         assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
         # also test decomposition
-        assert cp.Model(expr.decompose(), cp.any(is_present)).solve()
+        assert cp.Model(expr.decompose(), cp.any(is_present)).solve(solver=solver)
         assert expr.value()
         assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # also test without end times
+        expr = cp.NoOverlapOptional(start, duration, is_present=is_present)
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver)
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # absent tasks do not have to be scheduled, so they can overlap freely
+        expr = cp.NoOverlapOptional(start, duration, end, [False, True, False, False])
+        assert cp.Model(expr, cp.all(start == start[0])).solve(solver=solver)
+        assert expr.value()
 
         # test large task
         start = cp.intvar(0, 10, shape=4, name="start")
@@ -1310,9 +1340,9 @@ class TestGlobal:
         end = cp.intvar(0, 10, shape=4, name="end")
         is_present = cp.boolvar(shape=4)
         expr = cp.NoOverlapOptional(start, duration, end, is_present)
-        assert cp.Model(expr, cp.any(is_present)).solve() is False
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver) is False
 
-    
+
     def test_ite(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
