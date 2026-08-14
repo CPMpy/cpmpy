@@ -929,7 +929,7 @@ class Regular(GlobalConstraint):
     The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
 
     Requires a non-empty input sequence (``array`` arity >= 1), at least one transition,
-    and at least one accepting state (OR-Tools ``AddAutomaton`` rejects all three empties).
+    at least one accepting state, and start/accepting states that appear in the transition table.
 
     The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
     The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
@@ -951,8 +951,9 @@ class Regular(GlobalConstraint):
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
                 (at least one required)
             start (int | str): Starting node id
+                (must appear in the transition table)
             accepting (ListLike[int | str]): List of accepting node ids
-                (at least one required)
+                (at least one required; each must appear in the transition table)
         """
         array = flatlist(array)
         if len(array) == 0:
@@ -981,6 +982,10 @@ class Regular(GlobalConstraint):
         for s, v, e in transitions:
             node_set.update([s,e])
             self.trans_dict[(s, v)] = e
+        if start not in node_set:
+            raise ValueError('Regular start state must appear in the transition table')
+        if any(e not in node_set for e in accepting):
+            raise ValueError('Regular accepting states must appear in the transition table')
         self.nodes = sorted(node_set)
         # normalize node_ids to be 0..n-1, allows for smaller domains
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
@@ -1004,24 +1009,32 @@ class Regular(GlobalConstraint):
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
 
-        transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+        # local copies
+        nodes = list(self.nodes)
+        node_map = dict(self.node_map)
+        transitions = [[node_map[n_in], v, node_map[n_out]] for n_in, v, n_out in transitions]
 
         if complete:
             # add a sink node for transitions that are not defined. When the Regular constraint is in positive context, this is not needed
-            sink = len(self.nodes)
-            self.nodes.append(sink)
-            self.node_map[sink] = sink
-            transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
+            sink = len(nodes)
+            nodes.append(sink)
+            node_map[sink] = sink
+            transitions.extend([[node_map[n], v, sink] for n in nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
 
         # keep track of current state when traversing the array
-        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
-        id_start = self.node_map[start]
+        # shape must be a tuple: intvar(..., shape=1) returns a scalar, not an array
+        state_vars = intvar(0, len(nodes)-1, shape=(len(arr),))
+        id_start = node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        cons: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
+        start_rows = [[v, e] for s, v, e in transitions if s == id_start]
+        if len(start_rows) == 0:
+            # start state has no outgoing transition: no non-empty word is accepted
+            return [BoolVal(False)], []
+        cons: list[Expression] = [Table([arr[0], state_vars[0]], start_rows)]
         # define the rest of the automaton using transition table
         cons.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
         # last state must be accepting
-        value : list[Expression] = [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])]
+        value : list[Expression] = [InDomain(state_vars[-1], [node_map[e] for e in accepting])]
         if complete:
             # constraint is satisfied iff last state is accepting
             return value, cons
