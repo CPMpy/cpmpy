@@ -1033,17 +1033,22 @@ def element(arg_list):
 
 class Count(GlobalFunction):
     """
-    The Count global function represents the number of occurrences of a value in an array
+    The Count global function represents the number of occurrences of a value in an array.
+
+    Requires a non-empty ``arr`` (arity >= 1).
     """
 
     def __init__(self, arr: ListLike[ExprLike], val: ExprLike):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to count in
+                (at least one required)
             val (ExprLike): 'Value' to count occurences of (can also be an expression)
         """
         if not is_any_list(arr):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
+        if len(arr) == 0:
+            raise ValueError('Count function must be given at least one argument')
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
         super().__init__("count", (arr, val))
