@@ -1482,6 +1482,8 @@ class IfThenElse(GlobalConstraint):
 class InDomain(GlobalConstraint):
     """
     Enforces the expression is assigned to a value in the given domain.
+
+    Requires a non-empty domain (``arr`` arity >= 1).
     """
 
     def __init__(self, expr: Expression, arr: Iterable[int|np.integer]):
@@ -1489,10 +1491,14 @@ class InDomain(GlobalConstraint):
         Arguments:
             expr (Expression): Expression to be assigned to a value in the given domain
             arr (Iterable[int | np.integer]): Iterable of integer constants representing the domain
+                (at least one required)
         """
         if not isinstance(arr, np.ndarray):
             arr = np.array(arr, dtype=int)
-        assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
+        if arr.ndim != 1:
+            raise ValueError("The second argument of an InDomain constraint should be a 1D array of integer constants")
+        if len(arr) == 0:
+            raise ValueError('InDomain constraint must be given at least one domain value')
 
         has_subexpr = not isinstance(expr, (_NumVarImpl, BoolVal))
 
@@ -1550,7 +1556,10 @@ class InDomain(GlobalConstraint):
 
         # complement of arr
         arr_set = frozenset(arr)
-        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr_set])
+        complement = [v for v in range(lb,ub+1) if v not in arr_set]
+        if len(complement) == 0:
+            return BoolVal(False)
+        return InDomain(expr, complement)
 
 
 class Xor(GlobalConstraint):
