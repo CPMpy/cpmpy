@@ -2282,13 +2282,17 @@ class Precedence(GlobalConstraint):
 class GlobalCardinalityCount(GlobalConstraint):
     """
     Enforces that the number of occurrences of each value `vals[i]` in the list of variables `vars` is equal to `occ[i]`.
+
+    Requires a non-empty ``vars`` list and a non-empty ``vals``/``occ`` list (arity >= 1).
     """
 
     def __init__(self, vars: ListLike[ExprLike], vals: ListLike[int|np.integer], occ: ListLike[ExprLike], closed: bool = False):
         """
         Arguments:
             vars (ListLike[ExprLike]): List of expressions or constants representing the variables
+                (at least one required)
             vals (ListLike[int | np.integer]): List of integer values
+                (at least one required)
             occ (ListLike[ExprLike]): List of expressions or constants representing the number of occurrences of each value
             closed (bool): Whether the constraint is closed, if true, `vars` can only take values in `vals`
         """
@@ -2298,8 +2302,12 @@ class GlobalCardinalityCount(GlobalConstraint):
             raise TypeError("GlobalCardinalityCount expects a list of values, but got", vals)
         if not is_any_list(occ):
             raise TypeError("GlobalCardinalityCount expects a list of variables as occurrences, but got", occ)
+        if len(vars) == 0:
+            raise ValueError('GlobalCardinalityCount constraint must be given at least one variable')
         if len(vals) != len(occ):
             raise ValueError(f"Number of values and occurrences must be equal, but got {len(vals)} and {len(occ)}")
+        if len(vals) == 0:
+            raise ValueError('GlobalCardinalityCount constraint must be given at least one value')
         super().__init__("gcc", (list(vars), list(vals), list(occ)))
         self.closed = closed
 
