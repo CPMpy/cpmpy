@@ -2637,15 +2637,20 @@ class LexLessEq(GlobalConstraint):
 class LexChainLess(GlobalConstraint):
     """
     Enforces that all rows of the matrix are lexicographically ordered.
+
+    Requires a non-empty 2D matrix (at least one row and one column).
     """
     def __init__(self, X: ListLike[ListLike[ExprLike]]):
         """
         Arguments:
             X (ListLike[ListLike[ExprLike]]): Matrix (List of lists) of expressions or constants to be compared lexicographically
+                (non-empty 2D matrix required)
         """
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
             raise ValueError(f"The matrix given in LexChainLess must be 2D, but got {Xarr.ndim} dimensions")
+        if 0 in Xarr.shape:
+            raise ValueError('LexChainLess constraint must be given a non-empty 2D matrix')
         super().__init__("lex_chain_less", tuple(Xarr.tolist()))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
