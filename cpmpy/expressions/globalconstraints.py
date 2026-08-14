@@ -617,8 +617,10 @@ class Table(GlobalConstraint):
             table = np.array(table, dtype=int)
         elif table.dtype.kind != 'i':  # dtype int
             table = table.astype(int, copy=False)
-        assert table.ndim == 2, "Table's table must be a 2D array"
-        assert table.shape[1] == len(array), f"Table width {table.shape[1]} != array length {len(array)}"
+        if table.ndim != 2:
+            raise ValueError("Table's table must be a 2D array")
+        if table.shape[1] != len(array):
+            raise ValueError(f"Table width {table.shape[1]} != array length {len(array)}")
 
         # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("table", (array, table), has_subexpr=has_subexpr)
@@ -774,8 +776,10 @@ class ShortTable(GlobalConstraint):
 
         if not isinstance(table, np.ndarray):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
-        assert table.ndim == 2, "ShortTable's table must be a 2D array"
-        assert table.shape[1] == len(array), f"ShortTable width {table.shape[1]} != array length {len(array)}"
+        if table.ndim != 2:
+            raise ValueError("ShortTable's table must be a 2D array")
+        if table.shape[1] != len(array):
+            raise ValueError(f"ShortTable width {table.shape[1]} != array length {len(array)}")
 
         # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
@@ -864,8 +868,10 @@ class NegativeTable(GlobalConstraint):
             table = np.array(table, dtype=int)
         elif table.dtype.kind != 'i':  # dtype int
             table = table.astype(int, copy=False)
-        assert table.ndim == 2, "NegativeTable's table must be a 2D array"
-        assert table.shape[1] == len(array), f"NegativeTable width {table.shape[1]} != array length {len(array)}"
+        if table.ndim != 2:
+            raise ValueError("NegativeTable's table must be a 2D array")
+        if table.shape[1] != len(array):
+            raise ValueError(f"NegativeTable width {table.shape[1]} != array length {len(array)}")
 
         # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("negative_table", (array, table), has_subexpr=has_subexpr)
