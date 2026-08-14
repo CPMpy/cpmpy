@@ -390,7 +390,7 @@ class AllEqualExceptN(GlobalConstraint):
     """
     Enforces that all arguments, except those equal to a value in n, have the same value.
 
-    Requires at least one argument in ``arr`` (arity >= 1).
+    Requires at least one argument in ``arr`` (arity >= 1) and a non-empty exception set ``n``.
     """
 
     def __init__(self, arr: ListLike[ExprLike], n: int|np.integer|list[int|np.integer]):
@@ -399,6 +399,7 @@ class AllEqualExceptN(GlobalConstraint):
             arr (ListLike[ExprLike]): List of expressions or constants to have the same value, except those equal to a value in n
                 (at least one required)
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the equality constraint
+                (at least one required)
         """
         flatarr = flatlist(arr)
         if len(flatarr) == 0:
@@ -406,6 +407,8 @@ class AllEqualExceptN(GlobalConstraint):
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
+        if len(n) == 0:
+            raise ValueError('AllEqualExceptN constraint must be given at least one excluded value')
         super().__init__("allequal_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
