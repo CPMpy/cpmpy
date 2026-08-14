@@ -2213,7 +2213,7 @@ class Precedence(GlobalConstraint):
     Given an array of variables X and a list of values P, values in P must appear in X in the order specified by P.
     I.e., if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
 
-    Requires a non-empty variable array (``vars`` arity >= 1).
+    Requires a non-empty variable array (``vars`` arity >= 1) and a non-empty precedence list (arity >= 1).
 
     Examples:
         - X = [1,2,1,3] satisfies the precedence [1,2,3].
@@ -2233,6 +2233,8 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
         if len(vars) == 0:
             raise ValueError('Precedence constraint must be given at least one variable')
+        if len(precedence) == 0:
+            raise ValueError('Precedence constraint must be given at least one precedence value')
         super().__init__("precedence", (list(vars), list(precedence)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
