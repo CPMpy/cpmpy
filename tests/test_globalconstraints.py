@@ -297,9 +297,14 @@ class TestGlobal:
         assert model.solve()
         assert iv.value() in vals
 
-        # Test InDomain with empty list (should be unsat)
-        model = cp.Model([cp.InDomain(iv, [])])
-        assert not model.solve()
+        # Test InDomain with empty list (construction mistake)
+        pytest.raises(ValueError, cp.InDomain, iv, [])
+
+        # Negating a covering domain must not construct an empty InDomain
+        covering = list(range(-8, 9))
+        neg = cp.InDomain(iv, covering).negate()
+        assert neg.value() is False
+        assert not cp.Model([~cp.InDomain(iv, covering)]).solve()
 
         # Test InDomain with singleton list
         model = cp.Model([cp.InDomain(iv, [1])])
@@ -1839,9 +1844,11 @@ class TestTypeChecks:
         """Globals that require a non-empty argument list must raise ValueError on empty input."""
         pytest.raises(ValueError, cp.AllDifferent, [])
         pytest.raises(ValueError, cp.AllDifferentExceptN, [], 0)
+        pytest.raises(ValueError, cp.AllDifferentExceptN, [cp.intvar(0, 1)], [])
         pytest.raises(ValueError, cp.AllDifferentExcept0, [])
         pytest.raises(ValueError, cp.AllEqual, [])
         pytest.raises(ValueError, cp.AllEqualExceptN, [], 0)
+        pytest.raises(ValueError, cp.AllEqualExceptN, [cp.intvar(0, 1)], [])
         pytest.raises(ValueError, cp.Xor, [])
         pytest.raises(ValueError, cp.Increasing, [])
         pytest.raises(ValueError, cp.Decreasing, [])
@@ -1855,10 +1862,42 @@ class TestTypeChecks:
         pytest.raises(ValueError, cp.Maximum, [])
         pytest.raises(ValueError, cp.NValue, [])
         pytest.raises(ValueError, cp.NValueExcept, [], 0)
+        pytest.raises(ValueError, cp.Count, [], 0)
+        pytest.raises(ValueError, cp.Among, [], [0])
+        pytest.raises(ValueError, cp.Among, [cp.intvar(0, 1)], [])
+        pytest.raises(ValueError, cp.GlobalCardinalityCount, [], [0], [0])
+        pytest.raises(ValueError, cp.GlobalCardinalityCount, [cp.intvar(0, 1)], [], [])
+        pytest.raises(ValueError, cp.Element, [], cp.intvar(0, 1))
+        pytest.raises(ValueError, cp.Inverse, [], [])
+        pytest.raises(ValueError, cp.Table, [], [[]])
+        pytest.raises(ValueError, cp.Table, [cp.intvar(0, 1)], [])
+        pytest.raises(ValueError, cp.Table, [cp.intvar(0, 1)], np.empty((0, 1), dtype=int))
+        pytest.raises(ValueError, cp.ShortTable, [], [[]])
+        pytest.raises(ValueError, cp.ShortTable, [cp.intvar(0, 1)], [])
+        pytest.raises(ValueError, cp.ShortTable, [cp.intvar(0, 1)], np.empty((0, 1), dtype=object))
+        pytest.raises(ValueError, cp.NegativeTable, [], [[]])
+        pytest.raises(ValueError, cp.NegativeTable, [cp.intvar(0, 1)], [])
+        pytest.raises(ValueError, cp.NegativeTable, [cp.intvar(0, 1)], np.empty((0, 1), dtype=int))
+        pytest.raises(ValueError, cp.InDomain, cp.intvar(0, 1), [])
+        pytest.raises(ValueError, cp.Regular, [cp.intvar(0, 1)], [], "A", ["A"])
+        pytest.raises(ValueError, cp.Regular, [cp.intvar(0, 1)], [("A", 0, "A")], "A", [])
+        pytest.raises(ValueError, cp.MDD, [cp.intvar(0, 1)], [])
+        pytest.raises(ValueError, cp.NDElement, np.empty((2, 0), dtype=object), [cp.intvar(0, 1), cp.intvar(0, 1)])
+        pytest.raises(ValueError, cp.Cumulative, [], [], None, [], 1)
+        pytest.raises(ValueError, cp.CumulativeOptional, [], [], None, [], 1, [])
+        pytest.raises(ValueError, cp.NoOverlap, [], [])
+        pytest.raises(ValueError, cp.NoOverlapOptional, [], [], None, [])
+        pytest.raises(ValueError, cp.Precedence, [], [0, 1])
+        pytest.raises(ValueError, cp.Precedence, [cp.intvar(0, 1)], [])
+        pytest.raises(ValueError, cp.LexLess, [], [])
+        pytest.raises(ValueError, cp.LexLessEq, [], [])
+        pytest.raises(ValueError, cp.LexChainLess, np.empty((0, 2)))
+        pytest.raises(ValueError, cp.LexChainLessEq, np.empty((2, 0)))
         from cpmpy.expressions.core import Operator
         pytest.raises(ValueError, Operator, "and", [])
         pytest.raises(ValueError, Operator, "or", [])
         pytest.raises(ValueError, Operator, "sum", [])
+        pytest.raises(ValueError, Operator, "wsum", [[], []])
 
     def test_multicicruit(self):
         c1 = cp.Circuit(cp.intvar(0,4, shape=5))
