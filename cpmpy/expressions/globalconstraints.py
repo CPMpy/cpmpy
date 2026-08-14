@@ -279,11 +279,12 @@ class AllDifferentExceptN(GlobalConstraint):
     """
     Enforces that all arguments, except those equal to a value in n, have a different (distinct) value.
 
-    Requires at least one argument in ``arr`` (arity >= 1).
+    Requires at least one argument in ``arr`` (arity >= 1) and a non-empty exception set ``n``.
 
     Arguments:
         arr (Sequence[Expression]): List of expressions to be different from each other, except those equal to a value in n
         n (int or list[int]): Value or list of values that are excluded from satisfying the alldifferent condition
+            (at least one required)
     """
 
     def __init__(self, arr: ListLike[ExprLike], n: int|np.integer|list[int|np.integer]):
@@ -292,6 +293,7 @@ class AllDifferentExceptN(GlobalConstraint):
             arr (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to a value in n
                 (at least one required)
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the distinctness constraint
+                (at least one required)
         """
         flatarr = flatlist(arr)
         if len(flatarr) == 0:
@@ -299,6 +301,8 @@ class AllDifferentExceptN(GlobalConstraint):
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
+        if len(n) == 0:
+            raise ValueError('AllDifferentExceptN constraint must be given at least one excluded value')
         super().__init__("alldifferent_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
