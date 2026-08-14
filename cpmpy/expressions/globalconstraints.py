@@ -1162,6 +1162,7 @@ class MDD(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the input sequence
                 (at least one required)
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
+                (at least one required)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
             reduce (bool, default=True): During decomposition, whether to reduce the MDD as a first decomposition step
                 by merging nodes with equivalent suffixes, reducing the size of the MDD
@@ -1173,6 +1174,10 @@ class MDD(GlobalConstraint):
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
 
+        if not is_any_list(transitions):
+            raise TypeError("The second argument of an MDD constraint should be a list of transitions")
+        if len(transitions) == 0:
+            raise ValueError('MDD constraint must be given at least one transition')
         _node_type = type(transitions[0][0])
         for id1, v, id2 in transitions:
             if not isinstance(id1, _node_type) or not isinstance(v, int) or not isinstance(id2, _node_type):
