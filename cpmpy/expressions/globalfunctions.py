@@ -1100,16 +1100,24 @@ class Among(GlobalFunction):
     This is similar to :class:`Count <cpmpy.expressions.globalfunctions.Count>`, but instead of counting occurrences of a single value,
     it counts occurrences of any value in a set. For example, `Among([x1, x2, x3, x4], [1, 2])`
     returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
+
+    Requires a non-empty ``arr`` and a non-empty ``vals`` (arity >= 1).
     """
 
     def __init__(self, arr: ListLike[ExprLike], vals: ListLike[int|np.integer]):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to count occurrences in
+                (at least one required)
             vals (ListLike[int | np.integer]): List of integer constants whose occurrences are counted
+                (at least one required)
         """
         if not is_any_list(arr) or not is_any_list(vals):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
+        if len(arr) == 0:
+            raise ValueError('Among function must be given at least one `arr` argument')
+        if len(vals) == 0:
+            raise ValueError('Among function must be given at least one value in `vals`')
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
         super().__init__("among", (arr, vals))
