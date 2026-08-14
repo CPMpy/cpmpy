@@ -787,6 +787,7 @@ class Operator(Expression):
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
             assert isinstance(arg_list[0], (list, tuple, np.ndarray)), "wsum: arg0 has to be a list-like"
+            assert isinstance(arg_list[1], (list, tuple, np.ndarray)), "wsum: arg1 has to be a list-like"
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
             weights: list[ExprLike] = []
             for a in arg_list[0]:
