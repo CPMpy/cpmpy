@@ -729,8 +729,8 @@ class Operator(Expression):
     it is stored first (as expr[0]), this eases weighted sum detection
 
     N-ary operators (``and``, ``or``, ``sum``) require at least one argument (arity >= 1).
-    Empty argument lists are rejected: while logically plausible, they usually indicate a
-    construction / user mistake (e.g. unexpectedly empty input).
+    ``wsum`` likewise requires at least one term. Empty argument lists are rejected: while
+    logically plausible, they usually indicate a construction / user mistake (e.g. unexpectedly empty input).
     """
     allowed: Final[dict[str, tuple[int, bool]]] = {
         #name: (arity, is_bool)       arity 0 = n-ary, min 1
@@ -794,7 +794,12 @@ class Operator(Expression):
                     weights.append(int(a)) # bool or int, simplifies things later on
                 else:
                     weights.append(a) # can be float
-            arg_list = (weights, arg_list[1])
+            exprs = arg_list[1]
+            if len(weights) != len(exprs):
+                raise ValueError(f"Operator 'wsum' expects equal lengths, got {len(weights)} weights and {len(exprs)} expressions")
+            if len(weights) == 0:
+                raise ValueError("Operator 'wsum' must be given at least one term")
+            arg_list = (weights, exprs)
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
