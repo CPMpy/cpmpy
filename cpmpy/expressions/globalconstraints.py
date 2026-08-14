@@ -915,7 +915,8 @@ class Regular(GlobalConstraint):
     Takes as input a sequence of variables and a automaton representation using a transition table.
     The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
 
-    Requires a non-empty input sequence (``array`` arity >= 1).
+    Requires a non-empty input sequence (``array`` arity >= 1), at least one transition,
+    and at least one accepting state (OR-Tools ``AddAutomaton`` rejects all three empties).
 
     The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
     The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
@@ -935,8 +936,10 @@ class Regular(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the input sequence
                 (at least one required)
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
+                (at least one required)
             start (int | str): Starting node id
             accepting (ListLike[int | str]): List of accepting node ids
+                (at least one required)
         """
         array = flatlist(array)
         if len(array) == 0:
@@ -946,6 +949,8 @@ class Regular(GlobalConstraint):
         
         if not is_any_list(transitions):
             raise TypeError("The second argument of a regular constraint should be a list of transitions")
+        if len(transitions) == 0:
+            raise ValueError('Regular constraint must be given at least one transition')
         _node_type = type(transitions[0][0])
         for s,v,e in transitions:
             if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
@@ -954,6 +959,8 @@ class Regular(GlobalConstraint):
             raise TypeError("The third argument of a regular constraint should be a node id")
         if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
             raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
+        if len(accepting) == 0:
+            raise ValueError('Regular constraint must be given at least one accepting state')
         super().__init__("regular", (list(array), list(transitions), start, list(accepting)))
 
         node_set = set()
@@ -980,8 +987,6 @@ class Regular(GlobalConstraint):
         # Decompose to transition table using Table constraints
 
         arr, transitions, start, accepting = self.args
-        if len(accepting) == 0:
-            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
 
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
@@ -1024,9 +1029,6 @@ class Regular(GlobalConstraint):
         """
 
         arr, transitions, start, accepting = self.args
-
-        if len(accepting) == 0:
-            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
 
         # Collect all nodes and all transition values in the DFA
         nodes_set = set()
