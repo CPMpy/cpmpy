@@ -597,14 +597,15 @@ class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
 
-    Requires a non-empty ``array`` of variables (arity >= 1).
+    Requires a non-empty ``array`` of variables (arity >= 1) and a non-empty ``table`` (at least one row).
     """
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
                 (at least one required)
-            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
+            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table
+                (at least one row required)
         """
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
@@ -626,6 +627,8 @@ class Table(GlobalConstraint):
             table = table.astype(int, copy=False)
         if table.ndim != 2:
             raise ValueError("Table's table must be a 2D array")
+        if table.shape[0] == 0:
+            raise ValueError('Table constraint must be given at least one row')
         if table.shape[1] != len(array):
             raise ValueError(f"Table width {table.shape[1]} != array length {len(array)}")
 
@@ -702,9 +705,6 @@ class Table(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
          """
 
-        if len(self.args[1]) == 0: # empty table, does not allow any assignments
-            return [cp.BoolVal(False)], []
-
         arr, tab = self._variable_ordering(heuristic)
 
         mdd: dict[int, dict[int, int]] = {}
@@ -756,7 +756,7 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
 
-    Requires a non-empty ``array`` of variables (arity >= 1).
+    Requires a non-empty ``array`` of variables (arity >= 1) and a non-empty ``table`` (at least one row).
     """
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
@@ -766,6 +766,7 @@ class ShortTable(GlobalConstraint):
                 (at least one required)
             table (ListLike[ListLike[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
                 STAR represents a wildcard (corresponding variable can take any value).
+                At least one row required.
         """
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
@@ -785,6 +786,8 @@ class ShortTable(GlobalConstraint):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         if table.ndim != 2:
             raise ValueError("ShortTable's table must be a 2D array")
+        if table.shape[0] == 0:
+            raise ValueError('ShortTable constraint must be given at least one row')
         if table.shape[1] != len(array):
             raise ValueError(f"ShortTable width {table.shape[1]} != array length {len(array)}")
 
@@ -847,7 +850,7 @@ class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
 
-    Requires a non-empty ``array`` of variables (arity >= 1).
+    Requires a non-empty ``array`` of variables (arity >= 1) and a non-empty ``table`` (at least one row).
     """
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
@@ -855,7 +858,8 @@ class NegativeTable(GlobalConstraint):
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
                 (at least one required)
-            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
+            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table
+                (at least one row required)
         """
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
@@ -877,6 +881,8 @@ class NegativeTable(GlobalConstraint):
             table = table.astype(int, copy=False)
         if table.ndim != 2:
             raise ValueError("NegativeTable's table must be a 2D array")
+        if table.shape[0] == 0:
+            raise ValueError('NegativeTable constraint must be given at least one row')
         if table.shape[1] != len(array):
             raise ValueError(f"NegativeTable width {table.shape[1]} != array length {len(array)}")
 
