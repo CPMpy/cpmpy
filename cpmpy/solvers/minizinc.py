@@ -776,16 +776,16 @@ class CPM_minizinc(SolverInterface):
             demand, demand_cons = get_nonneg_args(demand, is_present)
             extra_cons += demand_cons
 
-            # absent tasks consume no resources
-            demand_str = "[{}]".format(",".join(
-                "if {} then {} else 0 endif".format(self._convert_expression(p), self._convert_expression(d))
-                for d, p in zip(demand, is_present)))
+            # absent tasks do not have to be scheduled: expressed with an optional start time
+            opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
+                                                              self._convert_expression(s))
+                         for s, p in zip(start, is_present)]
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
-            return format_str.format(self._convert_expression(start),
+            return format_str.format("[{}]".format(",".join(opt_start)),
                                      self._convert_expression(dur),
-                                     demand_str,
+                                     self._convert_expression(demand),
                                      self._convert_expression(capacity))
 
         elif expr.name == "no_overlap":
@@ -818,7 +818,7 @@ class CPM_minizinc(SolverInterface):
             dur, dur_cons = get_nonneg_args(dur, is_present)
             extra_cons += dur_cons
 
-            # absent tasks do not have to be scheduled
+            # absent tasks do not have to be scheduled: expressed with an optional start time
             opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
                                                               self._convert_expression(s))
                          for s, p in zip(start, is_present)]

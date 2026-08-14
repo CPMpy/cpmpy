@@ -1258,8 +1258,10 @@ class TestGlobal:
 
     @pytest.mark.usefixtures("solver")
     def test_optional_cumulative(self, solver):
-        if solver in ("pysat", "pysdd", "pindakaas", "rc2"):
+        if solver == "pysdd":
             pytest.skip(f"{solver} does not support integer variables")
+        if solver == "rc2":
+            pytest.skip(f"{solver} only supports optimization problems")
 
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 3, 2]
@@ -1307,8 +1309,10 @@ class TestGlobal:
 
     @pytest.mark.usefixtures("solver")
     def test_optional_no_overlap(self, solver):
-        if solver in ("pysat", "pysdd", "pindakaas", "rc2"):
+        if solver == "pysdd":
             pytest.skip(f"{solver} does not support integer variables")
+        if solver == "rc2":
+            pytest.skip(f"{solver} only supports optimization problems")
 
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 6, 2]
