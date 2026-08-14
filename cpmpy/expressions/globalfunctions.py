@@ -907,6 +907,8 @@ class NDElement(GlobalFunction):
     """
     The `NDElement(Arr, Indices)` global function allows indexing into a multi-dimensional array
     with multiple decision variables.
+
+    Requires a non-empty array (no zero-size dimensions).
     """
 
     def __init__(self, arr: ListLike[ExprLike], indices: ListLike[Expression]):
@@ -930,6 +932,8 @@ class NDElement(GlobalFunction):
 
         if nd_array.ndim <= 1:
             raise TypeError("NDElement only supports multi-dimensional arrays. Use cpmpy.globalfunctions.Element for 1D arrays.")
+        if 0 in nd_array.shape:
+            raise ValueError('NDElement function must be given a non-empty array')
         if len(indices) != nd_array.ndim:
             raise ValueError(f"NDElement expects {nd_array.ndim} indices, got {len(indices)}")
 
