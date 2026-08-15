@@ -1670,11 +1670,17 @@ class TestBounds:
         # div constraint
         a,b = cp.intvar(1,2,shape=2)
         cons = (42 // (a - b)) >= 3
+        a._value, b._value = 1, 1
+        assert cons.value() is False
+        assert argval(cons) is False
+        pytest.raises(IncompleteFunctionError, (42 // (a - b)).value)
+
         m = cp.Model([p.implies(cons), a == b])
         if cp.SolverLookup.lookup("z3").supported():
             assert m.solve(solver="z3")# ortools does not support divisor spanning 0 work here
-            pytest.raises(IncompleteFunctionError, cons.value)
-            assert not argval(cons)
+            assert cons.value() is False
+            assert argval(cons) is False
+            pytest.raises(IncompleteFunctionError, (42 // (a - b)).value)
 
         # mayhem
         cons = (arr[10 // (a - b)] == 1).implies(p)
