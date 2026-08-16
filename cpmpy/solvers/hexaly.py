@@ -50,8 +50,8 @@ import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction, FloatSum
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
+from ..expressions.globalfunctions import GlobalFunction, FloatSum, Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Element, NDElement
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
@@ -73,7 +73,7 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "mod", "pow", "element"})
+    supported_global_constraints = frozenset({Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name})
     supported_reified_global_constraints = frozenset()
 
 
@@ -364,7 +364,7 @@ class CPM_hexaly(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"nd_element"})
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={NDElement.name})
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -444,7 +444,7 @@ class CPM_hexaly(SolverInterface):
             return eval_comparison(cpm_expr.name, x,y)
 
         elif isinstance(cpm_expr, GlobalConstraint):
-            if cpm_expr.name == "alldifferent":
+            if cpm_expr.name == AllDifferent.name:
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
                 return self.hex_model.distinct(hex_arr)
             raise ValueError(f"Global constraint {cpm_expr} is not supported by hexaly")
@@ -452,30 +452,30 @@ class CPM_hexaly(SolverInterface):
         elif isinstance(cpm_expr, GlobalFunction):
             if cpm_expr.name == "nvalues":
                 return self.hex_model.distinct(self._hex_expr(cpm_expr.args))
-            if cpm_expr.name == "element":
+            if cpm_expr.name == Element.name:
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args[0]))
                 idx = self._hex_expr(cpm_expr.args[1])
                 return self.hex_model.at(hex_arr,idx)
-            if cpm_expr.name == "abs":
+            if cpm_expr.name == Abs.name:
                 return self.hex_model.abs(self._hex_expr(cpm_expr.args[0]))
-            if cpm_expr.name == "mul":
+            if cpm_expr.name == Multiplication.name:
                 a, b = self._hex_expr(cpm_expr.args)
                 return a * b
-            if cpm_expr.name == "min":
+            if cpm_expr.name == Minimum.name:
                 return self.hex_model.min(*self._hex_expr(cpm_expr.args))
-            if cpm_expr.name == "max":
+            if cpm_expr.name == Maximum.name:
                 return self.hex_model.max(*self._hex_expr(cpm_expr.args))
-            if cpm_expr.name == "div":
+            if cpm_expr.name == Division.name:
                 a, b = self._hex_expr(cpm_expr.args)
                 # ensure we are rounding towards zero
                 return self.hex_model.iif((a >= 0) & (b >= 0), self.hex_model.floor(a / b), # result is positive
                        self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
                        self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
                        self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
-            if cpm_expr.name == "mod":
+            if cpm_expr.name == Modulo.name:
                 a, b = self._hex_expr(cpm_expr.args)
                 return a % b
-            if cpm_expr.name == "pow":
+            if cpm_expr.name == Power.name:
                 a, b = self._hex_expr(cpm_expr.args)
                 return a ** b
             raise ValueError(f"Global function {cpm_expr} is not supported by hexaly")
