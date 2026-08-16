@@ -52,7 +52,7 @@ from cpmpy.transformations.negation import push_down_negation, push_down_negatio
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalfunctions import FloatSum
+from ..expressions.globalfunctions import FloatSum, Minimum, Maximum, Abs, Multiplication, Power, Division
 from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
@@ -85,7 +85,7 @@ class CPM_gurobi(SolverInterface):
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "pow"})
+    supported_global_constraints = frozenset({Minimum.name, Maximum.name, Abs.name, Multiplication.name, Power.name})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -407,7 +407,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","->","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","->","sub", Minimum.name, Maximum.name, Multiplication.name, Abs.name, Power.name}), csemap=self._csemap)  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -467,13 +467,13 @@ class CPM_gurobi(SolverInterface):
                     grblhs = self._make_numexpr(lhs)
                     return self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
 
-                elif lhs.name == 'mul':
+                elif lhs.name == Multiplication.name:
                     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.setParam("NonConvex", 2)
                     return self.grb_model.addConstr(a * b == grbrhs)
 
-                elif lhs.name == 'div':
+                elif lhs.name == Division.name:
                     if not is_num(lhs.args[1]):
                         raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
                     a, b = self.solver_vars(lhs.args)
@@ -485,13 +485,13 @@ class CPM_gurobi(SolverInterface):
                     if is_num(grbrhs):
                         grbrhs = self.solver_var(intvar(lb=grbrhs, ub=grbrhs))
 
-                    if lhs.name == 'min':
+                    if lhs.name == Minimum.name:
                         return self.grb_model.addGenConstrMin(grbrhs, self.solver_vars(lhs.args))
-                    elif lhs.name == 'max':
+                    elif lhs.name == Maximum.name:
                         return self.grb_model.addGenConstrMax(grbrhs, self.solver_vars(lhs.args))
-                    elif lhs.name == 'abs':
+                    elif lhs.name == Abs.name:
                         return self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
-                    elif lhs.name == 'pow':
+                    elif lhs.name == Power.name:
                         x, a = self.solver_vars(lhs.args)
                         return self.grb_model.addGenConstrPow(x, grbrhs, a)
                     else:
