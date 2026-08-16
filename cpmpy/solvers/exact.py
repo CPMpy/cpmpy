@@ -86,7 +86,7 @@ class CPM_exact(SolverInterface):
     https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
-    supported_global_constraints = frozenset({"mul"})
+    supported_global_constraints = frozenset({Multiplication.name})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -530,7 +530,7 @@ class CPM_exact(SolverInterface):
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","->","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","->", Multiplication.name}), csemap=self._csemap)  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
 
         return cpm_cons
@@ -581,7 +581,7 @@ class CPM_exact(SolverInterface):
                 lhs, rhs = con.args
                 if con.name == "==":
                     # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
-                    if lhs.name == "mul":
+                    if lhs.name == Multiplication.name:
                         if is_num(rhs): # make dummy var
                             rhs = intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
