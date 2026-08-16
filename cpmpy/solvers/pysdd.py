@@ -74,8 +74,12 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
     """
 
-    supported_global_constraints = frozenset({Xor.name})
-    supported_reified_global_constraints = frozenset({Xor.name})
+    supported_global_constraints = frozenset({
+        Xor.name,
+    })
+    supported_reified_global_constraints = frozenset({
+        Xor.name,
+    })
 
     @staticmethod
     def supported():

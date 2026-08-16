@@ -86,7 +86,9 @@ class CPM_exact(SolverInterface):
     https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
-    supported_global_constraints = frozenset({Multiplication.name})
+    supported_global_constraints = frozenset({
+        Multiplication.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

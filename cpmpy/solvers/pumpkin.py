@@ -73,8 +73,20 @@ class CPM_pumpkin(SolverInterface):
     - ``pum_solver``: the pumpkin.Model() object
     """
 
-    supported_global_constraints = frozenset({AllDifferent.name, Cumulative.name, NoOverlap.name, Table.name, NegativeTable.name, InDomain.name,
-                                              Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Element.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        Cumulative.name,
+        Division.name,
+        Element.name,
+        InDomain.name,
+        Maximum.name,
+        Minimum.name,
+        Multiplication.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        Table.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

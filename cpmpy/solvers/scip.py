@@ -71,7 +71,11 @@ class CPM_scip(SolverInterface):
     # - "mul": addCons(mul == rhs).
     # No native "div": PySCIPOpt uses real division, which does not match CPMpy integer division
     # (round toward zero); same rationale as Gurobi — decompose via Division.decompose().
-    supported_global_constraints = frozenset({Xor.name, Abs.name, Multiplication.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        Multiplication.name,
+        Xor.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

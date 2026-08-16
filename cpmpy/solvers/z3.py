@@ -79,7 +79,14 @@ class CPM_z3(SolverInterface):
         Terminology note: a 'model' for z3 is a solution!
     """
 
-    supported_global_constraints = frozenset({AllDifferent.name, Xor.name, IfThenElse.name, Division.name, Multiplication.name, Modulo.name})
+    supported_global_constraints = frozenset({
+        AllDifferent.name,
+        Division.name,
+        IfThenElse.name,
+        Modulo.name,
+        Multiplication.name,
+        Xor.name,
+    })
     supported_reified_global_constraints = supported_global_constraints
 
     @staticmethod

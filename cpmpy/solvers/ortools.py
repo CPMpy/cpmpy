@@ -88,9 +88,27 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
-    supported_global_constraints = frozenset({AllDifferent.name, Xor.name, Table.name, NegativeTable.name, Cumulative.name, Circuit.name,
-                                                   Inverse.name, NoOverlap.name, Regular.name, CumulativeOptional.name, NoOverlapOptional.name,
-                                                   Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        Circuit.name,
+        Cumulative.name,
+        CumulativeOptional.name,
+        Division.name,
+        Element.name,
+        Inverse.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        NoOverlapOptional.name,
+        Power.name,
+        Regular.name,
+        Table.name,
+        Xor.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

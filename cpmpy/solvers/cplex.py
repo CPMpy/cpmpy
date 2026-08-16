@@ -86,7 +86,11 @@ class CPM_cplex(SolverInterface):
     Documentation of the solver's own Python API:
     https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
-    supported_global_constraints = frozenset({Minimum.name, Maximum.name, Abs.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        Maximum.name,
+        Minimum.name,
+    })
 
     @staticmethod
     def supported():

@@ -96,14 +96,50 @@ class CPM_minizinc(SolverInterface):
     https://minizinc-python.readthedocs.io/
     """
 
-    supported_global_constraints = frozenset({AllDifferent.name, AllDifferentExceptN.name, AllDifferentExcept0.name, AllEqual.name,
-                                              Inverse.name, IfThenElse.name, Xor.name, Table.name, InDomain.name, NegativeTable.name, MDD.name, Regular.name, Cumulative.name, Circuit.name, GlobalCardinalityCount.name,
-                                              Increasing.name, Decreasing.name,
-                                              IncreasingStrict.name, DecreasingStrict.name, LexLessEq.name, LexLess.name,
-                                              LexChainLess.name, LexChainLessEq.name,
-                                              Precedence.name, NoOverlap.name,
-                                              Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name, Count.name, NValue.name, Among.name, NDElement.name})
-    supported_reified_global_constraints = supported_global_constraints - {Circuit.name, Precedence.name, Regular.name}
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        AllDifferentExcept0.name,
+        AllDifferentExceptN.name,
+        AllEqual.name,
+        Among.name,
+        Circuit.name,
+        Count.name,
+        Cumulative.name,
+        Decreasing.name,
+        DecreasingStrict.name,
+        Division.name,
+        Element.name,
+        GlobalCardinalityCount.name,
+        IfThenElse.name,
+        InDomain.name,
+        Increasing.name,
+        IncreasingStrict.name,
+        Inverse.name,
+        LexChainLess.name,
+        LexChainLessEq.name,
+        LexLess.name,
+        LexLessEq.name,
+        MDD.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        NDElement.name,
+        NValue.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        Power.name,
+        Precedence.name,
+        Regular.name,
+        Table.name,
+        Xor.name,
+    })
+    supported_reified_global_constraints = supported_global_constraints - {
+        Circuit.name,
+        Precedence.name,
+        Regular.name,
+    }
 
     required_version = (2, 8, 2)
 

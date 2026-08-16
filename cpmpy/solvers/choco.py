@@ -84,12 +84,40 @@ class CPM_choco(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({AllDifferent.name, AllDifferentExcept0.name, AllEqual.name,
-                                    Table.name, NegativeTable.name, ShortTable.name, Regular.name, InDomain.name,
-                                    Cumulative.name, NoOverlap.name, Circuit.name, GlobalCardinalityCount.name, Inverse.name, Precedence.name,
-                                    Increasing.name, Decreasing.name, IncreasingStrict.name, DecreasingStrict.name,
-                                    LexLessEq.name, LexLess.name, MDD.name,
-                                    Minimum.name, Maximum.name, Division.name, Modulo.name, Power.name, Abs.name, Multiplication.name, Count.name, Element.name, NValue.name, Among.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        AllDifferentExcept0.name,
+        AllEqual.name,
+        Among.name,
+        Circuit.name,
+        Count.name,
+        Cumulative.name,
+        Decreasing.name,
+        DecreasingStrict.name,
+        Division.name,
+        Element.name,
+        GlobalCardinalityCount.name,
+        InDomain.name,
+        Increasing.name,
+        IncreasingStrict.name,
+        Inverse.name,
+        LexLess.name,
+        LexLessEq.name,
+        MDD.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        NValue.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        Power.name,
+        Precedence.name,
+        Regular.name,
+        ShortTable.name,
+        Table.name,
+    })
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
     @staticmethod

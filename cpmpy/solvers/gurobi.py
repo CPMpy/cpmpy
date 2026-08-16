@@ -85,7 +85,13 @@ class CPM_gurobi(SolverInterface):
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
-    supported_global_constraints = frozenset({Minimum.name, Maximum.name, Abs.name, Multiplication.name, Power.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        Maximum.name,
+        Minimum.name,
+        Multiplication.name,
+        Power.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

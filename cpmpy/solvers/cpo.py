@@ -74,10 +74,33 @@ class CPM_cpo(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({AllDifferent.name, Inverse.name, Table.name, InDomain.name, NegativeTable.name, GlobalCardinalityCount.name,
-                                              Cumulative.name, CumulativeOptional.name, NoOverlap.name, NoOverlapOptional.name,
-                                              Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name, NValue.name})
-    supported_reified_global_constraints = frozenset({AllDifferent.name, Table.name, InDomain.name, NegativeTable.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        Cumulative.name,
+        CumulativeOptional.name,
+        Division.name,
+        Element.name,
+        GlobalCardinalityCount.name,
+        InDomain.name,
+        Inverse.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        NValue.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        NoOverlapOptional.name,
+        Power.name,
+        Table.name,
+    })
+    supported_reified_global_constraints = frozenset({
+        AllDifferent.name,
+        InDomain.name,
+        NegativeTable.name,
+        Table.name,
+    })
 
     _docp = None  # Static attribute to hold the docplex.cp module
 

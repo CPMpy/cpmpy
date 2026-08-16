@@ -95,8 +95,24 @@ class CPM_gcs(SolverInterface):
     https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
-    supported_global_constraints = frozenset({AllDifferent.name, Table.name, NegativeTable.name, Inverse.name, Circuit.name, Xor.name,
-                                              Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name, Count.name, NValue.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        Circuit.name,
+        Count.name,
+        Division.name,
+        Element.name,
+        Inverse.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        NValue.name,
+        NegativeTable.name,
+        Power.name,
+        Table.name,
+        Xor.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

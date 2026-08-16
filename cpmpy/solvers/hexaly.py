@@ -73,7 +73,16 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        Division.name,
+        Element.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        Power.name,
+    })
     supported_reified_global_constraints = frozenset()
 
 
