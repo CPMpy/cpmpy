@@ -53,8 +53,8 @@ from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction, FloatSum
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Xor, IfThenElse
+from ..expressions.globalfunctions import GlobalFunction, FloatSum, Multiplication, Division, Modulo, Power
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -79,7 +79,7 @@ class CPM_z3(SolverInterface):
         Terminology note: a 'model' for z3 is a solution!
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mul", "mod"})
+    supported_global_constraints = frozenset({AllDifferent.name, Xor.name, IfThenElse.name, Division.name, Multiplication.name, Modulo.name})
     supported_reified_global_constraints = supported_global_constraints
 
     @staticmethod
@@ -378,7 +378,7 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"}))
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({Division.name, Modulo.name}))
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -517,12 +517,12 @@ class CPM_z3(SolverInterface):
             return eval_comparison(cpm_con.name, lhs, rhs)
 
         elif isinstance(cpm_con, GlobalFunction):
-            if cpm_con.name == "mod":
+            if cpm_con.name == Modulo.name:
                 # minimic modulo with integer division (round towards o)
                 x,y = self._z3_expr(cpm_con.args)
                 return z3.If(z3.And(x >= 0), x % y, -(-x % y))
 
-            elif cpm_con.name == "mul":
+            elif cpm_con.name == Multiplication.name:
                 x, y = self._z3_expr(cpm_con.args)
                 if isinstance(x, z3.BoolRef):
                     x = z3.If(x, 1, 0)
@@ -530,7 +530,7 @@ class CPM_z3(SolverInterface):
                     y = z3.If(y, 1, 0)
                 return x * y
 
-            elif cpm_con.name == "div":
+            elif cpm_con.name == Division.name:
                 # z3 rounds towards negative infinity, need this hack when result is negative
                 x,y = self._z3_expr(cpm_con.args)
                 return z3.If(z3.And(x >= 0, y >= 0), x / y,
@@ -538,7 +538,7 @@ class CPM_z3(SolverInterface):
                        z3.If(z3.And(x >= 0, y <= 0), -(x / -y),
                        z3.If(z3.And(x <= 0, y >= 0), -(-x / y), 0))))
 
-            elif cpm_con.name == "pow":
+            elif cpm_con.name == Power.name:
                 x,y = self._z3_expr(cpm_con.args)
                 if not is_num(cpm_con.args[1]):
                     # tricky in Z3 not all power constraints are decidable
@@ -555,9 +555,9 @@ class CPM_z3(SolverInterface):
             # TODO:
             # table
 
-            if cpm_con.name == 'alldifferent':
+            if cpm_con.name == AllDifferent.name:
                 return z3.Distinct(self._z3_expr(cpm_con.args))
-            elif cpm_con.name == 'xor':
+            elif cpm_con.name == Xor.name:
                 z3_args = self._z3_expr(cpm_con.args)
                 if len(z3_args) == 1: # just the arg
                     return z3_args[0]
@@ -565,7 +565,7 @@ class CPM_z3(SolverInterface):
                 for a in z3_args[2:]:
                     z3_cons = z3.Xor(z3_cons, a)
                 return z3_cons
-            elif cpm_con.name == 'ite':
+            elif cpm_con.name == IfThenElse.name:
                 return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
                              self._z3_expr(cpm_con.args[2]))
 
