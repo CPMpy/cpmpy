@@ -1101,6 +1101,8 @@ class MDD(GlobalConstraint):
                           ("E", 2, "F")])
     """
 
+    name = "mdd"
+
     def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None, reduce: bool = True):
         """
         Arguments:
@@ -1121,7 +1123,7 @@ class MDD(GlobalConstraint):
                 raise TypeError(
                     f"The second argument of an MDD constraint should be a list of transitions ({_node_type}, int, {_node_type})")
 
-        super().__init__("mdd", (array,))
+        super().__init__(self.name, (array,))
         self.root_node = transitions[0][0] if start is None else start
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
         for id1, v, id2 in transitions:

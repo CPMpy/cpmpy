@@ -928,6 +928,8 @@ class NDElement(GlobalFunction):
     with multiple decision variables.
     """
 
+    name = "nd_element"
+
     def __init__(self, arr: ListLike[ExprLike], indices: ListLike[Expression]):
         """
         Arguments:
@@ -952,7 +954,7 @@ class NDElement(GlobalFunction):
         if len(indices) != nd_array.ndim:
             raise ValueError(f"NDElement expects {nd_array.ndim} indices, got {len(indices)}")
 
-        super().__init__("nd_element", (nd_array, *tuple(indices)))
+        super().__init__(self.name, (nd_array, *tuple(indices)))
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
