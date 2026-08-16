@@ -61,7 +61,8 @@ from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, ExprLike, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl, NegBoolView, boolvar
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, AllDifferent, Table, NegativeTable, Inverse, Circuit, Xor
+from ..expressions.globalfunctions import Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Element, Count, NValue
 from ..expressions.utils import is_int, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
@@ -94,8 +95,8 @@ class CPM_gcs(SolverInterface):
     https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "table", "negative_table", "inverse", "circuit", "xor",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue"})
+    supported_global_constraints = frozenset({AllDifferent.name, Table.name, NegativeTable.name, Inverse.name, Circuit.name, Xor.name,
+                                              Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name, Count.name, NValue.name})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -693,10 +694,10 @@ class CPM_gcs(SolverInterface):
 
                 # If the comparison is '==' we can have a NumExpr on the lhs
                 elif con.name == '==':
-                    if lhs.name == 'abs':
+                    if lhs.name == Abs.name:
                         assert(len(lhs.args) == 1) # Should not have a nested expression inside abs
                         self.gcs.post_abs(*self.solver_vars(list(lhs.args) + [rhs]))
-                    elif lhs.name in ['mul', 'div', 'pow', 'mod']:
+                    elif lhs.name in {Multiplication.name, Division.name, Power.name, Modulo.name}:
                         self.gcs.post_arithmetic(*self.solver_vars(list(lhs.args) + [rhs]), lhs.name)
                     elif lhs.name == 'sub':
                         var1 = self.solver_var(lhs.args[0])
@@ -714,16 +715,16 @@ class CPM_gcs(SolverInterface):
                         summands = self.solver_vars(lhs.args[1])
                         summands.append(self.gcs.negate(self.solver_var(rhs)))
                         self.gcs.post_linear_equality(summands, list(lhs.args[0]) + [1], 0)
-                    elif lhs.name == 'max':
+                    elif lhs.name == Maximum.name:
                         self.gcs.post_max(self.solver_vars(lhs.args), self.solver_var(rhs))
-                    elif lhs.name == 'min':
+                    elif lhs.name == Minimum.name:
                         self.gcs.post_min(self.solver_vars(lhs.args), self.solver_var(rhs))   
-                    elif lhs.name == 'element':
+                    elif lhs.name == Element.name:
                         arr, idx = self.solver_vars(lhs.args)
                         self.gcs.post_element(self.solver_var(rhs), idx, arr)
-                    elif lhs.name == 'count':
+                    elif lhs.name == Count.name:
                         self.gcs.post_count(self.solver_vars(lhs.args[0]), self.solver_var(lhs.args[1]), self.solver_var(rhs))
-                    elif lhs.name == 'nvalue':
+                    elif lhs.name == NValue.name:
                         self.gcs.post_nvalue(self.solver_var(rhs), self.solver_vars(lhs.args))
                     else:
                         # Think that's all the possible NumExprs?
@@ -732,18 +733,18 @@ class CPM_gcs(SolverInterface):
                     raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(con))
             
             # rest: base (Boolean) global constraints
-            elif con.name == 'xor':
+            elif con.name == Xor.name:
                 self.gcs.post_xor(self.solver_vars(con.args))
-            elif con.name == 'circuit':
+            elif con.name == Circuit.name:
                 self.gcs.post_circuit(self.solver_vars(con.args))
-            elif con.name == 'inverse':
+            elif con.name == Inverse.name:
                 gcs_args = self.solver_vars(con.args)
                 self.gcs.post_inverse(gcs_args[0], gcs_args[1])
-            elif con.name == 'alldifferent':
+            elif con.name == AllDifferent.name:
                 self.gcs.post_alldifferent(self.solver_vars(con.args))
-            elif con.name == 'table':
+            elif con.name == Table.name:
                 self.gcs.post_table(self.solver_vars(con.args[0]), con.args[1])
-            elif con.name == 'negative_table':
+            elif con.name == NegativeTable.name:
                 self.gcs.post_negative_table(self.solver_vars(con.args[0]), con.args[1])
             elif isinstance(con, GlobalConstraint):
                 # GCS also has SmartTable, Regular Language Membership, Knapsack constraints
