@@ -52,9 +52,9 @@ import warnings
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import Cumulative, DirectConstraint
+from ..expressions.globalconstraints import AllDifferent, AllDifferentExcept0, AllEqual, Table, NegativeTable, ShortTable, Regular, InDomain, Cumulative, NoOverlap, Circuit, GlobalCardinalityCount, Inverse, Precedence, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess, MDD, DirectConstraint, GlobalConstraint
+from ..expressions.globalfunctions import Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Count, Element, NValue, Among, NDElement
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
-from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR, \
     get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -84,12 +84,12 @@ class CPM_choco(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "allequal",
-                                    "table", 'negative_table', "short_table", "regular", "InDomain",
-                                    "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
-                                    "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
-                                    "lex_lesseq", "lex_less", "mdd",
-                                    "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
+    supported_global_constraints = frozenset({AllDifferent.name, AllDifferentExcept0.name, AllEqual.name,
+                                    Table.name, NegativeTable.name, ShortTable.name, Regular.name, InDomain.name,
+                                    Cumulative.name, NoOverlap.name, Circuit.name, GlobalCardinalityCount.name, Inverse.name, Precedence.name,
+                                    Increasing.name, Decreasing.name, IncreasingStrict.name, DecreasingStrict.name,
+                                    LexLessEq.name, LexLess.name, MDD.name,
+                                    Minimum.name, Maximum.name, Division.name, Modulo.name, Power.name, Abs.name, Multiplication.name, Count.name, Element.name, NValue.name, Among.name})
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
     @staticmethod
@@ -409,7 +409,7 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"nd_element"})
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={NDElement.name})
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
@@ -519,44 +519,44 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == '==':
 
                 chc_rhs = self._to_var(rhs) # result is always var
-                all_vars = {"min", "max", "abs", "div", "mod", "element", "nvalue"}
+                all_vars = {Minimum.name, Maximum.name, Abs.name, Division.name, Modulo.name, Element.name, NValue.name}
                 if lhs.name in all_vars:
 
                     chc_args = self._to_vars(lhs.args)
 
-                    if lhs.name == 'min': # min(vars) = var
+                    if lhs.name == Minimum.name: # min(vars) = var
                         return self.chc_model.min(chc_rhs, chc_args)
-                    elif lhs.name == 'max': # max(vars) = var
+                    elif lhs.name == Maximum.name: # max(vars) = var
                         return self.chc_model.max(chc_rhs, chc_args)
-                    elif lhs.name == 'abs': # abs(var) = var
+                    elif lhs.name == Abs.name: # abs(var) = var
                         assert len(chc_args) == 1, f"Expected one argument of abs constraint, but got {chc_args}"
                         return self.chc_model.absolute(chc_rhs, chc_args[0])
-                    elif lhs.name == "div": # var / var = var
+                    elif lhs.name == Division.name: # var / var = var
                         dividend, divisor = chc_args
                         return self.chc_model.div(dividend, divisor, chc_rhs)
-                    elif lhs.name == 'mod': # var % var = var
+                    elif lhs.name == Modulo.name: # var % var = var
                         dividend, divisor = chc_args
                         return self.chc_model.mod(dividend, divisor, chc_rhs)
-                    elif lhs.name == "element": # varsvar[var] = var
+                    elif lhs.name == Element.name: # varsvar[var] = var
                         # TODO: actually, Choco also supports ints[var] = var, but no mix of var and int in array
                         arr, idx = chc_args
                         return self.chc_model.element(chc_rhs, arr, idx)
-                    elif lhs.name == "nvalue": # nvalue(vars) = var
+                    elif lhs.name == NValue.name: # nvalue(vars) = var
                         # TODO: should look into leaving nvalue <= arg so can post atmost_nvalues here
                         return self.chc_model.n_values(chc_args, chc_rhs)
 
-                elif lhs.name == 'count': # count(vars, var/int) = var
+                elif lhs.name == Count.name: # count(vars, var/int) = var
                     arr, val = lhs.args
                     return self.chc_model.count(self.solver_var(val), self._to_vars(arr), chc_rhs)
-                elif lhs.name == "among":
+                elif lhs.name == Among.name:
                     arr, vals = lhs.args
                     return self.chc_model.among(chc_rhs, self._to_vars(arr), vals)
-                elif lhs.name == 'mul': # var * var/int = var/int
+                elif lhs.name == Multiplication.name: # var * var/int = var/int
                     a,b = self.solver_vars(lhs.args)
                     if isinstance(a, int):
                         a,b = b,a # int arg should always be second
                     return self.chc_model.times(a,b, self.solver_var(rhs))
-                elif lhs.name == 'pow': # var ^ int = var
+                elif lhs.name == Power.name: # var ^ int = var
                     chc_rhs = self._to_var(rhs)
                     return self.chc_model.pow(*self.solver_vars(lhs.args),chc_rhs)
 
@@ -569,26 +569,26 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {AllDifferent.name, AllEqual.name, Circuit.name, Inverse.name, Increasing.name, Decreasing.name, IncreasingStrict.name, DecreasingStrict.name, LexLessEq.name, LexLess.name}:
                 chc_args = self._to_vars(cpm_expr.args)
-                if cpm_expr.name == 'alldifferent':
+                if cpm_expr.name == AllDifferent.name:
                     return self.chc_model.all_different(chc_args)
-                elif cpm_expr.name == 'allequal':
+                elif cpm_expr.name == AllEqual.name:
                     return self.chc_model.all_equal(chc_args)
-                elif cpm_expr.name == "circuit":
+                elif cpm_expr.name == Circuit.name:
                     return self.chc_model.circuit(chc_args)
-                elif cpm_expr.name == "inverse":
+                elif cpm_expr.name == Inverse.name:
                     return self.chc_model.inverse_channeling(*chc_args)
-                elif cpm_expr.name == "increasing":
+                elif cpm_expr.name == Increasing.name:
                     return self.chc_model.increasing(chc_args,0)
-                elif cpm_expr.name == "decreasing":
+                elif cpm_expr.name == Decreasing.name:
                     return self.chc_model.decreasing(chc_args,0)
-                elif cpm_expr.name == "strictly_increasing":
+                elif cpm_expr.name == IncreasingStrict.name:
                     return self.chc_model.increasing(chc_args,1)
-                elif cpm_expr.name == "strictly_decreasing":
+                elif cpm_expr.name == DecreasingStrict.name:
                     return self.chc_model.decreasing(chc_args,1)
-                elif cpm_expr.name in ["lex_lesseq", "lex_less"]:
-                    if cpm_expr.name == "lex_lesseq":
+                elif cpm_expr.name in [LexLessEq.name, LexLess.name]:
+                    if cpm_expr.name == LexLessEq.name:
                         return self.chc_model.lex_less_eq(*chc_args)
                     return self.chc_model.lex_less(*chc_args)
 # Ready for when it is fixed in pychoco (https://github.com/chocoteam/pychoco/issues/30)
@@ -596,19 +596,19 @@ class CPM_choco(SolverInterface):
 #                    return self.chc_model.lex_chain_less(chc_args)
 
             # but not all
-            elif cpm_expr.name == 'alldifferent_except_0':
+            elif cpm_expr.name == AllDifferentExcept0.name:
                 args, n = cpm_expr.args
                 assert len(n) == 1 and n[0] == 0, f"Choco only supports alldifferent_except_n with n=0, got {n}"
                 return self.chc_model.all_different_except_0(self._to_vars(args))
-            elif cpm_expr.name == 'table':
+            elif cpm_expr.name == Table.name:
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.table(array, table)
-            elif cpm_expr.name == 'negative_table':
+            elif cpm_expr.name == NegativeTable.name:
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.table(array, table, False)
-            elif cpm_expr.name == 'short_table':
+            elif cpm_expr.name == ShortTable.name:
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = cpm_expr.args
                 table = np.array(table)
@@ -619,7 +619,7 @@ class CPM_choco(SolverInterface):
                 chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
-            elif cpm_expr.name == "regular":
+            elif cpm_expr.name == Regular.name:
                 from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
                 array, transitions, start, accepting = cpm_expr.args
                 for i, (lb, ub) in enumerate(zip(*get_bounds(array))):
@@ -633,7 +633,7 @@ class CPM_choco(SolverInterface):
                 automaton.set_initial_state(cpm_expr.node_map[start])
                 automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
                 return self.chc_model.regular(self._to_vars(array), automaton)
-            elif cpm_expr.name == "mdd":
+            elif cpm_expr.name == MDD.name:
                 from pychoco.objects.graphs.multivalued_decision_diagram import MultivaluedDecisionDiagram
                 from pychoco.backend import create_mdd_transitions
                 from pychoco._handle_wrapper import _HandleWrapper
@@ -652,11 +652,11 @@ class CPM_choco(SolverInterface):
                 _HandleWrapper.__init__(chc_mdd, chc_handle)
                 return self.chc_model.mddc(self._to_vars(array), chc_mdd)
 
-            elif cpm_expr.name == 'InDomain':
+            elif cpm_expr.name == InDomain.name:
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)
-            elif cpm_expr.name == "cumulative":
+            elif cpm_expr.name == Cumulative.name:
                 if len(cpm_expr.args) == 4:
                     start, dur, demand, cap = cpm_expr.args
                 else:
@@ -678,16 +678,16 @@ class CPM_choco(SolverInterface):
                 if len(extra_cons): # replace some negative durations, part of constraint
                     return self.chc_model.and_([chc_cumulative] + [self._get_constraint(c) for c in extra_cons])
                 return chc_cumulative
-            elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
+            elif cpm_expr.name == NoOverlap.name: # post as Cumulative with capacity 1
                 if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
                     return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1))
                 else:
                     start, dur, end = cpm_expr.args
                     return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
-            elif cpm_expr.name == "precedence":
+            elif cpm_expr.name == Precedence.name:
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
-            elif cpm_expr.name == "gcc":
+            elif cpm_expr.name == GlobalCardinalityCount.name:
                 vars, vals, occ = cpm_expr.args
                 return self.chc_model.global_cardinality(self._to_vars(vars), self.solver_vars(vals), self._to_vars(occ), cpm_expr.closed)
             else:
