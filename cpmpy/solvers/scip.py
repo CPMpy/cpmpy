@@ -36,8 +36,8 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
-from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction, FloatSum
+from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint, Xor
+from ..expressions.globalfunctions import GlobalFunction, FloatSum, Abs, Multiplication
 from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
@@ -71,7 +71,11 @@ class CPM_scip(SolverInterface):
     # - "mul": addCons(mul == rhs).
     # No native "div": PySCIPOpt uses real division, which does not match CPMpy integer division
     # (round toward zero); same rationale as Gurobi — decompose via Division.decompose().
-    supported_global_constraints = frozenset({"xor", "abs", "mul"})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        Multiplication.name,
+        Xor.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -294,9 +298,9 @@ class CPM_scip(SolverInterface):
         elif cpm_expr.name == "wsum":
             return scip.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
         elif isinstance(cpm_expr, GlobalFunction):  # GlobalFunction: abs, mul (PySCIPOpt supports these in constraints/objective)
-            if cpm_expr.name == "abs":
+            if cpm_expr.name == Abs.name:
                 return abs(self._make_numexpr(cpm_expr.args[0]))
-            elif cpm_expr.name == "mul":
+            elif cpm_expr.name == Multiplication.name:
                 a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
                 return a * b
             else:
@@ -330,7 +334,7 @@ class CPM_scip(SolverInterface):
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", Abs.name, "->"}) | self.supported_global_constraints, csemap=self._csemap)
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
@@ -416,7 +420,7 @@ class CPM_scip(SolverInterface):
                 raise Exception(f"Unknown linear expression {sub_expr} name")
 
         elif isinstance(cpm_expr, GlobalConstraint):
-            if cpm_expr.name == "xor":
+            if cpm_expr.name == Xor.name:
                 # Convert to SCIP arguments, handling constants, post `xor(args) == rhsvar` to SCIP
                 scip_args = []
                 rhsvar = True

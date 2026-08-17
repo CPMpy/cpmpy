@@ -71,8 +71,8 @@ from ..exceptions import MinizincNameException, MinizincBoundsException, Minizin
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
-from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, MDD, Regular
-from ..expressions.globalfunctions import Multiplication, FloatSum
+from ..expressions.globalconstraints import AllDifferent, AllDifferentExceptN, AllDifferentExcept0, AllEqual, GlobalConstraint, Inverse, IfThenElse, Xor, Table, InDomain, NegativeTable, MDD, Regular, Cumulative, Circuit, GlobalCardinalityCount, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess, LexChainLess, LexChainLessEq, Precedence, NoOverlap, DirectConstraint
+from ..expressions.globalfunctions import Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Element, Count, NValue, Among, NDElement, FloatSum
 from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
@@ -96,14 +96,50 @@ class CPM_minizinc(SolverInterface):
     https://minizinc-python.readthedocs.io/
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
-                                              "increasing", "decreasing",
-                                              "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
-                                              "lex_chain_less","lex_chain_lesseq",
-                                              "precedence", "no_overlap",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "nd_element"})
-    supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence", "regular"}
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        AllDifferentExcept0.name,
+        AllDifferentExceptN.name,
+        AllEqual.name,
+        Among.name,
+        Circuit.name,
+        Count.name,
+        Cumulative.name,
+        Decreasing.name,
+        DecreasingStrict.name,
+        Division.name,
+        Element.name,
+        GlobalCardinalityCount.name,
+        IfThenElse.name,
+        InDomain.name,
+        Increasing.name,
+        IncreasingStrict.name,
+        Inverse.name,
+        LexChainLess.name,
+        LexChainLessEq.name,
+        LexLess.name,
+        LexLessEq.name,
+        MDD.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        NDElement.name,
+        NValue.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        Power.name,
+        Precedence.name,
+        Regular.name,
+        Table.name,
+        Xor.name,
+    })
+    supported_reified_global_constraints = supported_global_constraints - {
+        Circuit.name,
+        Precedence.name,
+        Regular.name,
+    }
 
     required_version = (2, 8, 2)
 
@@ -693,90 +729,102 @@ class CPM_minizinc(SolverInterface):
                 return "not " + self.solver_var(expr._bv)
             return self.solver_var(expr)
 
-        # table(vars, tbl): no [] nesting of args, and special table output...
-        if expr.name == "table":
-            str_vars = self._convert_expression(expr.args[0])
-            str_tbl = "[|\n"  # opening
-            for row in expr.args[1]:
-                str_tbl += ",".join(map(str, row)) + " |"  # rows
-            str_tbl += "\n|]"  # closing
-            return "table({}, {})".format(str_vars, str_tbl)
+        if isinstance(expr, GlobalConstraint) and not isinstance(expr, DirectConstraint):
+            # direct constraints can have the same name as globals...
 
-        # negative_table(vars, tbl): use not table(...) for forbidden assignments
-        if expr.name == "negative_table":
-            str_vars = self._convert_expression(expr.args[0])
-            str_tbl = "[|\n"  # opening
-            for row in expr.args[1]:
-                str_tbl += ",".join(map(str, row)) + " |"  # rows
-            str_tbl += "\n|]"  # closing
-            return "not table({}, {})".format(str_vars, str_tbl)
+            # table(vars, tbl): no [] nesting of args, and special table output...
+            if expr.name == Table.name:
+                str_vars = self._convert_expression(expr.args[0])
+                str_tbl = "[|\n"  # opening
+                for row in expr.args[1]:
+                    str_tbl += ",".join(map(str, row)) + " |"  # rows
+                str_tbl += "\n|]"  # closing
+                return "table({}, {})".format(str_vars, str_tbl)
 
-        # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
-        if expr.name == "inverse":
-            def zero_based(array):
-                return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
+            # negative_table(vars, tbl): use not table(...) for forbidden assignments
+            if expr.name == NegativeTable.name:
+                str_vars = self._convert_expression(expr.args[0])
+                str_tbl = "[|\n"  # opening
+                for row in expr.args[1]:
+                    str_tbl += ",".join(map(str, row)) + " |"  # rows
+                str_tbl += "\n|]"  # closing
+                return "not table({}, {})".format(str_vars, str_tbl)
 
-            str_fwd = zero_based(expr.args[0])
-            str_rev = zero_based(expr.args[1])
-            return "inverse({}, {})".format(str_fwd, str_rev)
+            # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
+            if expr.name == Inverse.name:
+                def zero_based(array):
+                    return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
 
-        if expr.name == "alldifferent_except0":
-            args_str = [self._convert_expression(e) for e in expr.args]
-            return "alldifferent_except_0([{}])".format(",".join(args_str))
+                str_fwd = zero_based(expr.args[0])
+                str_rev = zero_based(expr.args[1])
+                return "inverse({}, {})".format(str_fwd, str_rev)
 
-        if expr.name in ["lex_lesseq", "lex_less"]:
-            X = [self._convert_expression(e) for e in expr.args[0]]
-            Y = [self._convert_expression(e) for e in expr.args[1]]
-            return f"{expr.name}({{}}, {{}})".format(X, Y)
+            if expr.name == AllDifferentExcept0.name:
+                arr, excepting = expr.args
+                assert len(excepting) == 1 and excepting[0] == 0, "Should be [0], but got {}".format(excepting)
+                return "alldifferent_except_0({})".format(self._convert_expression(arr))
 
-        if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
-            arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
-            str_X = "[|\n"  # opening
-            for row in arr.T:  # Minizinc enforces lexicographic order on columns
-                str_X += ",".join(map(str, row)) + " |"  # rows
-            str_X += "\n|]"  # closing
-            return f"{expr.name}({{}})".format(str_X)
-
-        elif expr.name == "cumulative":
-            extra_cons = []
-            if len(expr.args) == 4:
-                start, dur, demand, capacity = expr.args
-            else:
-                start, dur, end, demand, capacity = expr.args
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
-
-            global_str = "cumulative({},{},{},{})"
-            # ensure duration is non-negative
-            dur, dur_cons = get_nonneg_args(dur)
-            extra_cons += dur_cons
-            # ensure demand is non-negative
-            demand, demand_cons = get_nonneg_args(demand)
-            extra_cons += demand_cons
-
-            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
-
-            return format_str.format(self._convert_expression(start),
-                                     self._convert_expression(dur),
-                                     self._convert_expression(demand),
-                                     self._convert_expression(capacity))
-
-        elif expr.name == "no_overlap":
-            extra_cons = []
-            if len(expr.args) == 2:
-                start, dur = expr.args
-            else:
-                start, dur, end = expr.args
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+            if expr.name == AllDifferentExceptN.name:
+                arr, excepting = expr.args
+                arr_str = self._convert_expression(arr)
+                excepting_str = self._convert_expression(excepting)
+                excepting_str = "{" + excepting_str[1:-1] + "}" # needs to be a set
+                return "alldifferent_except({},{})".format(arr_str, excepting_str)
             
-            global_str = "disjunctive({},{})"
-            # ensure duration is non-negative
-            dur, dur_cons = get_nonneg_args(dur)
-            extra_cons += dur_cons
+            if expr.name in [LexLessEq.name, LexLess.name]:
+                X = [self._convert_expression(e) for e in expr.args[0]]
+                Y = [self._convert_expression(e) for e in expr.args[1]]
+                return f"{expr.name}({{}}, {{}})".format(X, Y)
 
-            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+            if expr.name in [LexChainLess.name, LexChainLessEq.name]:
+                arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
+                str_X = "[|\n"  # opening
+                for row in arr.T:  # Minizinc enforces lexicographic order on columns
+                    str_X += ",".join(map(str, row)) + " |"  # rows
+                str_X += "\n|]"  # closing
+                return f"{expr.name}({{}})".format(str_X)
 
-            return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+            elif expr.name == Cumulative.name:
+                extra_cons = []
+                if len(expr.args) == 4:
+                    start, dur, demand, capacity = expr.args
+                else:
+                    start, dur, end, demand, capacity = expr.args
+                    extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
+                global_str = "cumulative({},{},{},{})"
+                # ensure duration is non-negative
+                dur, dur_cons = get_nonneg_args(dur)
+                extra_cons += dur_cons
+                # ensure demand is non-negative
+                demand, demand_cons = get_nonneg_args(demand)
+                extra_cons += demand_cons
+
+                format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+                return format_str.format(self._convert_expression(start),
+                                        self._convert_expression(dur),
+                                        self._convert_expression(demand),
+                                        self._convert_expression(capacity))
+
+            elif expr.name == NoOverlap.name:
+                extra_cons = []
+                if len(expr.args) == 2:
+                    start, dur = expr.args
+                else:
+                    start, dur, end = expr.args
+                    extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+                
+                global_str = "disjunctive({},{})"
+                # ensure duration is non-negative
+                dur, dur_cons = get_nonneg_args(dur)
+                extra_cons += dur_cons
+
+                format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+                return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+
+        # default case: convert all args to strings
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
@@ -831,7 +879,7 @@ class CPM_minizinc(SolverInterface):
             # default: prefix printing
             return "{}({})".format(op_str, ",".join(args_str))
 
-        elif expr.name == "element":
+        elif expr.name == Element.name:
             subtype = "int"
             if all(isinstance(v, bool) or \
                    (isinstance(v, Expression) and v.is_bool()) \
@@ -845,7 +893,7 @@ class CPM_minizinc(SolverInterface):
                                                                                              args_str[0])
             txt += f"      arr[{idx}]"
             return txt
-        elif expr.name == "nd_element":
+        elif expr.name == NDElement.name:
             arr = expr.args[0]
             subtype = "int"
             if all(isinstance(v, bool) or \
@@ -871,15 +919,15 @@ class CPM_minizinc(SolverInterface):
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
 
-        elif expr.name == "precedence":
+        elif expr.name == Precedence.name:
             return "value_precede_chain({},{})".format(args_str[1], args_str[0])
 
-        elif expr.name == 'ite':
+        elif expr.name == IfThenElse.name:
             cond, tr, fal = expr.args
             return "if {} then {} else {} endif".format(self._convert_expression(cond), self._convert_expression(tr),
                                                         self._convert_expression(fal))
 
-        elif expr.name == "gcc":
+        elif expr.name == GlobalCardinalityCount.name:
             assert isinstance(expr, GlobalCardinalityCount)  # typecheck that it has a .closed()
             vars, vals, occ = expr.args
             vars = self._convert_expression(vars)
@@ -891,38 +939,38 @@ class CPM_minizinc(SolverInterface):
                 name = "global_cardinality_closed"
             return "{}({},{},{})".format(name, vars, vals, occ)
 
-        elif expr.name == "div":
+        elif expr.name == Division.name:
             return "{} div {}".format(*args_str)
 
-        elif expr.name == "mod":
+        elif expr.name == Modulo.name:
             return "{} mod {}".format(*args_str)
 
-        elif expr.name == "pow":
+        elif expr.name == Power.name:
             return "{}^{}".format(*args_str)
 
-        elif expr.name == "abs":
+        elif expr.name == Abs.name:
             return "abs({})".format(args_str[0])
 
-        elif expr.name == "mul":
+        elif expr.name == Multiplication.name:
             assert isinstance(expr, Multiplication)
             if expr.is_lhs_num:
                 return "{}*({})".format(args_str[1], args_str[0])
             else:
                 return "({}) * ({})".format(args_str[1], args_str[0])
 
-        elif expr.name == "count":
+        elif expr.name == Count.name:
             vars, val = expr.args
             vars = self._convert_expression(vars)
             val = self._convert_expression(val)
             return "count({},{})".format(vars, val)
 
-        elif expr.name == "among":
+        elif expr.name == Among.name:
             vars, vals = expr.args
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
 
-        elif expr.name == "InDomain":
+        elif expr.name == InDomain.name:
             # InDomain(expr, domain_list) - convert domain_list to a set
             arg0_str = self._convert_expression(expr.args[0])
             domain = expr.args[1]
@@ -933,7 +981,7 @@ class CPM_minizinc(SolverInterface):
                 domain_str = self._convert_expression(domain)
             return "({} in {})".format(arg0_str, domain_str)
 
-        elif expr.name == "mdd":
+        elif expr.name == MDD.name:
             # mdd(array): transitions live in expr.mapping / expr.levels (not in args)
             # MiniZinc mdd expects: mdd(x, N, level, E, from, label, to)
             # with x=variables, N=number of nodes, level=level of each node, E=number of edges, from=source nodes, label=edge labels, to=target nodes
@@ -962,7 +1010,7 @@ class CPM_minizinc(SolverInterface):
             return "mdd({}, {}, {}, {}, {}, {}, {})".format(
                 array_str, len(nodes), level_str, len(from_list), from_str, label_str, to_str)
 
-        elif expr.name == "regular":
+        elif expr.name == Regular.name:
             # MiniZinc: `regular(array[int] of var int: x, array[int,int] of opt int: d, int: q0, set of int: F)`
             # We map CPMpy's named states to 1-indexed integers.
             # Example:
@@ -1001,7 +1049,7 @@ class CPM_minizinc(SolverInterface):
         elif isinstance(expr, DirectConstraint):
             return "{}({})".format(expr.name, ",".join(args_str))
 
-        print_map = {"allequal": "all_equal", "xor": "xorall"}
+        print_map = {AllEqual.name: "all_equal", Xor.name: "xorall"}
         if expr.name in print_map:
             return "{}([{}])".format(print_map[expr.name], ",".join(args_str))
 

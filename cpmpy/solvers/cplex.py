@@ -58,7 +58,7 @@ from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalfunctions import FloatSum
+from ..expressions.globalfunctions import FloatSum, Minimum, Maximum, Abs, Multiplication
 from ..expressions.utils import eval_comparison, flatlist, is_bool, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
@@ -86,7 +86,11 @@ class CPM_cplex(SolverInterface):
     Documentation of the solver's own Python API:
     https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
-    supported_global_constraints = frozenset({"min", "max", "abs"})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        Maximum.name,
+        Minimum.name,
+    })
 
     @staticmethod
     def supported():
@@ -375,7 +379,7 @@ class CPM_cplex(SolverInterface):
             a,b = self.solver_vars(cpm_expr.args)
             return a - b
 
-        if cpm_expr.name == "mul":
+        if cpm_expr.name == Multiplication.name:
             a,b = self.solver_vars(cpm_expr.args)
             return a * b
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
@@ -407,7 +411,7 @@ class CPM_cplex(SolverInterface):
                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", Multiplication.name]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
@@ -461,13 +465,13 @@ class CPM_cplex(SolverInterface):
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                 else:
                     # Global functions
-                    if lhs.name == 'min':
+                    if lhs.name == Minimum.name:
                         self.cplex_model.add_constraint(self.cplex_model.min(self.solver_vars(lhs.args)) == cplexrhs)
-                    elif lhs.name == 'max':
+                    elif lhs.name == Maximum.name:
                         self.cplex_model.add_constraint(self.cplex_model.max(self.solver_vars(lhs.args)) == cplexrhs)
-                    elif lhs.name == 'abs':
+                    elif lhs.name == Abs.name:
                         self.cplex_model.add_constraint(self.cplex_model.abs(self.solver_var(lhs.args[0])) == cplexrhs)
-                    elif lhs.name == 'mul': 
+                    elif lhs.name == Multiplication.name: 
                         raise ValueError("CPLEX only supports convex multiplication constraints, should be decomposed and linearized already. Please report on github.")
                         cplexlhs = self._make_numexpr(lhs)
                         self.cplex_model.add_constraint(cplexlhs == cplexrhs)

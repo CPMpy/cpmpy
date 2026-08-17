@@ -47,7 +47,8 @@ from packaging.version import Version
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import Cumulative, GlobalConstraint, NoOverlap
+from ..expressions.globalconstraints import AllDifferent, Cumulative, GlobalConstraint, InDomain, NegativeTable, NoOverlap, Table
+from ..expressions.globalfunctions import Abs, Division, Element, Maximum, Minimum, Multiplication
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.utils import is_num, is_int, is_any_list, get_bounds
 from ..transformations.get_variables import get_variables
@@ -72,8 +73,20 @@ class CPM_pumpkin(SolverInterface):
     - ``pum_solver``: the pumpkin.Model() object
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "InDomain",
-                                              "min", "max", "abs", "mul", "div", "element"})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        Cumulative.name,
+        Division.name,
+        Element.name,
+        InDomain.name,
+        Maximum.name,
+        Minimum.name,
+        Multiplication.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        Table.name,
+    })
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -132,7 +145,7 @@ class CPM_pumpkin(SolverInterface):
         self.predicate_map = {} # cache predicates for reuse
         if proof is not None: # Table and friends are not supported when proof logging
             # see https://github.com/ConSol-Lab/Pumpkin/issues/354
-            self.disabled_global_constraints = {"table", "negative_table", "InDomain"}
+            self.disabled_global_constraints = {Table.name, NegativeTable.name, InDomain.name}
         else:
             self.disabled_global_constraints = set()
 
@@ -380,7 +393,7 @@ class CPM_pumpkin(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
 
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div"}))
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({Division.name}))
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints - self.disabled_global_constraints,
@@ -389,7 +402,7 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max"}
+        supported_halfreif = {"or", "sum", "wsum", "sub", Multiplication.name, Division.name, Abs.name, Minimum.name, Maximum.name}
         cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif, csemap=self._csemap) # reified element not supported yet
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
@@ -419,7 +432,7 @@ class CPM_pumpkin(SolverInterface):
                     lhs = lhs.args[0][0] * lhs.args[1][0]
                 else:
                     raise ValueError(f"Lhs of predicate should be a sum with 1 argument or wsum with 1 arg, but got {lhs}")
-            elif lhs.name == 'mul':
+            elif lhs.name == Multiplication.name:
                 if lhs.is_lhs_num:
                     lhs = lhs.args[0] * lhs.args[1]
                 else:
@@ -455,7 +468,7 @@ class CPM_pumpkin(SolverInterface):
         elif is_num(cpm_var):
             return self.solver_var(intvar(cpm_var, cpm_var))
         # can also be a scaled variable (Multiplication with constant first)
-        elif cpm_var.name == "mul" and cpm_var.is_lhs_num:
+        elif cpm_var.name == Multiplication.name and cpm_var.is_lhs_num:
             const, cpm_var = cpm_var.args[0], cpm_var.args[1]
             if not is_num(const):
                 raise ValueError(f"Cannot create view from non-constant multiplier {const} * {cpm_var}")
@@ -496,7 +509,7 @@ class CPM_pumpkin(SolverInterface):
                 return True
             if cpm_expr.name == "wsum" and len(cpm_expr.args[0]) == 1:
                 return True
-        elif cpm_expr.name == 'mul' and cpm_expr.is_lhs_num:
+        elif cpm_expr.name == Multiplication.name and cpm_expr.is_lhs_num:
             return True
         return False
 
@@ -534,17 +547,17 @@ class CPM_pumpkin(SolverInterface):
                     return [constraints.Equals(self._sum_args(lhs, tag=tag), rhs, constraint_tag=tag)]
                
                 pum_rhs = self.to_pum_ivar(rhs) # other operators require IntExpression
-                if lhs.name == "div":
+                if lhs.name == Division.name:
                     return [constraints.Division(*self.to_pum_ivar(lhs.args), pum_rhs, constraint_tag=tag)]
-                elif lhs.name == "mul":
+                elif lhs.name == Multiplication.name:
                     return [constraints.Times(*self.to_pum_ivar(lhs.args), pum_rhs, constraint_tag=tag)]
-                elif lhs.name == "abs":
+                elif lhs.name == Abs.name:
                     return [constraints.Absolute(self.to_pum_ivar(lhs.args[0]), pum_rhs, constraint_tag=tag)]
-                elif lhs.name == "min":
+                elif lhs.name == Minimum.name:
                     return [constraints.Minimum(self.to_pum_ivar(lhs.args), pum_rhs, constraint_tag=tag)]
-                elif lhs.name == "max":
+                elif lhs.name == Maximum.name:
                     return [constraints.Maximum(self.to_pum_ivar(lhs.args), pum_rhs, constraint_tag=tag)]
-                elif lhs.name == "element":
+                elif lhs.name == Element.name:
                     arr, idx = lhs.args
                     return [constraints.Element(self.to_pum_ivar(idx),
                                                 self.to_pum_ivar(arr),
@@ -566,10 +579,10 @@ class CPM_pumpkin(SolverInterface):
             raise ValueError("Unknown comparison", cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint):
-            if cpm_expr.name == "alldifferent":
+            if cpm_expr.name == AllDifferent.name:
                 return [constraints.AllDifferent(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
             
-            elif cpm_expr.name == "cumulative":
+            elif cpm_expr.name == Cumulative.name:
                 pum_cons = []
                 if len(cpm_expr.args) == 4:
                     start, dur, demand, cap = cpm_expr.args
@@ -586,7 +599,7 @@ class CPM_pumpkin(SolverInterface):
                 pum_cons += [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)]
                 return pum_cons
 
-            elif cpm_expr.name == "no_overlap":
+            elif cpm_expr.name == NoOverlap.name:
                 if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
                     return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1), tag=tag)
@@ -594,21 +607,21 @@ class CPM_pumpkin(SolverInterface):
                     start, dur, end = cpm_expr.args
                     return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
 
-            elif cpm_expr.name == "table":
+            elif cpm_expr.name == Table.name:
                 arr, table = cpm_expr.args
                 return [constraints.Table(self.to_pum_ivar(arr),
                                           np.array(table).tolist(), # ensure Python list
                                           constraint_tag=tag)
                         ]
             
-            elif cpm_expr.name == "negative_table":
+            elif cpm_expr.name == NegativeTable.name:
                 arr, table = cpm_expr.args
                 return [constraints.NegativeTable(self.to_pum_ivar(arr),
                                                   np.array(table).tolist(),# ensure Python list
                                                   constraint_tag=tag)
                         ]
             
-            elif cpm_expr.name == "InDomain":
+            elif cpm_expr.name == InDomain.name:
                 val, domain = cpm_expr.args
                 return [constraints.Table(self.to_pum_ivar([val]),
                                           [[d] for d in domain], # each domain value is its own row

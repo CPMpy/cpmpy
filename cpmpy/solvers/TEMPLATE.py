@@ -67,6 +67,9 @@ from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.safening import safen_objective
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 
+from ..expressions.globalconstraints import AllDifferent
+from ..expressions.globalfunctions import Maximum, Element, Division
+
 
 class CPM_template(SolverInterface):
     """
@@ -81,7 +84,12 @@ class CPM_template(SolverInterface):
 
     # [GUIDELINE] list all supported global constraints and global functions
     #           (e.g., 'alldifferent', 'max', 'element', ...)
-    supported_global_constraints = frozenset({'alldifferent', 'max', 'element', 'div'})
+    supported_global_constraints = frozenset({
+        AllDifferent.name,
+        Division.name,
+        Element.name,
+        Maximum.name,
+    })
     # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
     #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
@@ -384,7 +392,7 @@ class CPM_template(SolverInterface):
                return self.TPL_solver.weighted_sum(weights, self.solver_vars(vars))
            # [GUIDELINE] or more fancy ones such as max
            #        be aware this is not the Maximum CONSTRAINT, but rather the Maximum NUMERICAL EXPRESSION
-           elif cpm_expr.name == "max":
+           elif cpm_expr.name == Maximum.name:
                return self.TPL_solver.maximum_of_vars(self.solver_vars(cpm_expr.args))
            # ...
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
@@ -498,9 +506,9 @@ class CPM_template(SolverInterface):
                 # global functions
                 elif con.name == "==":
                     TPL_rhs = self.solver_var(rhs)
-                    if lhs.name == "max":
+                    if lhs.name == Maximum.name:
                         self.TPL_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
-                    elif lhs.name == "element":
+                    elif lhs.name == Element.name:
                         TPL_arr, TPL_idx = self.solver_vars(lhs.args)
                         self.TPL_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
                     # elif...
@@ -510,7 +518,7 @@ class CPM_template(SolverInterface):
                     raise NotImplementedError("TEMPLATE: unknown comparison constraint", con)
 
             # global constraints
-            elif con.name == "alldifferent":
+            elif con.name == AllDifferent.name:
                 self.TPL_solver.add_alldifferent(self.solver_vars(con.args))
             else:
                 raise NotImplementedError("TEMPLATE: constraint not (yet) supported", con)

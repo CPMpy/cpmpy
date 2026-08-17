@@ -50,8 +50,8 @@ import time
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
-from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.globalconstraints import AllDifferent, Inverse, Table, InDomain, NegativeTable, GlobalCardinalityCount, Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
+from ..expressions.globalfunctions import GlobalFunction, Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Element, NValue
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.utils import is_num, is_int, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
@@ -74,10 +74,33 @@ class CPM_cpo(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
-                                              'cumulative', 'cumulative_optional', 'no_overlap', 'no_overlap_optional',
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "nvalue"})
-    supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
+    supported_global_constraints = frozenset({
+        Abs.name,
+        AllDifferent.name,
+        Cumulative.name,
+        CumulativeOptional.name,
+        Division.name,
+        Element.name,
+        GlobalCardinalityCount.name,
+        InDomain.name,
+        Inverse.name,
+        Maximum.name,
+        Minimum.name,
+        Modulo.name,
+        Multiplication.name,
+        NValue.name,
+        NegativeTable.name,
+        NoOverlap.name,
+        NoOverlapOptional.name,
+        Power.name,
+        Table.name,
+    })
+    supported_reified_global_constraints = frozenset({
+        AllDifferent.name,
+        InDomain.name,
+        NegativeTable.name,
+        Table.name,
+    })
 
     _docp = None  # Static attribute to hold the docplex.cp module
 
@@ -550,28 +573,28 @@ class CPM_cpo(SolverInterface):
             return eval_comparison(cpm_con.name, lhs, rhs)
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
-            if cpm_con.name == 'alldifferent':
+            if cpm_con.name == AllDifferent.name:
                 return dom.all_diff(self._cpo_expr(cpm_con.args))
-            elif cpm_con.name == "gcc":
+            elif cpm_con.name == GlobalCardinalityCount.name:
                 vars, vals, occ = self._cpo_expr(cpm_con.args)
                 cons = [dom.distribute(occ, vars, vals)]
                 if cpm_con.closed:  # not supported by cpo, so post separately
                     cons += [dom.allowed_assignments(v, vals) for v in vars]
                 return cons
-            elif cpm_con.name == "inverse":
+            elif cpm_con.name == Inverse.name:
                 x, y = self._cpo_expr(cpm_con.args)
                 return dom.inverse(x, y)
-            elif cpm_con.name == "table":
+            elif cpm_con.name == Table.name:
                 arr, table = self._cpo_expr(cpm_con.args)
                 return dom.allowed_assignments(arr, table)
-            elif cpm_con.name == "indomain":
+            elif cpm_con.name == InDomain.name:
                 expr, arr = self._cpo_expr(cpm_con.args)
                 return dom.allowed_assignments(expr, arr)
-            elif cpm_con.name == "negative_table":
+            elif cpm_con.name == NegativeTable.name:
                 arr, table = self._cpo_expr(cpm_con.args)
                 return dom.forbidden_assignments(arr, table)
-            elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
-                if cpm_con.name == "cumulative":
+            elif cpm_con.name == Cumulative.name or cpm_con.name == CumulativeOptional.name:
+                if cpm_con.name == Cumulative.name:
                     is_present = None
                     if len(cpm_con.args) == 4:
                         start, dur, demand, capacity = cpm_con.args
@@ -579,7 +602,7 @@ class CPM_cpo(SolverInterface):
                     else:
                         start, dur, end, demand, capacity = cpm_con.args
                 
-                elif cpm_con.name == "cumulative_optional":
+                elif cpm_con.name == CumulativeOptional.name:
                     if len(cpm_con.args) == 5:
                         start, dur, demand, capacity, is_present = cpm_con.args
                         end = None
@@ -607,7 +630,7 @@ class CPM_cpo(SolverInterface):
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
-            elif cpm_con.name == "no_overlap":
+            elif cpm_con.name == NoOverlap.name:
                 if len(cpm_con.args) == 2:
                     start, dur = cpm_con.args
                     end = None
@@ -616,7 +639,7 @@ class CPM_cpo(SolverInterface):
                 tasks, cons = self._make_tasks(start, dur, end, None)
                 return cons + [dom.no_overlap(tasks)]
             
-            elif cpm_con.name == "no_overlap_optional":
+            elif cpm_con.name == NoOverlapOptional.name:
                 if len(cpm_con.args) == 3:
                     start, dur, is_present = cpm_con.args
                     end = None
@@ -638,26 +661,26 @@ class CPM_cpo(SolverInterface):
                     raise ValueError(f"Global constraint {cpm_con} not known in CP Optimizer, please report on github.")
 
         elif isinstance(cpm_con, GlobalFunction):
-            if cpm_con.name == "element":
+            if cpm_con.name == Element.name:
                 return dom.element(*self._cpo_expr(cpm_con.args))
-            elif cpm_con.name == "min":
+            elif cpm_con.name == Minimum.name:
                 return dom.min(self._cpo_expr(cpm_con.args))
-            elif cpm_con.name == "max":
+            elif cpm_con.name == Maximum.name:
                 return dom.max(self._cpo_expr(cpm_con.args))
-            elif cpm_con.name == "abs":
+            elif cpm_con.name == Abs.name:
                 return dom.abs(self._cpo_expr(cpm_con.args)[0])
-            elif cpm_con.name == "nvalue":
+            elif cpm_con.name == NValue.name:
                 return dom.count_different(self._cpo_expr(cpm_con.args))
-            elif cpm_con.name == "mul":
+            elif cpm_con.name == Multiplication.name:
                 x, y = self._cpo_expr(cpm_con.args)
                 return x * y
-            elif cpm_con.name == "div":
+            elif cpm_con.name == Division.name:
                 x,y = self._cpo_expr(cpm_con.args)
                 return x // y
-            elif cpm_con.name == "mod":
+            elif cpm_con.name == Modulo.name:
                 x,y = self._cpo_expr(cpm_con.args)
                 return x % y
-            elif cpm_con.name == "pow":
+            elif cpm_con.name == Power.name:
                 x,y = self._cpo_expr(cpm_con.args)
                 return x ** y
 

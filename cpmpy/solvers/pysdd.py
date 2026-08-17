@@ -50,7 +50,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, boolvar
-from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalconstraints import DirectConstraint, Xor
 from ..expressions.utils import is_bool, is_int, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
@@ -74,8 +74,12 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
     """
 
-    supported_global_constraints = frozenset({"xor"})
-    supported_reified_global_constraints = frozenset({"xor"})
+    supported_global_constraints = frozenset({
+        Xor.name,
+    })
+    supported_reified_global_constraints = frozenset({
+        Xor.name,
+    })
 
     @staticmethod
     def supported():
