@@ -71,7 +71,7 @@ from ..exceptions import MinizincNameException, MinizincBoundsException, Minizin
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
-from ..expressions.globalconstraints import AllDifferent, AllDifferentExceptN, AllDifferentExcept0, AllEqual, Inverse, IfThenElse, Xor, Table, InDomain, NegativeTable, MDD, Regular, Cumulative, Circuit, GlobalCardinalityCount, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess, LexChainLess, LexChainLessEq, Precedence, NoOverlap, DirectConstraint
+from ..expressions.globalconstraints import AllDifferent, AllDifferentExceptN, AllDifferentExcept0, AllEqual, GlobalConstraint, Inverse, IfThenElse, Xor, Table, InDomain, NegativeTable, MDD, Regular, Cumulative, Circuit, GlobalCardinalityCount, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess, LexChainLess, LexChainLessEq, Precedence, NoOverlap, DirectConstraint
 from ..expressions.globalfunctions import Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Element, Count, NValue, Among, NDElement, FloatSum
 from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -729,98 +729,102 @@ class CPM_minizinc(SolverInterface):
                 return "not " + self.solver_var(expr._bv)
             return self.solver_var(expr)
 
-        # table(vars, tbl): no [] nesting of args, and special table output...
-        if expr.name == Table.name:
-            str_vars = self._convert_expression(expr.args[0])
-            str_tbl = "[|\n"  # opening
-            for row in expr.args[1]:
-                str_tbl += ",".join(map(str, row)) + " |"  # rows
-            str_tbl += "\n|]"  # closing
-            return "table({}, {})".format(str_vars, str_tbl)
+        if isinstance(expr, GlobalConstraint) and not isinstance(expr, DirectConstraint):
+            # direct constraints can have the same name as globals...
 
-        # negative_table(vars, tbl): use not table(...) for forbidden assignments
-        if expr.name == NegativeTable.name:
-            str_vars = self._convert_expression(expr.args[0])
-            str_tbl = "[|\n"  # opening
-            for row in expr.args[1]:
-                str_tbl += ",".join(map(str, row)) + " |"  # rows
-            str_tbl += "\n|]"  # closing
-            return "not table({}, {})".format(str_vars, str_tbl)
+            # table(vars, tbl): no [] nesting of args, and special table output...
+            if expr.name == Table.name:
+                str_vars = self._convert_expression(expr.args[0])
+                str_tbl = "[|\n"  # opening
+                for row in expr.args[1]:
+                    str_tbl += ",".join(map(str, row)) + " |"  # rows
+                str_tbl += "\n|]"  # closing
+                return "table({}, {})".format(str_vars, str_tbl)
 
-        # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
-        if expr.name == Inverse.name:
-            def zero_based(array):
-                return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
+            # negative_table(vars, tbl): use not table(...) for forbidden assignments
+            if expr.name == NegativeTable.name:
+                str_vars = self._convert_expression(expr.args[0])
+                str_tbl = "[|\n"  # opening
+                for row in expr.args[1]:
+                    str_tbl += ",".join(map(str, row)) + " |"  # rows
+                str_tbl += "\n|]"  # closing
+                return "not table({}, {})".format(str_vars, str_tbl)
 
-            str_fwd = zero_based(expr.args[0])
-            str_rev = zero_based(expr.args[1])
-            return "inverse({}, {})".format(str_fwd, str_rev)
+            # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
+            if expr.name == Inverse.name:
+                def zero_based(array):
+                    return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
 
-        if expr.name == AllDifferentExcept0.name:
-            arr, excepting = expr.args
-            assert len(excepting) == 1 and excepting[0] == 0, "Should be [0], but got {}".format(excepting)
-            return "alldifferent_except_0({})".format(self._convert_expression(arr))
+                str_fwd = zero_based(expr.args[0])
+                str_rev = zero_based(expr.args[1])
+                return "inverse({}, {})".format(str_fwd, str_rev)
 
-        if expr.name == AllDifferentExceptN.name:
-            arr, excepting = expr.args
-            arr_str = self._convert_expression(arr)
-            excepting_str = self._convert_expression(excepting)
-            excepting_str = "{" + excepting_str[1:-1] + "}" # needs to be a set
-            return "alldifferent_except({},{})".format(arr_str, excepting_str)
-        
-        if expr.name in [LexLessEq.name, LexLess.name]:
-            X = [self._convert_expression(e) for e in expr.args[0]]
-            Y = [self._convert_expression(e) for e in expr.args[1]]
-            return f"{expr.name}({{}}, {{}})".format(X, Y)
+            if expr.name == AllDifferentExcept0.name:
+                arr, excepting = expr.args
+                assert len(excepting) == 1 and excepting[0] == 0, "Should be [0], but got {}".format(excepting)
+                return "alldifferent_except_0({})".format(self._convert_expression(arr))
 
-        if expr.name in [LexChainLess.name, LexChainLessEq.name]:
-            arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
-            str_X = "[|\n"  # opening
-            for row in arr.T:  # Minizinc enforces lexicographic order on columns
-                str_X += ",".join(map(str, row)) + " |"  # rows
-            str_X += "\n|]"  # closing
-            return f"{expr.name}({{}})".format(str_X)
-
-        elif expr.name == Cumulative.name:
-            extra_cons = []
-            if len(expr.args) == 4:
-                start, dur, demand, capacity = expr.args
-            else:
-                start, dur, end, demand, capacity = expr.args
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
-
-            global_str = "cumulative({},{},{},{})"
-            # ensure duration is non-negative
-            dur, dur_cons = get_nonneg_args(dur)
-            extra_cons += dur_cons
-            # ensure demand is non-negative
-            demand, demand_cons = get_nonneg_args(demand)
-            extra_cons += demand_cons
-
-            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
-
-            return format_str.format(self._convert_expression(start),
-                                     self._convert_expression(dur),
-                                     self._convert_expression(demand),
-                                     self._convert_expression(capacity))
-
-        elif expr.name == NoOverlap.name:
-            extra_cons = []
-            if len(expr.args) == 2:
-                start, dur = expr.args
-            else:
-                start, dur, end = expr.args
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+            if expr.name == AllDifferentExceptN.name:
+                arr, excepting = expr.args
+                arr_str = self._convert_expression(arr)
+                excepting_str = self._convert_expression(excepting)
+                excepting_str = "{" + excepting_str[1:-1] + "}" # needs to be a set
+                return "alldifferent_except({},{})".format(arr_str, excepting_str)
             
-            global_str = "disjunctive({},{})"
-            # ensure duration is non-negative
-            dur, dur_cons = get_nonneg_args(dur)
-            extra_cons += dur_cons
+            if expr.name in [LexLessEq.name, LexLess.name]:
+                X = [self._convert_expression(e) for e in expr.args[0]]
+                Y = [self._convert_expression(e) for e in expr.args[1]]
+                return f"{expr.name}({{}}, {{}})".format(X, Y)
 
-            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+            if expr.name in [LexChainLess.name, LexChainLessEq.name]:
+                arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
+                str_X = "[|\n"  # opening
+                for row in arr.T:  # Minizinc enforces lexicographic order on columns
+                    str_X += ",".join(map(str, row)) + " |"  # rows
+                str_X += "\n|]"  # closing
+                return f"{expr.name}({{}})".format(str_X)
 
-            return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+            elif expr.name == Cumulative.name:
+                extra_cons = []
+                if len(expr.args) == 4:
+                    start, dur, demand, capacity = expr.args
+                else:
+                    start, dur, end, demand, capacity = expr.args
+                    extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
+                global_str = "cumulative({},{},{},{})"
+                # ensure duration is non-negative
+                dur, dur_cons = get_nonneg_args(dur)
+                extra_cons += dur_cons
+                # ensure demand is non-negative
+                demand, demand_cons = get_nonneg_args(demand)
+                extra_cons += demand_cons
+
+                format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+                return format_str.format(self._convert_expression(start),
+                                        self._convert_expression(dur),
+                                        self._convert_expression(demand),
+                                        self._convert_expression(capacity))
+
+            elif expr.name == NoOverlap.name:
+                extra_cons = []
+                if len(expr.args) == 2:
+                    start, dur = expr.args
+                else:
+                    start, dur, end = expr.args
+                    extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+                
+                global_str = "disjunctive({},{})"
+                # ensure duration is non-negative
+                dur, dur_cons = get_nonneg_args(dur)
+                extra_cons += dur_cons
+
+                format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+                return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+
+        # default case: convert all args to strings
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
