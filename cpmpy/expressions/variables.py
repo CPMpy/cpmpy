@@ -550,8 +550,13 @@ class NDVarArray(np.ndarray):
 
     def __array_ufunc__(self, ufunc: np.ufunc, method: str, *inputs: Any, **kwargs: Any) -> Any:
         """
-            overwrite numpy ufuncs: map supported ones to operators element-wise
-            (``out=`` supported for in-place ops like ``+=``; other kwargs raise)
+        NumPy ufunc entry point for symbolic element-wise ops.
+
+        Supported ``__call__`` ufuncs map to :mod:`operator` and build Expression trees
+        via :meth:`_elementwise`. Unsupported ufuncs raise :class:`TypeError` (never
+        fall through to object-dtype ufuncs that boolify comparisons).
+
+        ``out=`` is supported for in-place ops like ``+=``; other kwargs raise.
         """
         out = kwargs.pop("out", None)
         if kwargs:
