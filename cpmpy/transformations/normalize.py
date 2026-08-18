@@ -128,7 +128,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 newargs = list(args)
 
             if len(newargs) == 0: # empty disjunction
-                return True, BoolVal(False)
+                return True, (0 if num_context else BoolVal(False))
             elif len(newargs) == 1: # single argument, drop the operator
                 return True, newargs[0]
             elif changed:
@@ -153,7 +153,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 newargs = list(args)
 
             if len(newargs) == 0: # empty conjunction
-                return True, BoolVal(True)
+                return True, (1 if num_context else BoolVal(True))
             elif len(newargs) == 1: # single argument, drop the operator
                 return True, newargs[0]
             elif changed:
