@@ -46,17 +46,25 @@ class TestTransSimplify:
         # also when the other arguments are constants that get removed
         assert str(simplify_boolean([Operator("or", [bv[0], False])])) == "[bv[0]]"
         assert str(simplify_boolean([Operator("and", [bv[0], True])])) == "[bv[0]]"
+        assert str(simplify_boolean([Operator("or", [bv[0], BoolVal(False)])])) == "[bv[0]]"
+        assert str(simplify_boolean([Operator("and", [bv[0], BoolVal(True)])])) == "[bv[0]]"
         # nothing left, so the identity element of the operator
         assert str(simplify_boolean([Operator("or", [False, False])])) == "[boolval(False)]"
         assert str(simplify_boolean([Operator("and", [True, True])])) == "[boolval(True)]"
+        assert str(simplify_boolean([Operator("or", [BoolVal(False), BoolVal(False)])])) == "[boolval(False)]"
+        assert str(simplify_boolean([Operator("and", [BoolVal(True), BoolVal(True)])])) == "[boolval(True)]"
 
         # also in a nested context
         assert str(self.transform(Operator("or", [bv[0]]) == bv[1])) == "[(bv[0]) == (bv[1])]"
         assert str(self.transform(Operator("and", [bv[0]]).implies(bv[1]))) == "[(bv[0]) -> (bv[1])]"
         assert str(self.transform(Operator("or", [Operator("and", [bv[0]]), bv[1]]))) == "[(bv[0]) or (bv[1])]"
 
-        # more than one argument is left untouched
-        assert str(simplify_boolean([Operator("or", [bv[0], bv[1]])])) == "[(bv[0]) or (bv[1])]"
+        # empty and/or in a numerical context become 0/1, not BoolVal
+        iv = self.ivs[0]
+        assert str(self.transform(iv + Operator("or", [False, False]) >= 10)) == "[(iv[0]) + 0 >= 10]"
+        assert str(self.transform(iv + Operator("and", [True, True]) >= 10)) == "[(iv[0]) + 1 >= 10]"
+        assert str(self.transform(iv >= Operator("or", [False, False]))) == "[iv[0] >= 0]"
+        assert str(self.transform(iv >= Operator("and", [True, True]))) == "[iv[0] >= 1]"
 
     def test_bool_in_comp(self):
         expr = self.ivs[0] >= False
