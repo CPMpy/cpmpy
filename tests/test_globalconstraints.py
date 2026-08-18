@@ -293,6 +293,7 @@ class TestGlobal:
 
         # Test InDomain with constant list
         vals = [1, 5, 8, -4]
+        assert cp.InDomain(iv, vals).name == "indomain"
         model = cp.Model([cp.InDomain(iv, vals)])
         assert model.solve()
         assert iv.value() in vals
