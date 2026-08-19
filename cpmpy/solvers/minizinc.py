@@ -97,7 +97,7 @@ class CPM_minizinc(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "regular", "cumulative", "cumulative_optional", "circuit", "gcc",
+                                              "inverse", "ite", "xor", "table", "indomain", "negative_table", "mdd", "regular", "cumulative", "cumulative_optional", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
@@ -972,7 +972,7 @@ class CPM_minizinc(SolverInterface):
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
 
-        elif expr.name == "InDomain":
+        elif expr.name == "indomain":
             # InDomain(expr, domain_list) - convert domain_list to a set
             arg0_str = self._convert_expression(expr.args[0])
             domain = expr.args[1]
