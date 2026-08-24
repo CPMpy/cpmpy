@@ -674,7 +674,7 @@ def get_linear_positive_decompositions():
 def linearize_reified_variables(constraints:list[Expression], 
                                 min_values:int=3,
                                 csemap:Optional[CSEMap]=None,
-                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
+                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> tuple[list[Expression], list[Expression]]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and
     reified (BV <-> (x >= val)) implications with order encoding when a variable
@@ -691,6 +691,9 @@ def linearize_reified_variables(constraints:list[Expression],
     (TODO: add both encodings and channel between them?)
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
+
+    Returns:
+        tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
     """
     assert min_values > 0
     
