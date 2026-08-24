@@ -293,6 +293,7 @@ class TestGlobal:
 
         # Test InDomain with constant list
         vals = [1, 5, 8, -4]
+        assert cp.InDomain(iv, vals).name == "indomain"
         model = cp.Model([cp.InDomain(iv, vals)])
         assert model.solve()
         assert iv.value() in vals
@@ -1255,6 +1256,25 @@ class TestGlobal:
         assert not cp.Model(expr).solve()
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
+
+    def test_cumulative_var_duration_no_end(self):
+        # regression: OR-Tools interval construction used self.csemap (missing) when
+        # duration is variable and end is not provided
+        start = cp.intvar(0, 10, shape=3, name="start")
+        duration = cp.intvar(1, 5, shape=3, name="dur")
+        demand = [1, 2, 1]
+        capacity = 3
+        cons = cp.Cumulative(start=start, duration=duration, demand=demand, capacity=capacity)
+        assert cp.Model(cons).solve(solver="ortools")
+        assert cons.value()
+
+    def test_no_overlap_var_duration_no_end(self):
+        # same OR-Tools path as Cumulative for variable-sized intervals without end
+        start = cp.intvar(0, 10, shape=3, name="start")
+        duration = cp.intvar(1, 4, shape=3, name="dur")
+        cons = cp.NoOverlap(start, duration)
+        assert cp.Model(cons).solve(solver="ortools")
+        assert cons.value()
 
     def test_optional_cumulative(self):
         start = cp.intvar(0, 10, shape=4, name="start")
