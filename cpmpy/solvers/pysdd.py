@@ -286,7 +286,7 @@ class CPM_pysdd(SolverInterface):
 
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -301,7 +301,7 @@ class CPM_pysdd(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
@@ -311,7 +311,7 @@ class CPM_pysdd(SolverInterface):
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
-        return cpm_cons
+        return cpm_cons, []
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pysdd":
         """
@@ -340,7 +340,8 @@ class CPM_pysdd(SolverInterface):
 
         # transform and post the constraints
         # XXX the order in the for loop will matter on runtime efficiency...
-        for cpm_con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+        for cpm_con in _value + _defining:
             # replace root by conjunction of itself and the con expression
             self.pysdd_root = self.pysdd_manager.conjoin(self.pysdd_root,
                                                 self._pysdd_expr(cpm_con))

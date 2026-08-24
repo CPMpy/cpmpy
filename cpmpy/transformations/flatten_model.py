@@ -108,7 +108,8 @@ def flatten_model(orig_model, csemap=None):
     """
 
     # the top-level constraints
-    basecons = flatten_constraint(orig_model.constraints, csemap=csemap)
+    value, defining = flatten_constraint(orig_model.constraints, csemap=csemap)
+    basecons = value + defining
 
     # the objective
     if orig_model.objective_ is None:
@@ -132,7 +133,12 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
             csemap: a CSEMap object to store the flattened expressions
             do_simplify: whether to simplify -> operators during flattening, might remove variables
         
-        output: see definition of 'flat normal form' above.
+        Returns:
+            tuple[list[Expression], list[Expression]]:
+                ``(value, defining)``. *value* is the flattened form of the input;
+                *defining* are CSE / ``get_or_make_var`` side constraints
+                (e.g. ``abs(x) == IV``). Callers that do not need the split can use
+                ``value + defining``.
 
         it will return 'Exception' if something is not supported
 
@@ -140,8 +146,8 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
             TODO, what built-in python error is best?
             RE TODO: we now have custom NotImpl/NotSupported
     """
-
-    newlist = []
+    value = []
+    defining = []
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
@@ -151,7 +157,7 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
     for expr in lst_of_expr:
 
         if not expr.has_subexpr():
-            newlist.append(expr)  # no need to do anything
+            value.append(expr)  # no need to do anything
             continue
 
         elif isinstance(expr, Operator):
@@ -171,7 +177,9 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
                         if isinstance(a, Operator) and a.name == '->':
                             newargs[i:i+1] = [recurse_negation(a.args[0]),a.args[1]]
                     # there could be nested implications
-                    newlist.extend(flatten_constraint(Operator('or', newargs), csemap=csemap, do_simplify=False))
+                    v, d = flatten_constraint(Operator('or', newargs), csemap=csemap, do_simplify=False)
+                    value.extend(v)
+                    defining.extend(d)
                     continue
                 # conjunctions in disjunctions could be split out by applying distributivity,
                 # but this would explode the number of constraints in favour of having less auxiliary variables.
@@ -182,20 +190,27 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
                 if expr.args[1].name == 'and':
                     a1s = expr.args[1].args
                     a0 = expr.args[0]
-                    newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s], csemap=csemap, do_simplify=False))
+                    v, d = flatten_constraint([a0.implies(a1) for a1 in a1s], csemap=csemap, do_simplify=False)
+                    value.extend(v)
+                    defining.extend(d)
                     continue
                 # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
                 elif expr.args[0].name == 'or':
                     a0s = expr.args[0].args
                     a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([recurse_negation(a1).implies(recurse_negation(a0)) for a0 in a0s], csemap=csemap, do_simplify=False))
+                    v, d = flatten_constraint([recurse_negation(a1).implies(recurse_negation(a0)) for a0 in a0s], csemap=csemap, do_simplify=False)
+                    value.extend(v)
+                    defining.extend(d)
                     continue
                 # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
                 elif expr.args[0].name == '->':
                     a01,a02 = expr.args[0].args
                     a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([recurse_negation(a1).implies(a01), 
-                                                       recurse_negation(a1).implies(recurse_negation(a02))], csemap=csemap, do_simplify=False))
+                    v, d = flatten_constraint([recurse_negation(a1).implies(a01),
+                                                     recurse_negation(a1).implies(recurse_negation(a02))],
+                                                    csemap=csemap, do_simplify=False)
+                    value.extend(v)
+                    defining.extend(d)
                     continue
 
                 # ->, allows a boolexpr on one side
@@ -208,9 +223,9 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
                     lhs,lcons = normalized_boolexpr(expr.args[0], csemap=csemap)
                     rhs,rcons = get_or_make_var(expr.args[1], csemap=csemap)
 
-                newlist.append(Operator(expr.name, (lhs,rhs)))
-                newlist.extend(lcons)
-                newlist.extend(rcons)
+                value.append(Operator(expr.name, (lhs,rhs)))
+                defining.extend(lcons)
+                defining.extend(rcons)
                 continue
 
 
@@ -218,8 +233,8 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
             # if none of the above cases + continue matched:
             # a normalizable boolexpr
             (con, flatcons) = normalized_boolexpr(expr, csemap=csemap)
-            newlist.append(con)
-            newlist.extend(flatcons)
+            value.append(con)
+            defining.extend(flatcons)
 
         elif isinstance(expr, Comparison):
             """
@@ -255,9 +270,9 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
             # already flat?
             if not expr.has_subexpr():
                 if not rewritten:
-                    newlist.append(expr)  # original
+                    value.append(expr)  # original
                 else:
-                    newlist.append(Comparison(exprname, lexpr, rexpr))
+                    value.append(Comparison(exprname, lexpr, rexpr))
                 continue
 
             # ensure rhs is var
@@ -276,23 +291,36 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
             else:
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
 
-            newlist.append(Comparison(exprname, lhs, rvar))
-            newlist.extend(lcons)
-            newlist.extend(rcons)
+            value.append(Comparison(exprname, lhs, rvar))
+            defining.extend(lcons)
+            defining.extend(rcons)
 
         elif isinstance(expr, cp.expressions.globalconstraints.GlobalConstraint):
             """
     - Global constraint: global([Var]*)          (CPMpy class 'GlobalConstraint')
             """
             (con, flatcons) = normalized_boolexpr(expr, csemap=csemap)
-            newlist.append(con)
-            newlist.extend(flatcons)
+            value.append(con)
+            defining.extend(flatcons)
 
         else:
             # any other case (e.g. DirectConstraint), pass as is
-            newlist.append(expr)
+            value.append(expr)
 
-    return newlist
+    return value, defining
+
+
+def apply_transform(transform, value, defining, **kwargs):
+    """
+        Apply a ``(list) -> (value, defining)`` transform to both streams and merge.
+
+        ``transform`` is run on ``value`` and on ``defining`` separately. New defining
+        constraints from either call are appended to the defining stream; rewritten
+        defining constraints stay defining.
+    """
+    v2, d_from_v = transform(value, **kwargs)
+    d2, d_from_d = transform(defining, **kwargs)
+    return list(v2), list(d2) + list(d_from_v) + list(d_from_d)
 
 
 def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):

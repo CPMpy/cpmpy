@@ -30,7 +30,12 @@ from .flatten_model import flatten_constraint, get_or_make_var
 from .negation import recurse_negation
 
 def only_bv_reifies(constraints, csemap=None):
+    """
+        Ensure reifications have a BoolVar on the left-hand side.
 
+        Returns:
+            tuple[list[Expression], list[Expression]]: ``(value, defining)``
+    """
     newcons = []
     for cpm_expr in constraints:
         if cpm_expr.name in ['->', "=="]:
@@ -40,17 +45,20 @@ def only_bv_reifies(constraints, csemap=None):
                 # BE -> BV :: ~BV -> ~BE
                 if cpm_expr.name == '->':
                     newexpr = (~a1).implies(recurse_negation(a0))
-                    newexpr = only_bv_reifies(flatten_constraint(newexpr, csemap=csemap), csemap=csemap)
+                    v, d = flatten_constraint(newexpr, csemap=csemap)
+                    rv, rd = only_bv_reifies(v + d, csemap=csemap)
+                    newexpr = rv + rd
                 else:
                     newexpr = [a1 == a0]  # BE == BV :: BV == BE
                     if not a0.is_bool():
-                        newexpr = flatten_constraint(newexpr, csemap=csemap)
+                        v, d = flatten_constraint(newexpr, csemap=csemap)
+                        newexpr = v + d
                 newcons.extend(newexpr)
             else:
                 newcons.append(cpm_expr)
         else:
             newcons.append(cpm_expr)
-    return newcons
+    return newcons, []
 
 def only_implies(constraints, csemap=None):
     """
@@ -123,9 +131,12 @@ def only_implies(constraints, csemap=None):
             newcons.append(cpm_expr)
     
     if len(retransform) != 0:
-        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform, csemap=csemap), csemap=csemap), csemap=csemap))
+        v, d = flatten_constraint(retransform, csemap=csemap)
+        bv, bd = only_bv_reifies(v + d, csemap=csemap)
+        iv, id_ = only_implies(bv + bd, csemap=csemap)
+        newcons.extend(iv + id_)
 
-    return newcons
+    return newcons, []
 
 
 def reify_rewrite(constraints, supported=frozenset(), csemap=None):
@@ -143,12 +154,16 @@ def reify_rewrite(constraints, supported=frozenset(), csemap=None):
 
         :param supported: a (frozen)set of expression names that support reification in the solver, including
                           supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: ``(value, defining)``
     """
     if not is_any_list(constraints):
         # assume list, so make list
         constraints = [constraints]
 
-    newcons = []
+    value = []
+    defining = []
     for cpm_expr in constraints:
         assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, " \
                                                  f"run transformations.normalize.make_cpm_expr first!"
@@ -168,19 +183,19 @@ def reify_rewrite(constraints, supported=frozenset(), csemap=None):
             boolexpr_index = 0
 
         if boolexpr_index is None:  # non-reified or variable-only reification
-            newcons.append(cpm_expr)
+            value.append(cpm_expr)
         else:  # reification, check for rewrite
             boolexpr = cpm_expr.args[boolexpr_index]
             if isinstance(boolexpr, Operator):
                 # Case 1, BE is Operator (and, or, ->)
                 #   assume supported, return as is
-                newcons.append(cpm_expr)
+                value.append(cpm_expr)
                 #   could actually rewrite into list of clauses like to_cnf() does... not for here
             elif isinstance(boolexpr, GlobalConstraint):
                 # Case 2, BE is a GlobalConstraint
                 # replace BE by its decomposition, then flatten
                 if boolexpr.name in supported:
-                    newcons.append(cpm_expr)
+                    value.append(cpm_expr)
                 else:
                     raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition "
                                      f"transformation from `cpmpy.transformations.decompose_global` to decompose "
@@ -191,20 +206,20 @@ def reify_rewrite(constraints, supported=frozenset(), csemap=None):
                 #   have list of supported lhs's such as sum and wsum...
                 #   at the very least, (iv1 == iv2) == bv has to be supported
                 if isinstance(lhs, _NumVarImpl) or lhs.name in supported:
-                    newcons.append(cpm_expr)
+                    value.append(cpm_expr)
                 else:  # other cases, LHS is a total function
                     #     introduce aux var and bring function to toplevel
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
                     (auxvar, cons) = get_or_make_var(lhs, csemap=csemap)
-                    newcons += cons
+                    defining.extend(cons)
                     reifexpr = copy.copy(cpm_expr)
                     args = list(reifexpr.args)
                     args[boolexpr_index] = Comparison(op, auxvar, rhs)  # Comp(OP,AUX,RHS)
                     reifexpr.update_args(tuple(args))
-                    newcons.append(reifexpr)
+                    value.append(reifexpr)
             else:
                 # don't think this will be reached
-                newcons.append(cpm_expr)
+                value.append(cpm_expr)
 
-    return newcons
+    return value, defining

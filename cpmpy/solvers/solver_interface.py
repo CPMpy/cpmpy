@@ -200,9 +200,14 @@ class SolverInterface(object):
                 res.append(self.solver_var(cpm_var))
         return res
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
-            Transform arbitrary CPMpy expressions to constraints the solver supports
+            Transform arbitrary CPMpy expressions to constraints the solver supports.
+
+            Returns a pair ``(value, defining)``:
+            *value* is the rewritten form of the input constraints;
+            *defining* are CSE / ``get_or_make_var`` side constraints (e.g. ``abs(x) == IV``).
+            Callers that do not need the split can post ``value + defining``.
 
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
@@ -213,9 +218,9 @@ class SolverInterface(object):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: ``(value, defining)``
         """
-        return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
+        return toplevel_list(cpm_expr), []  # replace by the transformations your solver needs
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         """
@@ -240,7 +245,8 @@ class SolverInterface(object):
         get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for con in self.transform(cpm_expr):
+        value, defining = self.transform(cpm_expr)
+        for con in value + defining:
             raise NotImplementedError("solver add(): abstract function, overwrite")
 
         return self

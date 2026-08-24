@@ -26,9 +26,13 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
         Also for the reified uses of `NumExpr`
 
         :param supported:  a (frozen)set of expression names that supports all comparisons in the solver
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: ``(value, defining)``
     """
 
-    newlist = []
+    value = []
+    defining = []
     for cpm_expr in constraints:
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
@@ -38,7 +42,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
             elif not isinstance(subexpr, _BoolVarImpl): # bv -> expr
                 idx = 1
             else: # bv -> bv
-                newlist.append(cpm_expr)
+                value.append(cpm_expr)
                 continue
 
             new_arg, new_cons = _rewrite_comparison(cpm_expr.args[idx], supported=supported,csemap=csemap)
@@ -48,7 +52,8 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                 args[idx] = new_arg                
                 cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
             
-            newlist += [cpm_expr] + new_cons
+            value.append(cpm_expr)
+            defining.extend(new_cons)
 
             
         elif isinstance(cpm_expr, Comparison):
@@ -59,7 +64,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                 elif not isinstance(rhs, _BoolVarImpl):  # bv == expr
                     idx = 1
                 else: # bv == bv
-                    newlist.append(cpm_expr)
+                    value.append(cpm_expr)
                     continue
 
                 # identical to the above, but keep for readability?
@@ -70,20 +75,22 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                     args[idx] = new_arg
                     cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
 
-                newlist += [cpm_expr] + new_cons
+                value.append(cpm_expr)
+                defining.extend(new_cons)
 
             elif cpm_expr.name != "==": # numerical comparison
                 new_expr, new_cons = _rewrite_comparison(cpm_expr, supported=supported,csemap=csemap)
-                newlist += [new_expr] + new_cons
+                value.append(new_expr)
+                defining.extend(new_cons)
             
             else:
-                newlist.append(cpm_expr) # equality constraint, keep
+                value.append(cpm_expr) # equality constraint, keep
 
         else:
             # default, keep original
-            newlist.append(cpm_expr)
-                
-    return newlist
+            value.append(cpm_expr)
+
+    return value, defining
 
 
 def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):

@@ -54,7 +54,7 @@ from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, apply_transform
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum_const
 from ..transformations.normalize import toplevel_list
@@ -210,7 +210,7 @@ class CPM_highs(SolverInterface):
 
         raise NotImplementedError(f"HiGHS: unexpected linear expression {linexpr}, please report on our issue tracker.")
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports.
 
@@ -220,21 +220,31 @@ class CPM_highs(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum"}), csemap=self._csemap)  # the core of the MIP-linearization; rewrites sub to wsum
-        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
-        return cpm_cons
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # constraints that support reification
+
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # supports >, <, !=
+
+        value, defining = apply_transform(linearize_reified_variables, value, defining, min_values=2, csemap=self._csemap)
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(only_implies, value, defining,
+                                                csemap=self._csemap)  # anything that can create full reif should go above...
+
+        value, defining = apply_transform(linearize_constraint, value, defining,
+                                                supported=frozenset({"sum", "wsum"}), csemap=self._csemap)  # the core of the MIP-linearization; rewrites sub to wsum
+
+        value, defining = apply_transform(only_positive_bv, value, defining,
+                                                csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
+
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_highs":
         """
@@ -252,7 +262,9 @@ class CPM_highs(SolverInterface):
         # track user vars and ensure newly seen ones have solver columns
         get_variables(cpm_expr, collect=self.user_vars)
 
-        for con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+
+        for con in _value + _defining:
             if isinstance(con, Comparison):
                 lhs, rhs = con.args
                 if not is_num(rhs):

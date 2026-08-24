@@ -613,7 +613,7 @@ class CPM_minizinc(SolverInterface):
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Decompose globals not supported (and flatten globalfunctions)
             ensure it is a list of constraints
@@ -622,14 +622,14 @@ class CPM_minizinc(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        return cpm_cons
+        return cpm_cons, []
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_minizinc":
         """
@@ -652,7 +652,8 @@ class CPM_minizinc(SolverInterface):
         """
         get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints
-        for cpm_con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+        for cpm_con in _value + _defining:
             # Get text expression, add to the solver
             mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
             self.mzn_model.add_string(mzn_str)

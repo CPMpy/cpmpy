@@ -22,7 +22,9 @@ class TestTransfComp:
                 ]
 
         # test transformation
-        transform = lambda expr: only_numexpr_equality(flatten_constraint(expr))
+        def _join(vd):
+            return vd[0] + vd[1]
+        transform = lambda expr: _join(only_numexpr_equality(_join(flatten_constraint(expr))))
 
         for (expr, strexpr) in cases:
             self.setup_method()  # reset the IV counters

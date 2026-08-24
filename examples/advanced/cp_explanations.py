@@ -91,8 +91,9 @@ def omus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', 
 def omus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=1):
     # small optimisation: pre-flatten all constraints once
     # so it needs not be done over-and-over in solving
-    hard = flatten_constraint(hard_constraints) # batch flatten
-    soft = [flatten_constraint(c) for c in soft_constraints]
+    hv, hd = flatten_constraint(hard_constraints) # batch flatten
+    hard = hv + hd
+    soft = [(lambda vd: vd[0]+vd[1])(flatten_constraint(c)) for c in soft_constraints]
 
     ## Mip model
     if cp.Model(hard+soft).solve():

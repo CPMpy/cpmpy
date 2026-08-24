@@ -101,6 +101,22 @@ class TestNativeMus(TestMus):
         self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
 
+    def test_cse_defining_not_in_soft_group(self, solver):
+        """
+        Defining CSE constraints must be treated as hard for native MUS.
+        Otherwise the soft that first creates `abs(x)==IV` is spuriously required
+        when another soft reuses `IV` (Ignace, PR #986).
+        """
+        x = cp.intvar(-10, 10, name="x")
+        y = cp.intvar(-10, 10, name="y")
+        soft = [
+            cp.abs(x) + y <= 15,  # not needed for the conflict
+            cp.abs(x) + y >= 11,  # alone unsat with hard + domains
+        ]
+        hard = [x == 0]
+        mus = self.mus_func(soft, hard=hard, solver=solver)
+        assert set(mus) == {soft[1]}
+
 
 @pytest.mark.requires_solver("exact")
 class TestQuickXplain(TestMus):

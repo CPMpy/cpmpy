@@ -133,13 +133,18 @@ def to_opb(cpm_expr, csemap, ivarmap, encoding="auto"):
         csemap=csemap,
     )
     cpm_cons = simplify_boolean(cpm_cons)
-    cpm_cons = flatten_constraint(cpm_cons, csemap=csemap)  # flat normal form
-    cpm_cons = only_bv_reifies(cpm_cons, csemap=csemap)
-    cpm_cons = only_implies(cpm_cons, csemap=csemap)
-    cpm_cons = linearize_constraint(
+    v, d = flatten_constraint(cpm_cons, csemap=csemap)  # flat normal form
+    cpm_cons = v + d
+    v, d = only_bv_reifies(cpm_cons, csemap=csemap)
+    cpm_cons = v + d
+    v, d = only_implies(cpm_cons, csemap=csemap)
+    cpm_cons = v + d
+    v, d = linearize_constraint(
         cpm_cons, supported=frozenset({"sum", "wsum"}), csemap=csemap
     )
-    cpm_cons = int2bool(cpm_cons, ivarmap, encoding=encoding)
+    cpm_cons = v + d
+    v, d = int2bool(cpm_cons, ivarmap, encoding=encoding)
+    cpm_cons = v + d
 
     return _normalized_comparison(cpm_cons)
 

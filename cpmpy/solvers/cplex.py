@@ -63,7 +63,7 @@ from ..expressions.utils import eval_comparison, flatlist, is_bool, is_num, is_i
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, apply_transform
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, \
     only_positive_bv_wsum_const, decompose_linear, decompose_linear_objective
@@ -381,7 +381,7 @@ class CPM_cplex(SolverInterface):
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -394,7 +394,7 @@ class CPM_cplex(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
@@ -405,15 +405,21 @@ class CPM_cplex(SolverInterface):
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub"} | self.supported_global_constraints), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
-        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
-        return cpm_cons
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)
+        # linearize_reified_variables may append encoding constraints; keep them with the stream
+        value, defining = apply_transform(linearize_reified_variables, value, defining,
+                                                min_values=2, csemap=self._csemap)
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(only_implies, value, defining, csemap=self._csemap)
+        lin_supported = frozenset({"sum", "wsum", "->", "sub"} | self.supported_global_constraints)
+        value, defining = apply_transform(linearize_constraint, value, defining,
+                                                supported=lin_supported, csemap=self._csemap)
+        value, defining = apply_transform(only_positive_bv, value, defining, csemap=self._csemap)
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_cplex":
       """
@@ -438,7 +444,8 @@ class CPM_cplex(SolverInterface):
       get_variables(cpm_expr, collect=self.user_vars)
 
       # transform and post the constraints
-      for con in self.transform(cpm_expr):
+      _value, _defining = self.transform(cpm_expr)
+      for con in _value + _defining:
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const

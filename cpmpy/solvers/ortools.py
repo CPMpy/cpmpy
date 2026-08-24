@@ -63,7 +63,7 @@ from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_c
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var, apply_transform
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
@@ -440,7 +440,7 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -453,7 +453,7 @@ class CPM_ortools(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"}) # no support for `0` in denominator in API
@@ -462,13 +462,17 @@ class CPM_ortools(SolverInterface):
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # everything that can create
-                                             # reified expr must go before this
-        return cpm_cons
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(only_implies, value, defining,
+                                                csemap=self._csemap)  # everything that can create reified expr must go before this
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_ortools":
         """
@@ -493,7 +497,8 @@ class CPM_ortools(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+        for con in _value + _defining:
             self._post_constraint(con)
 
         return self

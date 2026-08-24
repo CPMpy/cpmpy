@@ -54,7 +54,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var, apply_transform
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.negation import push_down_negation
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
@@ -362,7 +362,7 @@ class CPM_pumpkin(SolverInterface):
         return self._objective is not None
 
     # `__add__()` first calls `transform()`
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -375,7 +375,7 @@ class CPM_pumpkin(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -386,14 +386,19 @@ class CPM_pumpkin(SolverInterface):
                                      supported=self.supported_global_constraints - self.disabled_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints - self.disabled_global_constraints,
                                      csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(only_implies, value, defining, csemap=self._csemap)
         supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max"}
-        cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif, csemap=self._csemap) # reified element not supported yet
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
-        return cpm_cons
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=supported_halfreif, csemap=self._csemap)  # reified element not supported yet
+
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
+
+        value, defining = apply_transform(canonical_comparison, value, defining)  # ensure rhs is always a constant
+
+        return value, defining
 
     def to_predicate(self, cpm_expr):
         """
@@ -576,7 +581,8 @@ class CPM_pumpkin(SolverInterface):
                 else:
                     start, dur, end, demand, cap = cpm_expr.args
                     end_cons = [s + d == e for s,d,e in zip(start, dur, end)]
-                    for cons in self.transform(end_cons):
+                    _value, _defining = self.transform(end_cons)
+                    for cons in _value + _defining:
                         pum_cons.extend(self._get_constraint(cons, tag=tag))
 
                 assert all(is_num(d) for d in dur), "Pumpkin only accepts Cumulative with fixed durations"
@@ -657,7 +663,8 @@ class CPM_pumpkin(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         try:
-            for con in self.transform(cpm_expr):
+            _value, _defining = self.transform(cpm_expr)
+            for con in _value + _defining:
                 if isinstance(con, Operator) and con.name == "->": # found implication
                     bv, subexpr = con.args
                     for pum_cons in self._get_constraint(subexpr):

@@ -22,6 +22,10 @@ def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None):
     :param: ivarmap: dictionary mapping integer variables to their encoding
     :param: encoding: choice of encoding: "direct", "order", "binary", or "auto", which makes encoding choices based on constraint comparator and domain size
     :param: csemap: To enable CSE
+
+    Returns:
+        tuple[list[Expression], list[Expression]]: ``(value, defining)`` where defining holds
+        encoding domain constraints (e.g. exactly-one).
     """
     assert encoding in (
         "auto",
@@ -30,11 +34,13 @@ def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None):
         "binary",
     ), "Only auto, direct, order, and binary encoding are supported"
 
-    cpm_out = []
+    value = []
+    defining = []
     for expr in cpm_lst:
         constraints, domain_constraints = _encode_expr(ivarmap, expr, encoding, csemap=csemap)
-        cpm_out += domain_constraints + constraints
-    return cpm_out
+        value.extend(constraints)
+        defining.extend(domain_constraints)
+    return value, defining
 
 
 def _encode_expr(ivarmap, expr, encoding, csemap=None):

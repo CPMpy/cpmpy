@@ -105,7 +105,9 @@ class TestTransInt2Bool:
         user_vars = tuple(get_variables(constraint))
         ivarmap = dict()
         csemap = CSEMap()
-        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=csemap)
+        v, d = flatten_constraint(constraint)
+        _v, _d = int2bool(v + d, ivarmap=ivarmap, encoding=encoding, csemap=csemap)
+        flat = _v + _d
 
         cons_sols = []
         flat_sols = []

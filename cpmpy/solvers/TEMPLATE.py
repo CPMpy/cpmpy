@@ -61,7 +61,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, apply_transform
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.safening import safen_objective
@@ -390,7 +390,7 @@ class CPM_template(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -403,7 +403,7 @@ class CPM_template(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
@@ -415,12 +415,16 @@ class CPM_template(SolverInterface):
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        value, defining = flatten_constraint(cpm_cons)  # flat normal form
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+
+        value, defining = apply_transform(only_bv_reifies, value, defining)
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+
         # ...
-        return cpm_cons
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_template":
         """
@@ -446,8 +450,8 @@ class CPM_template(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for con in self.transform(cpm_expr):
-
+        _value, _defining = self.transform(cpm_expr)
+        for con in _value + _defining:
             if isinstance(con, _BoolVarImpl):
                 # base case, just var or ~var
                 self.TPL_solver.add_clause([ self.solver_var(con) ])

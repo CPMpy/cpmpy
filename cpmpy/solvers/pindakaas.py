@@ -45,7 +45,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal, Comparison, NestedBoolExprLike
 from ..expressions.utils import eval_comparison, is_int
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, apply_transform
 from ..transformations.get_variables import get_variables
 from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool, replace_int_user_vars
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear
@@ -141,7 +141,8 @@ class CPM_pindakaas(SolverInterface):
             if isinstance(cpm_var, _NumVarImpl) and not cpm_var.is_bool():
                 if cpm_var.name not in self.ivarmap:
                     _, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                    for cpm_expr in self.transform(cons):
+                    _value, _defining = self.transform(cons)
+                    for cpm_expr in _value + _defining:
                         self._post_constraint(cpm_expr)
                 for bv in self.ivarmap[cpm_var.name].vars().flatten():
                     self.solver_var(bv)
@@ -255,7 +256,7 @@ class CPM_pindakaas(SolverInterface):
 
         raise TypeError(f"Unexpected type: {cpm_var}")
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -268,7 +269,7 @@ class CPM_pindakaas(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
@@ -280,13 +281,14 @@ class CPM_pindakaas(SolverInterface):
             csemap=self._csemap,
         )
         cpm_cons = simplify_boolean(cpm_cons)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)
-        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
-        return cpm_cons
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(linearize_reified_variables, value, defining, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(only_implies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(linearize_constraint, value, defining, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)
+        value, defining = apply_transform(int2bool, value, defining,
+                                          ivarmap=self.ivarmap, encoding=self.encoding, csemap=self._csemap)
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pindakaas":
         """
@@ -317,7 +319,8 @@ class CPM_pindakaas(SolverInterface):
 
         # transform and post the constraints
         try:
-            for con in self.transform(cpm_expr):
+            _value, _defining = self.transform(cpm_expr)
+            for con in _value + _defining:
                 self._post_constraint(con)
         except pdk.Unsatisfiable:
             self.unsatisfiable = True

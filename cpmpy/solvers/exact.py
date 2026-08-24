@@ -60,7 +60,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal, Nested
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, apply_transform
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
@@ -501,7 +501,7 @@ class CPM_exact(SolverInterface):
 
         return xcfvars, self.fix(xrhs)
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
         Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -514,7 +514,7 @@ class CPM_exact(SolverInterface):
             cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
         Returns:
-            list[Expression]: transformed constraints
+            tuple[list[Expression], list[Expression]]: (value, defining)
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -524,16 +524,26 @@ class CPM_exact(SolverInterface):
                                     supported=self.supported_global_constraints,
                                     supported_reified = self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","->","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
 
-        return cpm_cons
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
+
+        value, defining = apply_transform(linearize_reified_variables, value, defining, min_values=2, csemap=self._csemap)
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(only_implies, value, defining,
+                                                csemap=self._csemap)  # anything that can create full reif should go above...
+
+        value, defining = apply_transform(linearize_constraint, value, defining,
+                                                supported=frozenset({"sum","wsum","->","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
+
+        value, defining = apply_transform(only_positive_bv, value, defining,
+                                                csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
+
+
+        return value, defining
 
         # NOTE: the transformations that are still done specifically for Exact are two-fold:
         # transform '==' and '<=' to '>='
@@ -574,7 +584,8 @@ class CPM_exact(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+        for con in _value + _defining:
             # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
             if isinstance(con, Comparison):

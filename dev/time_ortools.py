@@ -114,39 +114,45 @@ def _process_instance(args):
 
         step = "flatten_constraint"
         t0 = time.perf_counter()
-        cpm_expr = flatten_constraint(cpm_expr, csemap=solver._csemap)
+        _v, _d = flatten_constraint(cpm_expr, csemap=solver._csemap)
+
+        cpm_expr = _v + _d
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)
 
         step = "reify_rewrite"
         t0 = time.perf_counter()
-        cpm_expr = reify_rewrite(cpm_expr, supported=frozenset({"sum", "wsum"}), csemap=solver._csemap)
+        _v, _d = reify_rewrite(cpm_expr, supported=frozenset({"sum", "wsum"}), csemap=solver._csemap)
+        cpm_expr = _v + _d
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)
 
         step = "only_numexpr_equality"
         t0 = time.perf_counter()
-        cpm_expr = only_numexpr_equality(
+        _v, _d = only_numexpr_equality(
             cpm_expr,
             supported=frozenset({"sum", "wsum", "sub"}),
             csemap=solver._csemap,
         )
+        cpm_expr = _v + _d
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)
 
         step = "only_bv_reifies"
         t0 = time.perf_counter()
-        cpm_expr = only_bv_reifies(cpm_expr, csemap=solver._csemap)
+        _v, _d = only_bv_reifies(cpm_expr, csemap=solver._csemap)
+        cpm_expr = _v + _d
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)
 
         step = "only_implies"
         t0 = time.perf_counter()
-        cpm_expr = only_implies(cpm_expr, csemap=solver._csemap)
+        _v, _d = only_implies(cpm_expr, csemap=solver._csemap)
+        cpm_expr = _v + _d
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)

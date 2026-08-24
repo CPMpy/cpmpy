@@ -423,7 +423,7 @@ class CPM_cpo(SolverInterface):
         return self.cpo_model.get_objective() is not None
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -436,7 +436,7 @@ class CPM_cpo(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -446,7 +446,7 @@ class CPM_cpo(SolverInterface):
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         # no flattening required
-        return cpm_cons
+        return cpm_cons, []
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_cpo":
         """
@@ -471,7 +471,9 @@ class CPM_cpo(SolverInterface):
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
 
-        for cpm_con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+
+        for cpm_con in _value + _defining:
             # translate each expression tree, then post straight away
             cpo_con = self._cpo_expr(cpm_con, boolexpr=True)
             self.cpo_model.add(cpo_con)

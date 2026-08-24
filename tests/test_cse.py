@@ -24,7 +24,7 @@ class TestCSE:
        
         nested_alldiff = cp.AllDifferent(x,y+y,z)      
 
-        flat_cons = flatten_constraint(nested_alldiff, csemap=self.csemap)
+        _v, _d = flatten_constraint(nested_alldiff, csemap=self.csemap); flat_cons = _v + _d
 
         assert len(flat_cons) == 2
         fc = flat_cons[0]
@@ -36,7 +36,7 @@ class TestCSE:
 
         # next time we use y + y, it should replace it IV0
         nested_cons2 = (y + y) % 3 == 0
-        flat_cons = flatten_constraint(nested_cons2, csemap=self.csemap)
+        _v, _d = flatten_constraint(nested_cons2, csemap=self.csemap); flat_cons = _v + _d
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "(IV0) mod 3 == 0"
         assert len(self.csemap) == 1
@@ -44,7 +44,7 @@ class TestCSE:
 
         # should also work for Boolean variables (introduce reification)
         nested_cons = (x + y + z >= 11) | (cp.AllDifferent(x,y,z))
-        flat_cons = flatten_constraint(nested_cons, csemap=self.csemap)
+        _v, _d = flatten_constraint(nested_cons, csemap=self.csemap); flat_cons = _v + _d
         
         assert len(flat_cons) == 3
         
@@ -54,7 +54,7 @@ class TestCSE:
         
         # next time we use x + y + z <= 10, it should replace it with BV0
         nested_cons2 = ((x + y + z >= 11) ^ cp.boolvar(name="a"))
-        flat_cons = flatten_constraint(nested_cons2, csemap=self.csemap)
+        _v, _d = flatten_constraint(nested_cons2, csemap=self.csemap); flat_cons = _v + _d
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "BV0 xor a"
@@ -63,7 +63,7 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x > 5) | (y + z > 7)
-        flat_cons = flatten_constraint(cons, csemap=self.csemap)
+        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert [str(con) for con in flat_cons] == [
@@ -81,7 +81,7 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x >= 6) | (y + z >= 8)
-        flat_cons = flatten_constraint(cons, csemap=self.csemap)
+        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert {str(con) for con in flat_cons} == {
@@ -98,7 +98,7 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x < 6) | (y + z < 8)
-        flat_cons = flatten_constraint(cons, csemap=self.csemap)
+        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert {str(con) for con in flat_cons} == {
@@ -116,7 +116,7 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x <= 5) | (y + z <= 7)
-        flat_cons = flatten_constraint(cons, csemap=self.csemap)
+        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert {str(con) for con in flat_cons} == {
@@ -134,7 +134,8 @@ class TestCSE:
         x = cp.intvar(0,10, name="x")
         b = cp.boolvar(name="b")
 
-        flat_cons = flatten_constraint((x > 5) == b, csemap=self.csemap)
+        _v, _d = flatten_constraint((x > 5) == b, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "(x > 5) == (b)"
@@ -144,7 +145,8 @@ class TestCSE:
         x = cp.intvar(0,10,name="x")
         b = cp.boolvar(name="b")
 
-        flat_cons = flatten_constraint((x == 5) == b, csemap=self.csemap)
+        _v, _d = flatten_constraint((x == 5) == b, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "(x == 5) == (b)"
@@ -158,7 +160,8 @@ class TestCSE:
         x = cp.intvar(0,10,name="x")
         b = cp.boolvar(name="b")
 
-        flat_cons = flatten_constraint((x != 5) == b, csemap=self.csemap)
+        _v, _d = flatten_constraint((x != 5) == b, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "(x != 5) == (b)"
@@ -172,7 +175,8 @@ class TestCSE:
         y = cp.intvar(0,10,name="y")
         b = cp.boolvar(name="b")
 
-        flat_cons = flatten_constraint((x == 5) == (y == 10), csemap=self.csemap)
+        _v, _d = flatten_constraint((x == 5) == (y == 10), csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 2
         assert str(flat_cons[0]) == "(x == 5) == (BV0)"
@@ -218,23 +222,23 @@ class TestCSE:
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
 
         cons = cp.max([x,y,z]) <= 42
-        eq_cons = only_numexpr_equality([cons], csemap=self.csemap)
+        eq_cons, def_cons = only_numexpr_equality([cons], csemap=self.csemap)
         
-        assert set([str(c) for c in eq_cons]) == {"(max(x,y,z)) == (IV0)", "IV0 <= 42"}
+        assert set([str(c) for c in eq_cons + def_cons]) == {"(max(x,y,z)) == (IV0)", "IV0 <= 42"}
         assert len(self.csemap) == 1
         
         # next time we use max([x,y,z]) it should replace it with IV0
         non_eq_cons = cp.max([x,y,z]) != 1337
-        eq_cons = only_numexpr_equality([non_eq_cons], csemap=self.csemap)
-        assert len(eq_cons) == 1
-        assert str(eq_cons[0]) == "IV0 != 1337"
+        eq_cons, def_cons = only_numexpr_equality([non_eq_cons], csemap=self.csemap)
+        assert len(eq_cons + def_cons) == 1
+        assert str((eq_cons + def_cons)[0]) == "IV0 != 1337"
         assert len(self.csemap) == 1
 
     def test_linearize(self):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
         
         cons = cp.max(x,y) < z
-        lin_cons = linearize_constraint([cons], supported={"max"}, csemap=self.csemap)
+        lin_cons, _ = linearize_constraint([cons], supported={"max"}, csemap=self.csemap)
         
         assert len(lin_cons) == 2
         assert str(lin_cons[0]) == "(max(x,y)) <= (IV0)"

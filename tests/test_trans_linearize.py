@@ -5,7 +5,44 @@ from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
-from cpmpy.transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations import linearize as _lin_mod
+_raw_linearize_constraint = _lin_mod.linearize_constraint
+_raw_linearize_reified_variables = _lin_mod.linearize_reified_variables
+_raw_decompose_linear = _lin_mod.decompose_linear
+_raw_canonical_comparison = _lin_mod.canonical_comparison
+_raw_only_positive_bv = _lin_mod.only_positive_bv
+_raw_only_positive_coefficients = _lin_mod.only_positive_coefficients
+_raw_only_positive_bv_wsum_const = _lin_mod.only_positive_bv_wsum_const
+_raw_only_positive_bv_wsum = _lin_mod.only_positive_bv_wsum
+def linearize_constraint(*a, **k):
+    v, d = _raw_linearize_constraint(*a, **k)
+    return v + d
+
+def linearize_reified_variables(*a, **k):
+    v, d = _raw_linearize_reified_variables(*a, **k)
+    return v + d
+
+def decompose_linear(*a, **k):
+    return _raw_decompose_linear(*a, **k)
+
+def canonical_comparison(*a, **k):
+    v, d = _raw_canonical_comparison(*a, **k)
+    return v + d
+
+def only_positive_bv(*a, **k):
+    v, d = _raw_only_positive_bv(*a, **k)
+    return v + d
+
+def only_positive_coefficients(*a, **k):
+    v, d = _raw_only_positive_coefficients(*a, **k)
+    return v + d
+
+def only_positive_bv_wsum_const(*a, **k):
+    return _raw_only_positive_bv_wsum_const(*a, **k)
+
+def only_positive_bv_wsum(*a, **k):
+    return _raw_only_positive_bv_wsum(*a, **k)
+
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.int2bool import IntVarEncDirect, IntVarEncOrder
 from cpmpy.transformations.normalize import toplevel_list
@@ -103,8 +140,9 @@ class TestTransLinearize:
     def test_trivially_false_bool_comparison_not_wrapped_in_or(self):
         b0 = cp.boolvar(name="b0")
         b1 = cp.boolvar(name="b1")  # reifies ((~b0) + -7 <= -6)
-        cons = only_implies(only_bv_reifies([((~b0) + -7 <= -6) == b1]))
-        lin = linearize_constraint(cons, supported={"or", "->", "sum", "wsum", "and"})
+        v, d = only_bv_reifies([((~b0) + -7 <= -6) == b1])
+        v, d = only_implies(v + d)
+        lin = linearize_constraint(v + d, supported={"or", "->", "sum", "wsum", "and"})
         # comparison is trivially true for any b0, so only b1 is forced true
         assert str(lin) == "[or(b1)]"
 
@@ -619,8 +657,8 @@ class TestLinearizeReifiedVariablesThreshold:
 
     def linearize(self, cpm_cons):
         cpm_cons = toplevel_list(cpm_cons)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self.csemap)
-        return cpm_cons
+        v, d = flatten_constraint(cpm_cons, csemap=self.csemap)
+        return v + d
 
     def test_linearize_reified_variables_below_threshold(self):
         """With min_values=3, (a==1)|(a==2) is not replaced."""

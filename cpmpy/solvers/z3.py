@@ -361,7 +361,7 @@ class CPM_z3(SolverInterface):
             self.obj_handle = self.z3_solver.maximize(z3_obj)
             self._minimize = False # record direction of optimisation
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -374,7 +374,7 @@ class CPM_z3(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -383,7 +383,7 @@ class CPM_z3(SolverInterface):
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        return cpm_cons
+        return cpm_cons, []
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_z3":
         """
@@ -409,7 +409,8 @@ class CPM_z3(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+        for cpm_con in _value + _defining:
             # translate each expression tree, then post straight away
             z3_con = self._z3_expr(cpm_con)
             self.z3_solver.add(z3_con)

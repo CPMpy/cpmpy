@@ -59,7 +59,7 @@ from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bo
     get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var, apply_transform
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -392,7 +392,7 @@ class CPM_choco(SolverInterface):
         return self._to_var(vals)
 
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -405,7 +405,7 @@ class CPM_choco(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -415,14 +415,17 @@ class CPM_choco(SolverInterface):
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons,
-                                 supported = self.supported_global_constraints | {"sum", "wsum"},
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(canonical_comparison, value, defining)
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported = self.supported_global_constraints | {"sum", "wsum"},
                                  csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # support >, <, !=
 
-        return cpm_cons
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # support >, <, !=
+
+
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_choco":
         """
@@ -448,7 +451,8 @@ class CPM_choco(SolverInterface):
         # ensure all vars are known to solver
 
         # transform and post the constraints
-        for con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+        for con in _value + _defining:
             c = self._get_constraint(con)
             if c is not None: # Reification constraints are not posted
                 c.post()

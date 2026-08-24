@@ -66,7 +66,7 @@ from ..expressions.utils import is_int, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.negation import push_down_negation
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var, apply_transform
 from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
@@ -467,7 +467,7 @@ class CPM_gcs(SolverInterface):
         else:
             self.gcs.maximise(self.solver_var(obj_var))
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -480,7 +480,7 @@ class CPM_gcs(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
@@ -489,18 +489,21 @@ class CPM_gcs(SolverInterface):
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
         # but no reification for linear not equals and not half reification for linear equality. 
         # Maybe a future transformation (or future work on the GCS solver).
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']), csemap=self._csemap)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=frozenset(['==']), csemap=self._csemap)
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
+
 
         # NB: GCS supports a small number of simple expressions as the reifying term
         # e.g. (x > 3) -> constraint could in principle be supported in the future.
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        return cpm_cons
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        return value, defining
 
     def verify(self, name=None, location=".", time_limit=None, display_output=False, veripb_args=[]):
         """
@@ -566,7 +569,9 @@ class CPM_gcs(SolverInterface):
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
 
-        for con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+
+        for con in _value + _defining:
             if isinstance(con, _BoolVarImpl):
                 # base case, just var or ~var
                 self.gcs.post_or([self.solver_var(con)])

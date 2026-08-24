@@ -41,7 +41,7 @@ from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, apply_transform
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum
 from ..transformations.normalize import toplevel_list
@@ -263,7 +263,8 @@ class CPM_scip(SolverInterface):
             obj = only_positive_bv_wsum(obj)
 
             # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
-            for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
+            _value, _defining = self.transform(safe_cons + decomp_cons + flat_cons)
+            for cpm_expr in _value + _defining:
                 self._add_transformed_constraint(cpm_expr)
 
             scip_obj = self._make_numexpr(obj)
@@ -305,7 +306,7 @@ class CPM_scip(SolverInterface):
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -318,21 +319,23 @@ class CPM_scip(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
-        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
-        return cpm_cons
+        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)
+        value, defining = apply_transform(reify_rewrite, value, defining,
+            supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
+        value, defining = apply_transform(only_numexpr_equality, value, defining,
+            supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
+        value, defining = apply_transform(linearize_reified_variables, value, defining, min_values=2, csemap=self._csemap)
+        value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(only_implies, value, defining, csemap=self._csemap)
+        value, defining = apply_transform(linearize_constraint, value, defining, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
+        value, defining = apply_transform(only_positive_bv, value, defining, csemap=self._csemap)
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_scip":
         """
@@ -357,7 +360,9 @@ class CPM_scip(SolverInterface):
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))
 
-        for con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+
+        for con in _value + _defining:
             self._add_transformed_constraint(con)
 
         return self

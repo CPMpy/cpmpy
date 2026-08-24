@@ -347,7 +347,7 @@ class CPM_hexaly(SolverInterface):
 
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: NestedBoolExprLike) -> tuple[list[Expression], list[Expression]]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -360,7 +360,7 @@ class CPM_hexaly(SolverInterface):
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
             Returns:
-                list[Expression]: transformed constraints
+                tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -369,7 +369,7 @@ class CPM_hexaly(SolverInterface):
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        return cpm_cons
+        return cpm_cons, []
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hexaly":
         """
@@ -394,7 +394,8 @@ class CPM_hexaly(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for con in self.transform(cpm_expr):
+        _value, _defining = self.transform(cpm_expr)
+        for con in _value + _defining:
             hex_expr = self._hex_expr(con)
             self.hex_model.add_constraint(hex_expr)
 
