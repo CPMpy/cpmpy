@@ -15,7 +15,7 @@ List of functions
 import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list,simplify_boolean
 from cpmpy.transformations.safening import no_partial_functions, safen_objective
-from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
+from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective, apply_transform
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
 from cpmpy.transformations.linearize import (
     decompose_linear,
@@ -122,31 +122,28 @@ def to_opb(cpm_expr, csemap, ivarmap, encoding="auto"):
         Transform a list of CPMpy expressions into a list of Pseudo-Boolean constraints.
     """
 
-    cpm_cons = toplevel_list(cpm_expr)
-    cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+    value, defining = toplevel_list(cpm_expr)
+    value, defining = apply_transform(no_partial_functions, value, defining, safen_toplevel={"div", "mod", "element"})
     # Use linear-specific decompositions (e.g. AllDifferent.decompose_linear)
     # before linearization, consistent with MIP backends.
-    cpm_cons = decompose_linear(
-        cpm_cons,
+    value, defining = apply_transform(
+        decompose_linear,
+        value,
+        defining,
         supported=frozenset(),
         supported_reified=frozenset(),
         csemap=csemap,
     )
-    cpm_cons = simplify_boolean(cpm_cons)
-    v, d = flatten_constraint(cpm_cons, csemap=csemap)  # flat normal form
-    cpm_cons = v + d
-    v, d = only_bv_reifies(cpm_cons, csemap=csemap)
-    cpm_cons = v + d
-    v, d = only_implies(cpm_cons, csemap=csemap)
-    cpm_cons = v + d
-    v, d = linearize_constraint(
-        cpm_cons, supported=frozenset({"sum", "wsum"}), csemap=csemap
+    value, defining = apply_transform(simplify_boolean, value, defining)
+    value, defining = apply_transform(flatten_constraint, value, defining, csemap=csemap)  # flat normal form
+    value, defining = apply_transform(only_bv_reifies, value, defining, csemap=csemap)
+    value, defining = apply_transform(only_implies, value, defining, csemap=csemap)
+    value, defining = apply_transform(
+        linearize_constraint, value, defining, supported=frozenset({"sum", "wsum"}), csemap=csemap
     )
-    cpm_cons = v + d
-    v, d = int2bool(cpm_cons, ivarmap, encoding=encoding)
-    cpm_cons = v + d
+    value, defining = apply_transform(int2bool, value, defining, ivarmap=ivarmap, encoding=encoding)
 
-    return _normalized_comparison(cpm_cons)
+    return _normalized_comparison(value + defining)
 
 
 def to_opb_objective(expr, csemap, ivarmap, encoding="auto"):

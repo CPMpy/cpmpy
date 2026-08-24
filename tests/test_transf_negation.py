@@ -1,6 +1,13 @@
 import cpmpy as cp
 from cpmpy.transformations.negation import push_down_negation, recurse_negation
 
+def _pair_to_list(fn):
+    def _wrapped(*a, **k):
+        v, d = fn(*a, **k)
+        return v + d
+    return _wrapped
+push_down_negation = _pair_to_list(push_down_negation)
+
 
 class TestTransfNegation:
 

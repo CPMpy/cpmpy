@@ -393,14 +393,14 @@ class CPM_gurobi(SolverInterface):
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = push_down_negation(cpm_cons)
-        cpm_cons = decompose_linear(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining)
+        value, defining = apply_transform(push_down_negation, value, defining)
+        value, defining = apply_transform(decompose_linear, value, defining,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(flatten_constraint, value, defining, csemap=self._csemap)  # flat normal form
         value, defining = apply_transform(reify_rewrite, value, defining,
             supported=frozenset(['sum', 'wsum']), csemap=self._csemap)
         value, defining = apply_transform(only_numexpr_equality, value, defining,
@@ -582,7 +582,7 @@ class CPM_gurobi(SolverInterface):
         Returns a MUS (list of constraints from soft that is unsatisfiable together, and subset minimal).
         """
 
-        soft_cons = toplevel_list(soft, merge_and=False)
+        soft_cons, _ = toplevel_list(soft, merge_and=False)
 
         # instantiate Gurobi solver
         s = cls()

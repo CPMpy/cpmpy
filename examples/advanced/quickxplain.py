@@ -21,7 +21,7 @@ def quickXplain(soft, hard=[], solver="ortools"):
             "z3", "pysat" and "gurobi" are incremental, "ortools" restarts the solver
     """
 
-    soft = toplevel_list(soft, merge_and=False)
+    soft, _ = toplevel_list(soft, merge_and=False)
     assump = cp.boolvar(shape=len(soft))
     solver = cp.SolverLookup.get(solver, cp.Model(hard))
     solver += assump.implies(soft)

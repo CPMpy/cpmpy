@@ -55,6 +55,7 @@ from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import apply_transform
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.safening import no_partial_functions
@@ -363,13 +364,13 @@ class CPM_hexaly(SolverInterface):
                 tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # apply transformations
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"nd_element"})
-        cpm_cons = decompose_in_tree(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining, safen_toplevel={"nd_element"})
+        value, defining = apply_transform(decompose_in_tree, value, defining,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        return cpm_cons, []
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hexaly":
         """

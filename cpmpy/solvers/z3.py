@@ -58,6 +58,7 @@ from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+from ..transformations.flatten_model import apply_transform
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 
@@ -377,13 +378,13 @@ class CPM_z3(SolverInterface):
                 tuple[list[Expression], list[Expression]]: (value, defining)
         """
 
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"}))
-        cpm_cons = decompose_in_tree(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining, safen_toplevel=frozenset({"div", "mod"}))
+        value, defining = apply_transform(decompose_in_tree, value, defining,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        return cpm_cons, []
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_z3":
         """

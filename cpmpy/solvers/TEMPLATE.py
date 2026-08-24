@@ -407,15 +407,15 @@ class CPM_template(SolverInterface):
         """
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons) # if the solver requires supported partial function globals to be safened, use the follwing instead:
-        # cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"element", "nd_element", "div", "mod"}))        
-        cpm_cons = push_down_negation(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining) # if the solver requires supported partial function globals to be safened, use the follwing instead:
+        # value, defining = apply_transform(no_partial_functions, value, defining, safen_toplevel=frozenset({"element", "nd_element", "div", "mod"}))        
+        value, defining = apply_transform(push_down_negation, value, defining)
+        value, defining = apply_transform(decompose_in_tree, value, defining,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        value, defining = flatten_constraint(cpm_cons)  # flat normal form
+        value, defining = apply_transform(flatten_constraint, value, defining)  # flat normal form
         value, defining = apply_transform(reify_rewrite, value, defining,
             supported=frozenset(['sum', 'wsum']))  # constraints that support reification
 

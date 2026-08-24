@@ -46,7 +46,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       csemap: Optional[CSEMap] = None,
                       decompose_custom: Optional[Dict[str, CustomDecomp]] = None,
                       decompose_custom_positive: Optional[Dict[str, CustomDecomp]] = None,
-                      ) -> list[Expression]:
+                      ):
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -60,6 +60,9 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param csemap: CSEMap object used to avoid decomposing the same global constraint twice
     :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
     :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
+
+    Returns:
+        tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
 
     To decompose a global constraint in positive context:
     1. Check `decompose_positive_custom`
@@ -181,11 +184,12 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 
     # recurse on any newly generated toplevel expressions
     if len(todolist) > 0:
-        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+        v, d = decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+        return newlist + v + d, []
     elif changed:
-        return newlist
+        return newlist, []
     else:  # not changed
-        return lst_of_expr
+        return lst_of_expr, []
 
 
 def decompose_objective(expr: Expression,

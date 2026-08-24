@@ -55,6 +55,7 @@ from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.utils import is_num, is_int, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import apply_transform
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.safening import no_partial_functions
@@ -439,14 +440,14 @@ class CPM_cpo(SolverInterface):
                 tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # apply transformations
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining)
+        value, defining = apply_transform(decompose_in_tree, value, defining,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         # no flattening required
-        return cpm_cons, []
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_cpo":
         """

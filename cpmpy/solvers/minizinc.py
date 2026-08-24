@@ -76,6 +76,7 @@ from ..expressions.globalfunctions import Multiplication, FloatSum
 from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import apply_transform
 from ..transformations.normalize import toplevel_list
 
 
@@ -624,12 +625,12 @@ class CPM_minizinc(SolverInterface):
             Returns:
                 tuple[list[Expression], list[Expression]]: (value, defining)
         """
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(decompose_in_tree, value, defining,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        return cpm_cons, []
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_minizinc":
         """

@@ -16,13 +16,16 @@ from ..expressions.globalconstraints import GlobalConstraint
 from .negation import recurse_negation
 
 
-def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> list[Expression]:
+def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True):
     """
     Unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
 
     Arguments:
         cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
         merge_and (bool):  if True then a toplevel 'and' will have its arguments merged at top level
+
+    Returns:
+        tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
     """
 
     # very efficient version with limited function lookups and list operations
@@ -47,10 +50,10 @@ def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> list[
     append = newlist.append
     unravel((cpm_expr,), append)
 
-    return newlist
+    return newlist, []
 
 
-def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[Expression]:
+def simplify_boolean(lst_of_expr: list[Expression], num_context=False):
     """
     Removes Boolean constants from CPMpy expressions, except inside global constraints/functions.
 
@@ -67,7 +70,8 @@ def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[E
         num_context (bool): whether the expressions are used as numeric arguments (default: False)
 
     Returns:
-        list[Expression]: simplified expressions; returns ``lst_of_expr`` unchanged if nothing changed
+        tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining;
+        value is ``lst_of_expr`` unchanged if nothing changed
     """
 
     newlist: list[Expression] = []
@@ -82,8 +86,8 @@ def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[E
             newlist.append(expr)
     
     if not changed:
-        return lst_of_expr
-    return newlist
+        return lst_of_expr, []
+    return newlist, []
 
 
 def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, Expression|int]:

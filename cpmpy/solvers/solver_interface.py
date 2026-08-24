@@ -220,7 +220,7 @@ class SolverInterface(object):
             Returns:
                 tuple[list[Expression], list[Expression]]: ``(value, defining)``
         """
-        return toplevel_list(cpm_expr), []  # replace by the transformations your solver needs
+        return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         """

@@ -23,7 +23,8 @@ def linearize_reified_variables(*a, **k):
     return v + d
 
 def decompose_linear(*a, **k):
-    return _raw_decompose_linear(*a, **k)
+    v, d = _raw_decompose_linear(*a, **k)
+    return v + d
 
 def canonical_comparison(*a, **k):
     v, d = _raw_canonical_comparison(*a, **k)
@@ -43,11 +44,19 @@ def only_positive_bv_wsum_const(*a, **k):
 def only_positive_bv_wsum(*a, **k):
     return _raw_only_positive_bv_wsum(*a, **k)
 
-from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.decompose_global import decompose_in_tree as _raw_decompose_in_tree
 from cpmpy.transformations.int2bool import IntVarEncDirect, IntVarEncOrder
-from cpmpy.transformations.normalize import toplevel_list
+from cpmpy.transformations.normalize import toplevel_list as _raw_toplevel_list
 from cpmpy.transformations.reification import only_bv_reifies, only_implies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
+
+def decompose_in_tree(*a, **k):
+    v, d = _raw_decompose_in_tree(*a, **k)
+    return v + d
+
+def toplevel_list(*a, **k):
+    v, d = _raw_toplevel_list(*a, **k)
+    return v + d
 
 
 class TestTransLinearize:

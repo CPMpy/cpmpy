@@ -3,6 +3,15 @@ from cpmpy.expressions.core import Operator, BoolVal, Comparison
 from cpmpy.transformations.negation import push_down_negation
 from cpmpy.transformations.normalize import simplify_boolean, toplevel_list
 
+def _pair_to_list(fn):
+    def _wrapped(*a, **k):
+        v, d = fn(*a, **k)
+        return v + d
+    return _wrapped
+simplify_boolean = _pair_to_list(simplify_boolean)
+toplevel_list = _pair_to_list(toplevel_list)
+push_down_negation = _pair_to_list(push_down_negation)
+
 
 class TestTransSimplify:
 

@@ -151,9 +151,9 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
-    lst_of_expr = toplevel_list(expr)               # ensure it is a list
+    lst_of_expr, _ = toplevel_list(expr)               # ensure it is a list
     if do_simplify:
-        lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
+        lst_of_expr, _ = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
     for expr in lst_of_expr:
 
         if not expr.has_subexpr():
@@ -337,7 +337,8 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions: {expr}")
 
-    expr = simplify_boolean([expr])[0]
+    expr, _ = simplify_boolean([expr])
+    expr = expr[0]
     (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)  # might rewrite expr into a (w)sum
     if isinstance(flatexpr, Expression) and flatexpr.name in supported:
         return (flatexpr, flatcons)

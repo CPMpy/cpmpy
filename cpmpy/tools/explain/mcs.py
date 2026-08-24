@@ -26,7 +26,7 @@ def mcs_opt(soft, hard, weights=1, solver="ortools"):
         :param: weights: weight of each constraint, default is 1
         :param: solver: the SAT-solver to use, must support optimization
     """
-    soft2 = toplevel_list(soft, merge_and=False)
+    soft2, _ = toplevel_list(soft, merge_and=False)
     mymss = mss_opt(soft2, hard, weights, solver=solver)
     return list(set(soft2) - set(mymss))
 
@@ -41,7 +41,7 @@ def mcs_grow(soft, hard, solver="ortools"):
         :param: hard: list of hard constraints, will be added to the model before solving
         :param: solver: the SAT-solver to use, must support assumptions
     """
-    soft2 = toplevel_list(soft, merge_and=False)
+    soft2, _ = toplevel_list(soft, merge_and=False)
     mymss = mss_grow(soft2, hard, solver)
     return list(set(soft2) - set(mymss))
 
@@ -57,6 +57,6 @@ def mcs_grow_naive(soft, hard, solver="ortools"):
         :param: hard: list of hard constraints, will be added to the model before solving
         :param: solver: the SAT-solver to use, ideally incremental such as "gurobi", "exact"
     """
-    soft2 = toplevel_list(soft, merge_and=False)
+    soft2, _ = toplevel_list(soft, merge_and=False)
     mymss = mss_grow_naive(soft2, hard, solver)
     return list(set(soft2) - set(mymss))

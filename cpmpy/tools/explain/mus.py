@@ -234,7 +234,7 @@ def mus_naive(soft, hard=[], solver="ortools"):
         :param solver: name of a solver, see SolverLookup.solvernames()
     """
     # ensure toplevel list
-    soft = toplevel_list(soft, merge_and=False)
+    soft, _ = toplevel_list(soft, merge_and=False)
 
     m = cp.Model(hard + soft)
     assert not m.solve(solver=solver), "MUS: model must be UNSAT"
@@ -268,7 +268,7 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
     """
 
-    soft = toplevel_list(soft, merge_and=False)
+    soft, _ = toplevel_list(soft, merge_and=False)
     assert cp.Model(hard + soft).solve(solver) is False, "The model should be UNSAT!"
 
     # the recursive call
@@ -299,7 +299,7 @@ def ocus_naive(soft, hard=[], weights=None, meta_constraint=True, solver="ortool
     """
         Naive implementation of `ocus` without assumption variables and incremental solving
     """
-    soft = toplevel_list(soft, merge_and=False)
+    soft, _ = toplevel_list(soft, merge_and=False)
     bvs = cp.boolvar(shape=(len(soft),))
 
     if weights is None:

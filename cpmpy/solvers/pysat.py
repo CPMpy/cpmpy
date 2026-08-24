@@ -383,17 +383,16 @@ class CPM_pysat(SolverInterface):
             Returns:
                 tuple[list[Expression], list[Expression]]: (value, defining)
         """
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = push_down_negation(cpm_cons)
-        cpm_cons = decompose_linear(
-            cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining)
+        value, defining = apply_transform(push_down_negation, value, defining)
+        value, defining = apply_transform(decompose_linear, value, defining,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap
         )
-        cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
-        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(simplify_boolean, value, defining) # why is this needed here? Also in flatten_constraint?
+        value, defining = apply_transform(flatten_constraint, value, defining, csemap=self._csemap)  # flat normal form
         value, defining = apply_transform(linearize_reified_variables, value, defining, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
         value, defining = apply_transform(only_bv_reifies, value, defining, csemap=self._csemap)
         value, defining = apply_transform(only_implies, value, defining, csemap=self._csemap)

@@ -3,6 +3,13 @@ from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.expressions.utils import argval
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
+def _pair_to_list(fn):
+    def _wrapped(*a, **k):
+        v, d = fn(*a, **k)
+        return v + d
+    return _wrapped
+no_partial_functions = _pair_to_list(no_partial_functions)
+
 
 class TestTransSafen:
 

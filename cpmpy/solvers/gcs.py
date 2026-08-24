@@ -482,14 +482,14 @@ class CPM_gcs(SolverInterface):
             Returns:
                 tuple[list[Expression], list[Expression]]: (value, defining)
         """
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = push_down_negation(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining)
+        value, defining = apply_transform(push_down_negation, value, defining)
+        value, defining = apply_transform(decompose_in_tree, value, defining,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        value, defining = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        value, defining = apply_transform(flatten_constraint, value, defining, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
         # but no reification for linear not equals and not half reification for linear equality. 

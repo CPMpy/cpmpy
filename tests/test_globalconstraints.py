@@ -10,8 +10,16 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError, IncompleteFunctionError
 from cpmpy.expressions.utils import STAR, argvals, argval
 from cpmpy.solvers import CPM_minizinc
-from cpmpy.transformations.decompose_global import decompose_in_tree
-from cpmpy.transformations.safening import no_partial_functions
+from cpmpy.transformations.decompose_global import decompose_in_tree as _raw_decompose_in_tree
+def decompose_in_tree(*a, **k):
+    v, d = _raw_decompose_in_tree(*a, **k)
+    return v + d
+
+from cpmpy.transformations.safening import no_partial_functions as _raw_no_partial_functions
+def no_partial_functions(*a, **k):
+    v, d = _raw_no_partial_functions(*a, **k)
+    return v + d
+
 
 from utils import skip_on_missing_pblib, inclusive_range, lambda_assert
 
@@ -793,7 +801,6 @@ class TestGlobal:
                     pass
 
     def test_abs(self):
-        from cpmpy.transformations.decompose_global import decompose_in_tree
         iv = cp.intvar(-8, 8, name="x")
         constraints = [cp.Abs(iv) + 9 <= 8]
         model = cp.Model(constraints)

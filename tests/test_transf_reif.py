@@ -87,7 +87,7 @@ class TestTransfReif:
         def _join(vd):
             return vd[0] + vd[1]
         f = lambda expr: str(_join(reify_rewrite(_join(flatten_constraint(expr)))))
-        fd = lambda expr: str(_join(reify_rewrite(_join(flatten_constraint(decompose_in_tree(expr))))))
+        fd = lambda expr: str(_join(reify_rewrite(_join(flatten_constraint(_join(decompose_in_tree(expr)))))))
 
 
         # various reify_rewrite cases:

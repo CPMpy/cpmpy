@@ -29,13 +29,13 @@ def make_assump_model(soft, hard=[], name=None):
         Provide name for assumption variables with `name` param.
     """
     # ensure toplevel list
-    soft2 = toplevel_list(soft, merge_and=False)
+    soft2, _ = toplevel_list(soft, merge_and=False)
 
     # make assumption variables
     assump = cp.boolvar(shape=(len(soft2),), name=name)
 
     # hard + implied soft constraints
-    hard = toplevel_list(hard)
+    hard, _ = toplevel_list(hard)
     model = cp.Model(hard + [assump.implies(soft2)])  # each assumption variable implies a candidate
 
     return model, soft2, assump

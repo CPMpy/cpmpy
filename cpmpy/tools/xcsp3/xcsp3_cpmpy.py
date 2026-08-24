@@ -660,7 +660,7 @@ def xcsp3_cpmpy(
         # Model.add() may leave nested lists (e.g. element-matrix index bounds); flatten first
         if solver in added_natives:
             from cpmpy.transformations.normalize import toplevel_list
-            model.constraints = toplevel_list(model.constraints)
+            model.constraints, _ = toplevel_list(model.constraints)
             for i, constraint in enumerate(model.constraints):
                 if constraint.name in added_natives[solver]:
                     model.constraints[i] = added_natives[solver][constraint.name](constraint.args)

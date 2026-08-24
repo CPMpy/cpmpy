@@ -89,21 +89,21 @@ def _process_instance(args):
     try:
         step = "toplevel_list"
         t0 = time.perf_counter()
-        cpm_expr = toplevel_list(cpm_expr)
+        cpm_expr, _ = toplevel_list(cpm_expr)
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)
 
         step = "no_partial_functions"
         t0 = time.perf_counter()
-        cpm_expr = no_partial_functions(cpm_expr, safen_toplevel={"div", "mod", "element"})
+        cpm_expr, _ = no_partial_functions(cpm_expr, safen_toplevel={"div", "mod", "element"})
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)
 
         step = "decompose_linear"
         t0 = time.perf_counter()
-        cpm_expr = decompose_linear(
+        cpm_expr, _ = decompose_linear(
             cpm_expr,
             supported=solver.supported_global_constraints,
             supported_reified=solver.supported_reified_global_constraints,
@@ -115,7 +115,7 @@ def _process_instance(args):
 
         step = "push_down_negation"
         t0 = time.perf_counter()
-        cpm_expr = push_down_negation(cpm_expr)
+        cpm_expr, _ = push_down_negation(cpm_expr)
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)

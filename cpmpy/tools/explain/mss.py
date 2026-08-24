@@ -91,7 +91,7 @@ def mss_grow_naive(soft, hard=[], solver="ortools"):
         :param: solver: the SAT-solver to use, ideally incremental such as "gurobi", "exact"
     """
 
-    soft = toplevel_list(soft, merge_and=False)
+    soft, _ = toplevel_list(soft, merge_and=False)
     if not is_any_list(hard):
         hard = [hard]
     else:

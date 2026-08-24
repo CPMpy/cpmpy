@@ -219,7 +219,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
                 # very special case, avoid writing as sum of 1 argument; write as disjunction of 1 arg instead
-                new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
+                new_expr, _ = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
                 if isinstance(new_expr[0], BoolVal):
                     if new_expr[0].value() is True:
@@ -612,7 +612,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
             csemap: map of expressions to an auxiliary variable
 
         returns:
-            list of expressions
+            tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
     """
     if supported is None:
         supported = frozenset[str]()

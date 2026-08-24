@@ -16,7 +16,7 @@ from typing import Optional, AbstractSet, Any, Sequence
 def no_partial_functions(lst_of_expr: list[Expression],
                         _toplevel: Optional[Any]=None, 
                         _nbc: Optional[Any] = None, 
-                        safen_toplevel: Optional[AbstractSet[str]] = None) -> list[Expression]:
+                        safen_toplevel: Optional[AbstractSet[str]] = None):
     """
     A partial function is a function whose output is not defined for all possible inputs.
 
@@ -70,6 +70,9 @@ def no_partial_functions(lst_of_expr: list[Expression],
         safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
                                     a solver supports the global function natively (not decomposed) but does not accept
                                     unsafe values in its API (e.g., OR-Tools for `div`).
+
+    Returns:
+        tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
     """
 
     if _toplevel is not None:
@@ -100,11 +103,12 @@ def no_partial_functions(lst_of_expr: list[Expression],
         newlist.append(expr)
         
     if len(todolist) > 0:
-        return newlist + no_partial_functions(todolist, safen_toplevel=safen_toplevel)
+        v, d = no_partial_functions(todolist, safen_toplevel=safen_toplevel)
+        return newlist + v + d, []
     elif changed:
-        return newlist
+        return newlist, []
     else:
-        return lst_of_expr
+        return lst_of_expr, []
 
 def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_toplevel: AbstractSet[str]) -> tuple[bool, list[Expression], list[Expression], list[Expression]]:
     """

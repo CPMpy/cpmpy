@@ -54,6 +54,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_bool, is_int, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import apply_transform
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.safening import no_partial_functions
 
@@ -304,14 +305,14 @@ class CPM_pysdd(SolverInterface):
                 tuple[list[Expression], list[Expression]]: (value, defining)
         """
         # works on list of nested expressions
-        cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons,
+        value, defining = toplevel_list(cpm_expr)
+        value, defining = apply_transform(no_partial_functions, value, defining)
+        value, defining = apply_transform(decompose_in_tree, value, defining,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
-        cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
-        return cpm_cons, []
+        value, defining = apply_transform(simplify_boolean, value, defining)  # for cleaning (BE >= 0) and such
+        return value, defining
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pysdd":
         """

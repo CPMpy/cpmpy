@@ -7,6 +7,14 @@ from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
 from cpmpy.transformations.linearize import decompose_linear
 
+def _pair_to_list(fn):
+    def _wrapped(*a, **k):
+        v, d = fn(*a, **k)
+        return v + d
+    return _wrapped
+decompose_in_tree = _pair_to_list(decompose_in_tree)
+decompose_linear = _pair_to_list(decompose_linear)
+
 
 class TestTransfDecomp:
 
