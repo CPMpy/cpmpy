@@ -49,11 +49,11 @@ def only_bv_reifies(constraints, csemap=None) -> tuple[list[Expression], list[Ex
                     rv, rd = only_bv_reifies(v + d, csemap=csemap)
                     newcons.extend(rv + rd)
                 else:
-                    swapped = [a1 == a0]  # BE == BV :: BV == BE
+                    newexpr = [a1 == a0]  # BE == BV :: BV == BE
                     if not a0.is_bool():
-                        v, d = flatten_constraint(swapped, csemap=csemap)
-                        swapped = v + d
-                    newcons.extend(swapped)
+                        v, d = flatten_constraint(newexpr, csemap=csemap)
+                        newexpr = v + d
+                    newcons.extend(newexpr)
             else:
                 newcons.append(cpm_expr)
         else:
