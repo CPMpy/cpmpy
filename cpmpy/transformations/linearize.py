@@ -64,7 +64,7 @@ Optional post-linearisation transformations:
 """
 
 import copy
-from typing import AbstractSet, Sequence, Optional
+from typing import AbstractSet, Sequence, Optional, cast
 
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
@@ -97,7 +97,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         reified: whether the constraint is fully reified
     """
 
-    newlist = []
+    newlist: list[Expression] = []
     for cpm_expr in lst_of_expr:
         # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
@@ -106,9 +106,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 newlist.append(Operator("or", [cpm_expr]))
             elif isinstance(cpm_expr, NegBoolView):
                 # might as well remove the negation
-                newlist.append(sum([~cpm_expr]) <= 0)
+                newlist.append(cast(Expression, sum([~cpm_expr]) <= 0))
             else: # positive literal
-                newlist.append(sum([cpm_expr]) >= 1)
+                newlist.append(cast(Expression, sum([cpm_expr]) >= 1))
 
         # Boolean operators
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
@@ -136,12 +136,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub, _ = linearize_constraint([sub_expr], supported=supported, reified=True, csemap=csemap)
                     # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
-                    indicator_constraints=[]
+                    indicator_constraints: list[Expression] = []
                     for lin in lin_sub:
                         if is_true_cst(lin):
                             continue
                         elif is_false_cst(lin):
-                            indicator_constraints=[] # do not add any constraints
+                            indicator_constraints = list[Expression]() # do not add any constraints
                             v, d = linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified)
                             newlist += v + d # post linear version of unary constraint
                             break # do not need to add other
@@ -310,7 +310,7 @@ def only_positive_bv(lst_of_expr, csemap=None) -> tuple[list[Expression], list[E
 
         Resulting expression is linear if the original expression was linear.
     """
-    newlist = []
+    newlist: list[Expression] = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Comparison):
@@ -456,7 +456,7 @@ def canonical_comparison(lst_of_expr: ListLike[Expression]) -> tuple[list[Expres
         Expects the input constraints to be flat. Only apply after applying :func:`flatten_constraint`
     """
 
-    newlist = []
+    newlist: list[Expression] = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == '->':    # half reification of comparison
@@ -562,7 +562,7 @@ def only_positive_coefficients(lst_of_expr) -> tuple[list[Expression], list[Expr
 
         Resulting expression is linear.
     """
-    newlist = []
+    newlist: list[Expression] = []
     for cpm_expr in lst_of_expr:
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args

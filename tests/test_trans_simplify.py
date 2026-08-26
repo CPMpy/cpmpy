@@ -1,16 +1,14 @@
 import cpmpy as cp
-from cpmpy.expressions.core import Operator, BoolVal, Comparison
+from cpmpy.expressions.core import Operator, BoolVal, Comparison, Expression
 from cpmpy.transformations.negation import push_down_negation
 from cpmpy.transformations.normalize import simplify_boolean, toplevel_list
 
-def _pair_to_list(fn):
-    def _wrapped(*a, **k):
-        v, d = fn(*a, **k)
-        return v + d
-    return _wrapped
-simplify_boolean = _pair_to_list(simplify_boolean)
-toplevel_list = _pair_to_list(toplevel_list)
-push_down_negation = _pair_to_list(push_down_negation)
+
+def _join_transform(expr):
+    value, defining = toplevel_list(expr)
+    value, defining = push_down_negation(value + defining)
+    value, defining = simplify_boolean(value + defining)
+    return value + defining
 
 
 class TestTransSimplify:
@@ -19,7 +17,7 @@ class TestTransSimplify:
         self.bvs = cp.boolvar(shape=3, name="bv")
         self.ivs = cp.intvar(0, 5, shape=3, name="iv")
 
-        self.transform = lambda x: simplify_boolean(push_down_negation(toplevel_list(x)))
+        self.transform = _join_transform
 
     def test_bool_ops(self):
         expr = Operator("or", self.bvs.tolist() + [False])
