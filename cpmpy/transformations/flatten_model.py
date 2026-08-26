@@ -311,27 +311,22 @@ def flatten_constraint(expr, csemap=None, do_simplify=True) -> tuple[list[Expres
     return value, defining
 
 
-def apply_transform(transform, value, defining, **kwargs):
+def apply_transform(transform, value, defining, **kwargs)-> tuple[list[Expression], list[Expression]]:
     """
         Apply a ``(list) -> (value, defining)`` transform to both streams and merge.
 
-        ``transform`` is run on ``value`` and on ``defining`` separately. New defining
-        constraints from either call are appended to the defining stream; rewritten
-        defining constraints stay defining.
+        ``transform`` is run on ``value`` and on ``defining`` separately. Only the new value
+        constraints from ``value`` are returned as value constraints. All other constraints are returned 
+        as defining constraints.
     """
-    v2, d_from_v = transform(value, **kwargs)
-    d2, d_from_d = transform(defining, **kwargs)
-    return list(v2), list(d2) + list(d_from_v) + list(d_from_d)
+    vv, dv = transform(value, **kwargs)
+    vd, dd = transform(defining, **kwargs)
+    return list(vv), list(vd) + list(dv) + list(dd)
 
 
-def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):
+def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None) -> tuple[Expression, list[Expression]]:
     """
-    - Decision variable: Var
-    - Linear: 
-        ======================                       ========
-        sum([Var])                                   (CPMpy class 'Operator', name 'sum')
-        wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
-        ======================                       ========
+        Returns the flattened objective expression and the defining constraints.
     """
     # lets be very explicit here
     if is_any_list(expr):

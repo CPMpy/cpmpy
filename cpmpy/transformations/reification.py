@@ -44,8 +44,8 @@ def only_bv_reifies(constraints, csemap=None) -> tuple[list[Expression], list[Ex
                     isinstance(a1, _BoolVarImpl):
                 # BE -> BV :: ~BV -> ~BE
                 if cpm_expr.name == '->':
-                    flat_new = (~a1).implies(recurse_negation(a0))
-                    v, d = flatten_constraint(flat_new, csemap=csemap)
+                    newexpr = (~a1).implies(recurse_negation(a0))
+                    v, d = flatten_constraint(newexpr, csemap=csemap)
                     rv, rd = only_bv_reifies(v + d, csemap=csemap)
                     newcons.extend(rv + rd)
                 else:

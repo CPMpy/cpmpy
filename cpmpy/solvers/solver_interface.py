@@ -215,7 +215,7 @@ class SolverInterface(object):
               encoding/domain constraints that link Boolean literals to integer
               variables (e.g. exactly-one / channeling from ``int2bool``).
 
-            Callers that do not need the split can post ``value + defining``.
+            Callers that do not need the split can concatenate the lists ``value + defining``.
 
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
