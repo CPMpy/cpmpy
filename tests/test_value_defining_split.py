@@ -24,12 +24,12 @@ class TestValueDefiningSplit:
         csemap = CSEMap()
 
         v0, d0 = flatten_constraint(cp.abs(x) + y <= 15, csemap=csemap)
-        assert len(v0) == 1 and len(d0) == 1
-        assert "abs" in str(d0[0])
-        assert "abs" not in str(v0[0])
+        assert str(v0) == "[(IV0) + (y) <= 15]"
+        assert str(d0) == "[(abs(x)) == (IV0)]"
 
         v1, d1 = flatten_constraint(cp.abs(x) + y >= 11, csemap=csemap)
-        assert len(v1) == 1 and d1 == []  # CSE reuses defining
+        assert str(v1) == "[(IV0) + (y) >= 11]"
+        assert str(d1) == "[]"  # CSE reuses defining
 
     def test_only_bv_reifies(self):
         x = cp.intvar(-10, 10, name="x")
@@ -51,17 +51,14 @@ class TestValueDefiningSplit:
         rv = cp.boolvar(name="rv")
         flat_v, flat_d = flatten_constraint(rv == (cp.max(ivs) > 5), csemap=CSEMap())
         v, d = apply_transform(reify_rewrite, flat_v, flat_d)
-        # value is the reified comparison over an aux; defining defines that aux
-        assert len(v) == 1 and "rv" in str(v[0])
-        assert any("max" in str(c) for c in d)
-        assert all("max" not in str(c) for c in v)
+        assert str(v) == "[(IV0 > 5) == (rv)]"
+        assert str(d) == "[(max(ivs[0],ivs[1],ivs[2])) == (IV0)]"
 
     def test_only_numexpr_equality(self):
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
         v, d = only_numexpr_equality([cp.max(x, y, z) < 5], supported=frozenset(), csemap=CSEMap())
-        assert len(v) == 1 and len(d) == 1
-        assert "max" in str(d[0]) and "==" in str(d[0])
-        assert "max" not in str(v[0])
+        assert str(v) == "[IV0 < 5]"
+        assert str(d) == "[(max(x,y,z)) == (IV0)]"
 
     def test_decompose_in_tree(self):
         # Globals/functions already return (value, defining) from decompose();
@@ -98,19 +95,14 @@ class TestValueDefiningSplit:
     def test_int2bool_domain_defining(self):
         x = cp.intvar(0, 2, name="x")
         v, d = int2bool([cp.sum([x]) >= 1], ivarmap={}, encoding="direct", csemap=CSEMap())
-        assert len(v) == 1
-        assert len(d) == 1
-        # value is the rewritten PB constraint; defining is the domain/exactly-one
-        assert "sum" in str(d[0]) and "== 1" in str(d[0])
-        assert "sum" not in str(v[0]) or str(v[0]).startswith("~")
+        assert str(v) == "[~BV[x == 0]]"
+        assert str(d) == "[sum(BV[x == 0], BV[x == 1], BV[x == 2]) == 1]"
 
     def test_apply_transform_preserves_existing_defining(self):
         x = cp.intvar(-10, 10, name="x")
         y = cp.intvar(-10, 10, name="y")
         csemap = CSEMap()
         v, d = flatten_constraint(cp.abs(x) + y <= 15, csemap=csemap)
-        assert len(d) == 1
-        # a no-op-ish transform on both streams must keep defining as defining
         v2, d2 = apply_transform(only_bv_reifies, v, d, csemap=csemap)
-        assert any("abs" in str(c) for c in d2)
-        assert all("abs" not in str(c) for c in v2)
+        assert str(v2) == "[(IV0) + (y) <= 15]"
+        assert str(d2) == "[(abs(x)) == (IV0)]"
