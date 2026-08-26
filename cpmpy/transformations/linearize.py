@@ -64,7 +64,7 @@ Optional post-linearisation transformations:
 """
 
 import copy
-from typing import AbstractSet, Sequence, Optional, cast
+from typing import AbstractSet, Sequence, Optional
 
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
@@ -106,9 +106,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 newlist.append(Operator("or", [cpm_expr]))
             elif isinstance(cpm_expr, NegBoolView):
                 # might as well remove the negation
-                newlist.append(cast(Expression, sum([~cpm_expr]) <= 0))
+                newlist.append((~cpm_expr) <= 0)
             else: # positive literal
-                newlist.append(cast(Expression, sum([cpm_expr]) >= 1))
+                newlist.append(cpm_expr >= 1)
 
         # Boolean operators
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
