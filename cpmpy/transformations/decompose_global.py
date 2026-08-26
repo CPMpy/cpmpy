@@ -26,6 +26,7 @@ import numpy as np
 
 
 from .cse import CSEMap
+from .flatten_model import apply_transform
 from ..expressions.core import Expression, BoolVal, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
@@ -91,7 +92,6 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     todolist: list[Expression] = []  # value constraints that still need to be decomposed
     defining_todo: list[Expression] = []  # defining constraints that still need to be decomposed
     newlist: list[Expression] = []
-    defining: list[Expression] = []
     changed = False
     for expr in lst_of_expr:
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
@@ -186,15 +186,14 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             newlist.append(expr)
 
     # recurse on newly generated value and defining expressions separately
-    decomp_kwargs = dict(supported=supported, supported_reified=supported_reified, csemap=csemap,
-                         decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
     if len(todolist) > 0 or len(defining_todo) > 0:
-        v, d_from_v = decompose_in_tree(todolist, **decomp_kwargs) if todolist else ([], [])
-        # rewritten defining stay defining (same merge rule as apply_transform)
-        dv, d_from_d = decompose_in_tree(defining_todo, **decomp_kwargs) if defining_todo else ([], [])
-        return newlist + list(v), list(defining) + list(d_from_v) + list(dv) + list(d_from_d)
+        v, d = apply_transform(decompose_in_tree, todolist, defining_todo,
+                               supported=supported, supported_reified=supported_reified, csemap=csemap,
+                               decompose_custom=decompose_custom,
+                               decompose_custom_positive=decompose_custom_positive)
+        return newlist + v, d
     elif changed:
-        return newlist, defining
+        return newlist, []
     else:  # not changed
         return lst_of_expr, []
 
