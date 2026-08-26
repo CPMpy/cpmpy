@@ -591,31 +591,26 @@ class CPM_gurobi(SolverInterface):
         grb_hard_cons = []
         grb_soft_cons = []
 
-        # Defining constraints from softs are posted as hard (already transformed).
-        defining_hard = []
-        # Multi-constraint softs need an indicator; those expressions still need transform.
-        indicator_hard = []
-
         for soft_con in soft_cons:
-            # transform each constraint separately; keep defining cons out of the soft group
+            # transform each constraint seperately, can map to multiple Gurobi-level constraints
             value, defining = s.transform(soft_con)
-            defining_hard.extend(defining)
+            soft_con_tf = value + defining
 
-            if len(value) == 0:
+            if len(soft_con_tf) == 0:
                 # uncommon case, just ensure `grb_soft_con` and `soft` are same length
-                value = [cp.BoolVal(True)]
+                soft_con_tf = [cp.BoolVal(True)]
             
-            if len(value) == 1:
-                # if `con` represented by a single value constraint, it can be added as-is
-                soft_con_rep = value[0]
+            if len(soft_con_tf) == 1:
+                # if `con` represented by a single transformed constraint, it can be added as-is
+                soft_con_rep = soft_con_tf[0]
                 grb_soft_cons.append(s._add_transformed(soft_con_rep))
             else:
-                # We introduce an assumption variable `a` and add *hard* constraints `a -> /\ value`.
+                # We introduce an assumption variable `a` and add *hard* constraints `a -> /\ tf_cons`.
                 # The lower bound fixing `a == 1` is the soft part Gurobi can select in the IIS.
                 assumption = cp.boolvar()
 
-                # add `a -> /\ C` as a hard constraint (value side only; defs already hard)
-                indicator_hard.append(assumption.implies(cp.all(value)))
+                # add `a -> /\ C` as a hard constraint
+                hard.append(assumption.implies(cp.all(soft_con_tf)))
 
                 soft_con_rep = s.solver_var(assumption)
                 soft_con_rep.setAttr("LB", 1)
@@ -623,12 +618,10 @@ class CPM_gurobi(SolverInterface):
 
                 
 
-        # transform and add user hard + indicators; defining is already transformed
-        _value, _defining = s.transform(list(hard) + indicator_hard)
+        # transform and add all hard constraints
+        _value, _defining = s.transform(hard)
         for cpm_con in _value + _defining:
             # use ._add_transformed instead of .add because we need the Gurobi constraint object later
-            grb_hard_cons.append(s._add_transformed(cpm_con))
-        for cpm_con in defining_hard:
             grb_hard_cons.append(s._add_transformed(cpm_con))
 
         # update model so we can access constraint attribtutes
