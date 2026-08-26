@@ -15,10 +15,6 @@ from cpmpy.transformations.linearize import linearize_constraint
 from cpmpy.transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 
 
-def _strs(exprs):
-    return list(map(str, exprs))
-
-
 class TestValueDefiningSplit:
     def setup_method(self):
         _IntVarImpl.counter = 0
@@ -42,18 +38,15 @@ class TestValueDefiningSplit:
         b = cp.boolvar(name="b")
         # BE -> BV rewrite flattens nested abs into a defining equality
         v, d = only_bv_reifies([((cp.abs(x) + x) >= 3).implies(b)], csemap=CSEMap())
-        assert _strs(v) == ["(~b) -> ((IV0) + (x) < 3)"]
-        assert _strs(d) == ["(abs(x)) == (IV0)"]
+        assert str(v) == "[(~b) -> ((IV0) + (x) < 3)]"
+        assert str(d) == "[(abs(x)) == (IV0)]"
 
     def test_only_implies(self):
         x = cp.intvar(-10, 10, name="x")
         b = cp.boolvar(name="b")
         v, d = only_implies([(b) == ((cp.abs(x) + x) >= 3)], csemap=CSEMap())
-        assert _strs(v) == [
-            "(b) -> ((IV0) + (x) >= 3)",
-            "(~b) -> ((IV0) + (x) < 3)",
-        ]
-        assert _strs(d) == ["(abs(x)) == (IV0)"]
+        assert str(v) == "[(b) -> ((IV0) + (x) >= 3), (~b) -> ((IV0) + (x) < 3)]"
+        assert str(d) == "[(abs(x)) == (IV0)]"
 
     def test_reify_rewrite(self):
         ivs = cp.intvar(1, 9, shape=3, name="ivs")
@@ -88,26 +81,26 @@ class TestValueDefiningSplit:
         cons = MyGlobal([a, b, c])
 
         v, d = decompose_in_tree([cons])
-        assert _strs(v) == ["sum(a, b, c) >= 1"]
-        assert _strs(d) == ["a == 1"]
+        assert str(v) == "[sum(a, b, c) >= 1]"
+        assert str(d) == "[a == 1]"
 
         v, d = decompose_in_tree([bv.implies(cons)])
-        assert _strs(v) == ["(bv) -> (sum(a, b, c) >= 1)"]
-        assert _strs(d) == ["a == 1"]
+        assert str(v) == "[(bv) -> (sum(a, b, c) >= 1)]"
+        assert str(d) == "[a == 1]"
 
         # nested global function: max defining stays defining
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
         q = cp.intvar(0, 2, name="q")
         v, d = decompose_in_tree([bv == ((cp.max([x, y, z]) + q) <= 10)], csemap=CSEMap())
-        assert _strs(v) == ["(bv) == ((IV0) + (q) <= 10)"]
+        assert str(v) == "[(bv) == ((IV0) + (q) <= 10)]"
         assert len(d) == 4
-        assert all("IV0" in s for s in _strs(d))
+        assert all("IV0" in str(c) for c in d)
 
     def test_linearize(self):
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
         v, d = linearize_constraint([cp.max(x, y) < z], supported={"max"}, csemap=CSEMap())
-        assert _strs(v) == ["(max(x,y)) <= (IV0)"]
-        assert _strs(d) == ["sum([1, -1] * [z, IV0]) == 1"]
+        assert str(v) == "[(max(x,y)) <= (IV0)]"
+        assert str(d) == "[sum([1, -1] * [z, IV0]) == 1]"
 
     def test_int2bool_domain_defining(self):
         x = cp.intvar(0, 2, name="x")
