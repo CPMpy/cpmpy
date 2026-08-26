@@ -70,7 +70,7 @@ import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 from .cse import CSEMap
 
-from .flatten_model import flatten_constraint, get_or_make_var
+from .flatten_model import flatten_constraint, get_or_make_var, apply_transform
 from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import simplify_boolean
 from ..exceptions import TransformationNotImplementedError
@@ -98,6 +98,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
     """
 
     newlist: list[Expression] = []
+    defining: list[Expression] = []
     for cpm_expr in lst_of_expr:
         # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
@@ -134,7 +135,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
-                    lin_sub, _ = linearize_constraint([sub_expr], supported=supported, reified=True, csemap=csemap)
+                    lin_sub, lin_def = linearize_constraint([sub_expr], supported=supported, reified=True, csemap=csemap)
+                    defining.extend(lin_def)
                     # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
                     indicator_constraints: list[Expression] = []
                     for lin in lin_sub:
@@ -143,7 +145,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                         elif is_false_cst(lin):
                             indicator_constraints = list[Expression]() # do not add any constraints
                             v, d = linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified)
-                            newlist += v + d # post linear version of unary constraint
+                            newlist.extend(v)
+                            defining.extend(d) # post linear version of unary constraint
                             break # do not need to add other
                         elif "->" in supported and not reified:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
@@ -172,7 +175,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                                 v, d = linearize_constraint([cond.implies(lin_lhs <= lin_rhs),
                                                        cond.implies(lin_lhs >= lin_rhs)],
                                                       supported=supported, reified=reified, csemap=csemap)
-                                indicator_constraints += v + d
+                                indicator_constraints.extend(v)
+                                defining.extend(d)
                             else:
                                 raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
                     newlist+=indicator_constraints
@@ -180,7 +184,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr)) - {cond, ~cond}
                     v, d = linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified, csemap=csemap)
-                    newlist += v + d
+                    newlist.extend(v)
+                    defining.extend(d)
 
             else: # supported operator
                 newlist.append(cpm_expr)
@@ -225,7 +230,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     if new_expr[0].value() is True:
                         continue # skip or([BoolVal(True)])
                     v, d = linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap)  # don't wrap in or(BoolVal(False))
-                    newlist += v + d
+                    newlist.extend(v)
+                    defining.extend(d)
                     continue
                 newlist.append(Operator("or", new_expr))
                 continue
@@ -241,7 +247,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     continue
                 elif not t_lb and not t_ub:
                     v, d = linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap) # post the linear version of False
-                    newlist += v + d
+                    newlist.extend(v)
+                    defining.extend(d)
                     break
 
             # now fix the comparisons themselves
@@ -249,12 +256,15 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 new_rhs, cons = get_or_make_var(rhs - 1, csemap=csemap) # if rhs is constant, will return new constant
                 newlist.append(lhs <= new_rhs)
                 v, d = linearize_constraint(cons, csemap=csemap)
-                newlist += v + d
+                # cons are defining; linearized form stays defining
+                defining.extend(v)
+                defining.extend(d)
             elif cpm_expr.name == ">":
                 new_rhs, cons = get_or_make_var(rhs + 1, csemap=csemap) # if rhs is constant, will return new constant
                 newlist.append(lhs >= new_rhs)
                 v, d = linearize_constraint(cons, csemap=csemap)
-                newlist += v + d
+                defining.extend(v)
+                defining.extend(d)
             elif cpm_expr.name == "!=":
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
@@ -276,15 +286,18 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     _, M2 = (rhs - lhs + 1).get_bounds()
                     cons = [lhs + -M1*z <= rhs-1, lhs  + -M2*z >= rhs-M2+1]
                     v, d = flatten_constraint(cons, csemap=csemap)
-                    lv, ld = linearize_constraint(v + d, supported=supported, reified=reified, csemap=csemap)
-                    newlist += lv + ld
+                    lv, ld = apply_transform(linearize_constraint, v, d,
+                                            supported=supported, reified=reified, csemap=csemap)
+                    newlist.extend(lv)
+                    defining.extend(ld)
 
                 else:
                     # introduce new indicator constraints
                     z = boolvar()
                     constraints = [z.implies(lhs < rhs), (~z).implies(lhs > rhs)]
                     v, d = linearize_constraint(constraints, supported=supported, reified=reified, csemap=csemap)
-                    newlist += v + d
+                    newlist.extend(v)
+                    defining.extend(d)
             else:
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
@@ -301,7 +314,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         else:
             raise ValueError(f"Unexpected expression {cpm_expr}, if you reach this, please report on github.")
 
-    return newlist, []
+    return newlist, defining
 
 def only_positive_bv(lst_of_expr, csemap=None) -> tuple[list[Expression], list[Expression]]:
     """
@@ -311,6 +324,7 @@ def only_positive_bv(lst_of_expr, csemap=None) -> tuple[list[Expression], list[E
         Resulting expression is linear if the original expression was linear.
     """
     newlist: list[Expression] = []
+    defining: list[Expression] = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Comparison):
@@ -339,7 +353,7 @@ def only_positive_bv(lst_of_expr, csemap=None) -> tuple[list[Expression], list[E
 
             if new_lhs is not lhs:
                 newlist.append(eval_comparison(cpm_expr.name, new_lhs, rhs))
-                newlist += new_cons  # already linear
+                defining.extend(new_cons)  # already linear
             else:
                 newlist.append(cpm_expr)
 
@@ -349,8 +363,9 @@ def only_positive_bv(lst_of_expr, csemap=None) -> tuple[list[Expression], list[E
             assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
                                                    f"`linearize_constraint` before calling `only_positive_bv` "
             # BV -> Expr
-            subexpr, _ = only_positive_bv([subexpr], csemap=csemap)
+            subexpr, sub_def = only_positive_bv([subexpr], csemap=csemap)
             newlist += [cond.implies(expr) for expr in subexpr]
+            defining.extend(sub_def)
 
         elif isinstance(cpm_expr, _BoolVarImpl):
             raise ValueError(f"Unreachable: unexpected Boolean literal (`_BoolVarImpl`) in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
@@ -359,7 +374,7 @@ def only_positive_bv(lst_of_expr, csemap=None) -> tuple[list[Expression], list[E
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 
-    return newlist, []
+    return newlist, defining
 
 def only_positive_bv_wsum(expr):
     """
@@ -563,6 +578,7 @@ def only_positive_coefficients(lst_of_expr) -> tuple[list[Expression], list[Expr
         Resulting expression is linear.
     """
     newlist: list[Expression] = []
+    defining: list[Expression] = []
     for cpm_expr in lst_of_expr:
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
@@ -589,13 +605,14 @@ def only_positive_coefficients(lst_of_expr) -> tuple[list[Expression], list[Expr
             cond, subexpr = cpm_expr.args
             assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
                                                    f"`linearize_constraint` before calling `only_positive_coefficients` "
-            subexpr, _ = only_positive_coefficients([subexpr])
+            subexpr, sub_def = only_positive_coefficients([subexpr])
             newlist += [cond.implies(expr) for expr in subexpr]
+            defining.extend(sub_def)
 
         else:
             newlist.append(cpm_expr)
 
-    return newlist, []
+    return newlist, defining
 
 
 def decompose_linear(lst_of_expr: Sequence[Expression],
@@ -693,7 +710,8 @@ def linearize_reified_variables(constraints:list[Expression],
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
 
     Returns:
-        tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
+        tuple[list[Expression], list[Expression]]: ``(value, defining)`` where defining holds
+        domain/channeling constraints introduced for the encoding
     """
     assert min_values > 0
     
@@ -769,7 +787,7 @@ def linearize_reified_variables(constraints:list[Expression],
                         continue  # do not keep
             newcons.append(con)
         
-        return newcons + toplevel, []
+        return newcons, toplevel
     
     assert len(toplevel) == 0, "cannot have toplevel constraints if len(bv_map) == 0"
     return constraints, []

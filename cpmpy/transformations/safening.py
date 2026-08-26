@@ -72,7 +72,7 @@ def no_partial_functions(lst_of_expr: list[Expression],
                                     unsafe values in its API (e.g., OR-Tools for `div`).
 
     Returns:
-        tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
+        tuple[list[Expression], list[Expression]]: ``(value, defining)``
     """
 
     if _toplevel is not None:
@@ -104,7 +104,7 @@ def no_partial_functions(lst_of_expr: list[Expression],
         
     if len(todolist) > 0:
         v, d = no_partial_functions(todolist, safen_toplevel=safen_toplevel)
-        return newlist + v + d, []
+        return newlist + v, d
     elif changed:
         return newlist, []
     else:

@@ -28,7 +28,8 @@ class TestCSE:
        
         nested_alldiff = cp.AllDifferent(x,y+y,z)      
 
-        _v, _d = flatten_constraint(nested_alldiff, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(nested_alldiff, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 2
         fc = flat_cons[0]
@@ -40,7 +41,8 @@ class TestCSE:
 
         # next time we use y + y, it should replace it IV0
         nested_cons2 = (y + y) % 3 == 0
-        _v, _d = flatten_constraint(nested_cons2, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(nested_cons2, csemap=self.csemap)
+        flat_cons = _v + _d
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "(IV0) mod 3 == 0"
         assert len(self.csemap) == 1
@@ -48,7 +50,8 @@ class TestCSE:
 
         # should also work for Boolean variables (introduce reification)
         nested_cons = (x + y + z >= 11) | (cp.AllDifferent(x,y,z))
-        _v, _d = flatten_constraint(nested_cons, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(nested_cons, csemap=self.csemap)
+        flat_cons = _v + _d
         
         assert len(flat_cons) == 3
         
@@ -58,7 +61,8 @@ class TestCSE:
         
         # next time we use x + y + z <= 10, it should replace it with BV0
         nested_cons2 = ((x + y + z >= 11) ^ cp.boolvar(name="a"))
-        _v, _d = flatten_constraint(nested_cons2, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(nested_cons2, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "BV0 xor a"
@@ -67,7 +71,8 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x > 5) | (y + z > 7)
-        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(cons, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert [str(con) for con in flat_cons] == [
@@ -85,7 +90,8 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x >= 6) | (y + z >= 8)
-        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(cons, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert {str(con) for con in flat_cons} == {
@@ -102,7 +108,8 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x < 6) | (y + z < 8)
-        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(cons, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert {str(con) for con in flat_cons} == {
@@ -120,7 +127,8 @@ class TestCSE:
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
 
         cons = (x <= 5) | (y + z <= 7)
-        _v, _d = flatten_constraint(cons, csemap=self.csemap); flat_cons = _v + _d
+        _v, _d = flatten_constraint(cons, csemap=self.csemap)
+        flat_cons = _v + _d
 
         assert len(flat_cons) == 3
         assert {str(con) for con in flat_cons} == {
@@ -242,11 +250,12 @@ class TestCSE:
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
         
         cons = cp.max(x,y) < z
-        lin_cons, _ = linearize_constraint([cons], supported={"max"}, csemap=self.csemap)
-        
-        assert len(lin_cons) == 2
+        lin_cons, def_cons = linearize_constraint([cons], supported={"max"}, csemap=self.csemap)
+        all_cons = lin_cons + def_cons
+
+        assert len(all_cons) == 2
         assert str(lin_cons[0]) == "(max(x,y)) <= (IV0)"
-        assert str(lin_cons[1]) == "sum([1, -1] * [z, IV0]) == 1"
+        assert str(def_cons[0]) == "sum([1, -1] * [z, IV0]) == 1"
         
         # next time we use z - 1 it should replace it with IV0
         # ... not sure how to find a test for this...

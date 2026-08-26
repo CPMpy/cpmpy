@@ -26,7 +26,7 @@ from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
 from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, get_or_make_var
+from .flatten_model import flatten_constraint, get_or_make_var, apply_transform
 from .negation import recurse_negation
 
 def only_bv_reifies(constraints, csemap=None) -> tuple[list[Expression], list[Expression]]:
@@ -37,6 +37,7 @@ def only_bv_reifies(constraints, csemap=None) -> tuple[list[Expression], list[Ex
             tuple[list[Expression], list[Expression]]: ``(value, defining)``
     """
     newcons: list[Expression] = []
+    defining: list[Expression] = []
     for cpm_expr in constraints:
         if cpm_expr.name in ['->', "=="]:
             a0, a1 = cpm_expr.args
@@ -46,19 +47,22 @@ def only_bv_reifies(constraints, csemap=None) -> tuple[list[Expression], list[Ex
                 if cpm_expr.name == '->':
                     newexpr = (~a1).implies(recurse_negation(a0))
                     v, d = flatten_constraint(newexpr, csemap=csemap)
-                    rv, rd = only_bv_reifies(v + d, csemap=csemap)
-                    newcons.extend(rv + rd)
+                    rv, rd = apply_transform(only_bv_reifies, v, d, csemap=csemap)
+                    newcons.extend(rv)
+                    defining.extend(rd)
                 else:
-                    newexpr = [a1 == a0]  # BE == BV :: BV == BE
+                    swapped = [a1 == a0]  # BE == BV :: BV == BE
                     if not a0.is_bool():
-                        v, d = flatten_constraint(newexpr, csemap=csemap)
-                        newexpr = v + d
-                    newcons.extend(newexpr)
+                        v, d = flatten_constraint(swapped, csemap=csemap)
+                        newcons.extend(v)
+                        defining.extend(d)
+                    else:
+                        newcons.extend(swapped)
             else:
                 newcons.append(cpm_expr)
         else:
             newcons.append(cpm_expr)
-    return newcons, []
+    return newcons, defining
 
 def only_implies(constraints, csemap=None) -> tuple[list[Expression], list[Expression]]:
     """
@@ -77,6 +81,7 @@ def only_implies(constraints, csemap=None) -> tuple[list[Expression], list[Expre
         AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
     """
     newcons: list[Expression] = []
+    defining: list[Expression] = []
     retransform: list[Expression] = []
 
     for cpm_expr in constraints:
@@ -132,11 +137,12 @@ def only_implies(constraints, csemap=None) -> tuple[list[Expression], list[Expre
     
     if len(retransform) != 0:
         v, d = flatten_constraint(retransform, csemap=csemap)
-        bv, bd = only_bv_reifies(v + d, csemap=csemap)
-        iv, id_ = only_implies(bv + bd, csemap=csemap)
-        newcons.extend(iv + id_)
+        bv, bd = apply_transform(only_bv_reifies, v, d, csemap=csemap)
+        iv, id_ = apply_transform(only_implies, bv, bd, csemap=csemap)
+        newcons.extend(iv)
+        defining.extend(id_)
 
-    return newcons, []
+    return newcons, defining
 
 
 def reify_rewrite(constraints, supported=frozenset(), csemap=None) -> tuple[list[Expression], list[Expression]]:
