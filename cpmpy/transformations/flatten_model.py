@@ -136,8 +136,9 @@ def flatten_constraint(expr, csemap=None, do_simplify=True) -> tuple[list[Expres
         Returns:
             tuple[list[Expression], list[Expression]]:
                 ``(value, defining)``. *value* is the flattened form of the input;
-                *defining* are CSE / ``get_or_make_var`` side constraints
-                (e.g. ``abs(x) == IV``). Callers that do not need the split can use
+                *defining* are constraints that define auxiliary variables created
+                while flattening (e.g. CSE / ``get_or_make_var`` equalities such as
+                ``abs(x) == IV``). Callers that do not need the split can use
                 ``value + defining``.
 
         it will return 'Exception' if something is not supported

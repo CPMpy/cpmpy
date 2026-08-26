@@ -205,8 +205,16 @@ class SolverInterface(object):
             Transform arbitrary CPMpy expressions to constraints the solver supports.
 
             Returns a pair ``(value, defining)``:
-            *value* is the rewritten form of the input constraints;
-            *defining* are CSE / ``get_or_make_var`` side constraints (e.g. ``abs(x) == IV``).
+
+            - *value*: the rewritten form of the input constraints (what the caller
+              asked for, after transformations).
+            - *defining*: constraints that (totally) define auxiliary variables
+              introduced along the way. They can always be posted as top-level
+              hard constraints. Typical examples include CSE /
+              ``get_or_make_var`` equalities (e.g. ``abs(x) == IV``), and
+              encoding/domain constraints that link Boolean literals to integer
+              variables (e.g. exactly-one / channeling from ``int2bool``).
+
             Callers that do not need the split can post ``value + defining``.
 
             Implemented through chaining multiple solver-independent **transformation functions** from
