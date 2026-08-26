@@ -3,8 +3,6 @@ Tests that transformations put auxiliary/defining constraints on the defining
 stream (and the rewritten input on the value stream), not the other way around.
 """
 import cpmpy as cp
-from cpmpy.expressions.globalconstraints import GlobalConstraint
-from cpmpy.expressions.utils import flatlist
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.comparison import only_numexpr_equality
@@ -66,35 +64,30 @@ class TestValueDefiningSplit:
         assert "max" not in str(v[0])
 
     def test_decompose_in_tree(self):
-        class MyGlobal(GlobalConstraint):
-            def __init__(self, arr):
-                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+        # Globals/functions already return (value, defining) from decompose();
+        # decompose_in_tree must keep that second list on the defining stream.
+        x = cp.intvar(0, 5, shape=3, name="x")
+        b = cp.boolvar(name="b")
 
-            def decompose(self):
-                return [cp.sum(self.args) == 1], [self.args[0] == 1]
+        # Table.decompose_positive: value = any(row selectors), defining = row implications
+        v, d = decompose_in_tree([cp.Table(x, [[0, 1, 2], [1, 2, 3]])])
+        assert str(v) == "[(BV0) or (BV1)]"
+        assert str(d) == ("[(BV0) -> (and(x[0] == 0, x[1] == 1, x[2] == 2)), "
+                          "(BV1) -> (and(x[0] == 1, x[1] == 2, x[2] == 3))]")
 
-            def decompose_positive(self):
-                return [cp.sum(self.args) >= 1], [self.args[0] == 1]
+        # nested Maximum: value keeps the comparison; defining totally defines the aux
+        v, d = decompose_in_tree([b == (cp.max(x) <= 3)], csemap=CSEMap())
+        assert str(v) == "[(b) == (IV0 <= 3)]"
+        assert str(d) == ("[(IV0) >= (x[0]), (IV0) >= (x[1]), (IV0) >= (x[2]), "
+                          "or((IV0) <= (x[0]), (IV0) <= (x[1]), (IV0) <= (x[2]))]")
 
-        a, b, c = cp.intvar(0, 10, shape=3, name=("a", "b", "c"))
-        bv = cp.boolvar(name="bv")
-        cons = MyGlobal([a, b, c])
-
-        v, d = decompose_in_tree([cons])
-        assert str(v) == "[sum(a, b, c) >= 1]"
-        assert str(d) == "[a == 1]"
-
-        v, d = decompose_in_tree([bv.implies(cons)])
-        assert str(v) == "[(bv) -> (sum(a, b, c) >= 1)]"
-        assert str(d) == "[a == 1]"
-
-        # nested global function: max defining stays defining
-        x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
-        q = cp.intvar(0, 2, name="q")
-        v, d = decompose_in_tree([bv == ((cp.max([x, y, z]) + q) <= 10)], csemap=CSEMap())
-        assert str(v) == "[(bv) == ((IV0) + (q) <= 10)]"
-        assert len(d) == 4
-        assert all("IV0" in str(c) for c in d)
+        # Element: value is the comparison on the aux; defining channels index -> arr
+        arr = cp.intvar(0, 5, shape=4, name="a")
+        i = cp.intvar(0, 3, name="i")
+        v, d = decompose_in_tree([arr[i] == 2], csemap=CSEMap())
+        assert str(v) == "[IV1 == 2]"
+        assert str(d) == ("[(i == 0) -> ((IV1) == (a[0])), (i == 1) -> ((IV1) == (a[1])), "
+                          "(i == 2) -> ((IV1) == (a[2])), (i == 3) -> ((IV1) == (a[3]))]")
 
     def test_linearize(self):
         x, y, z = cp.intvar(0, 10, shape=3, name=tuple("xyz"))
