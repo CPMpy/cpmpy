@@ -629,7 +629,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
             csemap: map of expressions to an auxiliary variable
 
         returns:
-            tuple[list[Expression], list[Expression]]: ``(value, defining)`` with empty defining
+            tuple[list[Expression], list[Expression]]: ``(value, defining)``
     """
     if supported is None:
         supported = frozenset[str]()

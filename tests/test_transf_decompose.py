@@ -4,6 +4,7 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import flatlist
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.decompose_global import decompose_in_tree as decompose_in_tree_raw
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
 from cpmpy.transformations.linearize import decompose_linear
 
@@ -253,6 +254,14 @@ class TestTransfDecomp:
         assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c) >= 1)", "a == 1"} # decompose positive
         assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
         assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
+
+        # defining from decompose() must stay on the defining stream
+        v, d = decompose_in_tree_raw([cons])
+        assert set(map(str, v)) == {"sum(a, b, c) >= 1"}
+        assert set(map(str, d)) == {"a == 1"}
+        v, d = decompose_in_tree_raw([bv.implies(cons)])
+        assert set(map(str, v)) == {"(bv) -> (sum(a, b, c) >= 1)"}
+        assert set(map(str, d)) == {"a == 1"}
 
 
 

@@ -62,7 +62,9 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
 
     Returns:
-        tuple[list[Expression], list[Expression]]: ``(value, defining)``
+        tuple[list[Expression], list[Expression]]: ``(value, defining)``.
+        Defining are the second lists from ``decompose()`` / ``decompose_positive()``
+        (and from nested global/function decompositions); they stay on the defining stream.
 
     To decompose a global constraint in positive context:
     1. Check `decompose_positive_custom`
@@ -86,8 +88,10 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     if supported_reified is None:
         supported_reified = frozenset[str]()
 
-    todolist: list[Expression] = []  # these still need to be decomposed
+    todolist: list[Expression] = []  # value constraints that still need to be decomposed
+    defining_todo: list[Expression] = []  # defining constraints that still need to be decomposed
     newlist: list[Expression] = []
+    defining: list[Expression] = []
     changed = False
     for expr in lst_of_expr:
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
@@ -110,10 +114,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 exprs, toplevel_exprs = decompose_custom[expr.name](expr)
             else:
                 exprs, toplevel_exprs = expr.decompose_positive()
-            # we merge the list toplevel rather than create an 'and'
-            # we add them to todolist because both might contain globals
-            if len(toplevel_exprs) > 0:
-                todolist.extend(toplevel_exprs)
+            # value side may still contain globals; defining side too (recurse separately)
             if len(exprs) > 0:
                 todolist.extend(exprs)
                 # don't save toplevel decompositions to the csemap, 
@@ -123,6 +124,8 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 #         csemap.save_decomposition(expr, exprs[0])
                 #     else:
                 #         csemap.save_decomposition(expr, Operator("and", exprs))
+            if len(toplevel_exprs) > 0:
+                defining_todo.extend(toplevel_exprs)
         
         elif isinstance(expr, (bool, np.bool_)):
             # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
@@ -132,7 +135,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
         elif expr.name == "not":  # not(global) or negation left by a decomposition
             args_changed, expr_newargs, expr_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
             if len(expr_toplevel) > 0:
-                todolist.extend(expr_toplevel)
+                defining_todo.extend(expr_toplevel)
             if not args_changed:
                 expr_newargs = expr.args  # lets be sure its set
 
@@ -162,7 +165,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 else:
                     exprs, toplevel_exprs = subexpr.decompose_positive()
                 if len(toplevel_exprs) > 0:
-                    todolist.extend(toplevel_exprs)
+                    defining_todo.extend(toplevel_exprs)
                 expr = Operator("->", [expr.args[0], cpm_all(exprs)])   
                 decomposed_positive = True
 
@@ -171,7 +174,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             if args_changed:
                 changed = True
                 if len(expr_toplevel) > 0:
-                    todolist.extend(expr_toplevel)
+                    defining_todo.extend(expr_toplevel)
 
                 # if decompose_positive: we know 'expr' is a fresh expression
                 if not decomposed_positive:
@@ -182,12 +185,16 @@ def decompose_in_tree(lst_of_expr: list[Expression],
         else:
             newlist.append(expr)
 
-    # recurse on any newly generated toplevel expressions
-    if len(todolist) > 0:
-        v, d = decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-        return newlist + v, d
+    # recurse on newly generated value and defining expressions separately
+    decomp_kwargs = dict(supported=supported, supported_reified=supported_reified, csemap=csemap,
+                         decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
+    if len(todolist) > 0 or len(defining_todo) > 0:
+        v, d_from_v = decompose_in_tree(todolist, **decomp_kwargs) if todolist else ([], [])
+        # rewritten defining stay defining (same merge rule as apply_transform)
+        dv, d_from_d = decompose_in_tree(defining_todo, **decomp_kwargs) if defining_todo else ([], [])
+        return newlist + list(v), list(defining) + list(d_from_v) + list(dv) + list(d_from_d)
     elif changed:
-        return newlist, []
+        return newlist, defining
     else:  # not changed
         return lst_of_expr, []
 
