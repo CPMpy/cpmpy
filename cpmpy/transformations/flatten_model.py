@@ -123,7 +123,7 @@ def flatten_model(orig_model, csemap=None):
             return cp.Model(*basecons, maximize=newobj)
 
 
-def flatten_constraint(expr, csemap=None, do_simplify=True):
+def flatten_constraint(expr, csemap=None, do_simplify=True) -> tuple[list[Expression], list[Expression]]:
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()

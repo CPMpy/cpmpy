@@ -84,7 +84,7 @@ from .int2bool import IntVarEnc, _encode_int_var
 
 
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
+def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None) -> tuple[list[Expression], list[Expression]]:
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -303,7 +303,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
     return newlist, []
 
-def only_positive_bv(lst_of_expr, csemap=None):
+def only_positive_bv(lst_of_expr, csemap=None) -> tuple[list[Expression], list[Expression]]:
     """
         Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
         Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
@@ -446,7 +446,7 @@ def only_positive_bv_wsum_const(cpm_expr):
         raise ValueError(f"unexpected expression, should be sum, wsum or var but got {cpm_expr}")
 
 
-def canonical_comparison(lst_of_expr: ListLike[Expression]):
+def canonical_comparison(lst_of_expr: ListLike[Expression]) -> tuple[list[Expression], list[Expression]]:
     """
         Canonicalize a comparison expression.
         Transforms linear expressions, or a reification thereof into canonical form by:
@@ -553,7 +553,7 @@ def only_positive_coefficients_(ws, xs):
     constant = sum(ws[i] for i in indices)
     return nw, na, constant
 
-def only_positive_coefficients(lst_of_expr):
+def only_positive_coefficients(lst_of_expr) -> tuple[list[Expression], list[Expression]]:
     """
         Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients (including 0) by negating its literal.
         This can simplify a `wsum` into `sum`.
@@ -601,7 +601,7 @@ def only_positive_coefficients(lst_of_expr):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Optional[AbstractSet[str]] = None,
                      supported_reified: Optional[AbstractSet[str]] = None,
-                     csemap: Optional[CSEMap] = None):
+                     csemap: Optional[CSEMap] = None) -> tuple[list[Expression], list[Expression]]:
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
 

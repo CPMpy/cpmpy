@@ -46,7 +46,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       csemap: Optional[CSEMap] = None,
                       decompose_custom: Optional[Dict[str, CustomDecomp]] = None,
                       decompose_custom_positive: Optional[Dict[str, CustomDecomp]] = None,
-                      ):
+                      ) -> tuple[list[Expression], list[Expression]]:
     """
     Decomposes global constraint or global function not supported by the solver.
 

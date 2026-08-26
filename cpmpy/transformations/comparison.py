@@ -16,11 +16,11 @@
 
 import copy
 from .flatten_model import get_or_make_var
-from ..expressions.core import Comparison, Operator
+from ..expressions.core import Comparison, Operator, Expression
 from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
-def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
+def only_numexpr_equality(constraints, supported=frozenset(), csemap=None) -> tuple[list[Expression], list[Expression]]:
     """
         Transforms ``NumExpr <op> IV`` to ``(NumExpr == A) & (A <op> IV)`` if not supported.
         Also for the reified uses of `NumExpr`
@@ -31,8 +31,8 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
             tuple[list[Expression], list[Expression]]: ``(value, defining)``
     """
 
-    value = []
-    defining = []
+    value: list[Expression] = []
+    defining: list[Expression] = []
     for cpm_expr in constraints:
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":

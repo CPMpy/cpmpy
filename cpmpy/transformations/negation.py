@@ -17,7 +17,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NDVarArray, cpm_array
 from ..expressions.utils import is_boolexpr
 
-def push_down_negation(lst_of_expr: list[Expression], toplevel=True):
+def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> tuple[list[Expression], list[Expression]]:
     """
         Recursively simplifies expressions by pushing down negation into the arguments.
         E.g., not(x >= 3 | y == 2) is simplified to (x < 3) & (y != 2).

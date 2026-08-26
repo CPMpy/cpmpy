@@ -16,7 +16,7 @@ from typing import Optional, AbstractSet, Any, Sequence
 def no_partial_functions(lst_of_expr: list[Expression],
                         _toplevel: Optional[Any]=None, 
                         _nbc: Optional[Any] = None, 
-                        safen_toplevel: Optional[AbstractSet[str]] = None):
+                        safen_toplevel: Optional[AbstractSet[str]] = None) -> tuple[list[Expression], list[Expression]]:
     """
     A partial function is a function whose output is not defined for all possible inputs.
 

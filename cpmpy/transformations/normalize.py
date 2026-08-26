@@ -16,7 +16,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from .negation import recurse_negation
 
 
-def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True):
+def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> tuple[list[Expression], list[Expression]]:
     """
     Unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
 
@@ -53,7 +53,7 @@ def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True):
     return newlist, []
 
 
-def simplify_boolean(lst_of_expr: list[Expression], num_context=False):
+def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> tuple[list[Expression], list[Expression]]:
     """
     Removes Boolean constants from CPMpy expressions, except inside global constraints/functions.
 

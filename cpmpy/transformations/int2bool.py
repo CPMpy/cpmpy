@@ -15,7 +15,7 @@ from ..expressions.utils import is_int
 UNKNOWN_COMPARATOR_ERROR = ValueError("Comparator is not known or should have been simplified by linearize.")
 
 
-def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None):
+def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None) -> tuple[list[Expression], list[Expression]]:
     """Convert integer linear constraints to pseudo-boolean constraints. Requires `linearize` transformation.
 
     :param: cpm_lst: list of constraints to transform
