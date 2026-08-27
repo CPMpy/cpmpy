@@ -67,7 +67,7 @@ from typing import Any, Literal, Optional, overload
 import numpy as np
 import cpmpy as cp  # to avoid circular import
 from .core import Expression, ExprLike, BoolExprLike, ListLike, BoolVal
-from .utils import is_num, is_int, is_boolexpr, get_bounds
+from .utils import is_num, is_int, is_boolexpr, get_bounds, argval
 
 # NumPy ufunc -> Python operator (single source of truth for NDVarArray.__array_ufunc__)
 _ND_UFUNCS: dict[np.ufunc, Callable[..., Any]] = {
@@ -498,7 +498,7 @@ class NDVarArray(np.ndarray):
         """ the values, for each of the stored variables, obtained in the last solve call
             (or 'None')
         """
-        return np.reshape([x.value() for x in self], self.shape)
+        return np.reshape([argval(x) for x in self], self.shape)
 
     def clear(self) -> None:
         """ clear, for each of the stored variables, the value obtained from the last solve call
