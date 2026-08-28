@@ -275,6 +275,8 @@ class CPM_pysat(SolverInterface):
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
+        elif self._proof is not None:
+           raise ValueError("Proof logging under assumptions is not supported by PySAT")
         else:
             assumptions = list(assumptions)  # iterable to list
             pysat_assum_vars = self.solver_vars(assumptions)
