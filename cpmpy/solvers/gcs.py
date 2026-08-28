@@ -297,14 +297,26 @@ class CPM_gcs(SolverInterface):
         if display is not None:
             sol_callback=self._get_callback(display)
 
+        # set time limit
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+
+        if self._proof is not None:
+            proof_location, proof_name = os.path.split(self._proof)
+            if proof_location == "":
+                proof_location = "."
+        else:
+            proof_name = None
+            proof_location = None
+
         self.gcs_result = self.gcs.solve(
             all_solutions=True, 
             timeout=time_limit, 
             solution_limit=solution_limit, 
             callback=sol_callback, 
             prove=self._proof is not None,
-            proof_name=self._proof,
-            proof_location=".",
+            proof_name=proof_name,
+            proof_location=proof_location,
             **kwargs)
 
         # new status, get runtime
