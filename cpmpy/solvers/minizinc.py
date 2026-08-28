@@ -73,7 +73,7 @@ from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, MDD, Regular
 from ..expressions.globalfunctions import Multiplication, FloatSum
-from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args, implies
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -97,11 +97,11 @@ class CPM_minizinc(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "indomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
+                                              "inverse", "ite", "xor", "table", "indomain", "negative_table", "mdd", "regular", "cumulative", "cumulative_optional", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
-                                              "precedence", "no_overlap",
+                                              "precedence", "no_overlap", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "nd_element"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence", "regular"}
 
@@ -760,6 +760,34 @@ class CPM_minizinc(SolverInterface):
                                      self._convert_expression(demand),
                                      self._convert_expression(capacity))
 
+        elif expr.name == "cumulative_optional":
+            extra_cons = []
+            if len(expr.args) == 5:
+                start, dur, demand, capacity, is_present = expr.args
+            else:
+                start, dur, end, demand, capacity, is_present = expr.args
+                extra_cons += [implies(p, s + d == e) for s, d, e, p in zip(start, dur, end, is_present)]
+
+            global_str = "cumulative({},{},{},{})"
+            # ensure duration is non-negative (only enforced for the tasks that are present)
+            dur, dur_cons = get_nonneg_args(dur, is_present)
+            extra_cons += dur_cons
+            # ensure demand is non-negative (only enforced for the tasks that are present)
+            demand, demand_cons = get_nonneg_args(demand, is_present)
+            extra_cons += demand_cons
+
+            # absent tasks do not have to be scheduled: expressed with an optional start time
+            opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
+                                                              self._convert_expression(s))
+                         for s, p in zip(start, is_present)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format("[{}]".format(",".join(opt_start)),
+                                     self._convert_expression(dur),
+                                     self._convert_expression(demand),
+                                     self._convert_expression(capacity))
+
         elif expr.name == "no_overlap":
             extra_cons = []
             if len(expr.args) == 2:
@@ -776,6 +804,28 @@ class CPM_minizinc(SolverInterface):
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
             return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+
+        elif expr.name == "no_overlap_optional":
+            extra_cons = []
+            if len(expr.args) == 3:
+                start, dur, is_present = expr.args
+            else:
+                start, dur, end, is_present = expr.args
+                extra_cons += [implies(p, s + d == e) for s, d, e, p in zip(start, dur, end, is_present)]
+
+            global_str = "disjunctive({},{})"
+            # ensure duration is non-negative (only enforced for the tasks that are present)
+            dur, dur_cons = get_nonneg_args(dur, is_present)
+            extra_cons += dur_cons
+
+            # absent tasks do not have to be scheduled: expressed with an optional start time
+            opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
+                                                              self._convert_expression(s))
+                         for s, p in zip(start, is_present)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format("[{}]".format(",".join(opt_start)), self._convert_expression(dur))
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
