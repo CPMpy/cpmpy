@@ -127,6 +127,9 @@ def quickxplain(soft, hard=[], solver="ortools"):
 
     # optimization: find max index of solver core
     solver_core = frozenset(s.get_core())
+    if not solver_core:
+        # conflict is entirely in the hard constraints
+        return []
     max_idx = max(i for i, a in enumerate(assump) if a in solver_core)
 
     core = do_recursion(list(assump)[:max_idx + 1], [], [])
@@ -275,7 +278,7 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
     def do_recursion(soft, hard, delta):
 
         m = cp.Model(hard)
-        if len(delta) != 0 and m.solve(solver) is False:
+        if m.solve(solver) is False:
             # conflict is in hard constraints, no need to recurse
             return []
 

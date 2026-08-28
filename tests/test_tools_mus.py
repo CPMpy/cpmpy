@@ -94,6 +94,27 @@ class TestMus:
         mus_naive_cons = self.naive_func(soft=soft, hard=hard)
         assert len(set(mus_naive_cons)) == 1
 
+    def test_non_flat_trivial_unsat_soft(self, solver):
+        p = cp.boolvar(name="p")
+
+        soft = [p, ~p & p]
+        hard = []
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
+        assert len(set(mus_cons)) == 1
+        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
+        assert len(set(mus_naive_cons)) == 1
+
+    def test_non_flat_trivial_unsat_hard(self, solver):
+        p = cp.boolvar(name="p")
+
+        soft = [p]
+        hard = [~p & p]
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
+        assert len(set(mus_cons)) == 0
+        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
+        assert len(set(mus_naive_cons)) == 0
+
+
 @pytest.mark.requires_solver("exact", "gurobi")
 class TestNativeMus(TestMus):
     def setup_method(self):
