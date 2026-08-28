@@ -18,8 +18,8 @@ class CSEMap:
     def __getitem__(self, expr: Expression) -> _IntVarImpl:
         return self.flat_map[expr]
 
-    def __setitem__(self, attr, val):
-        raise ValueError("__setitem__ is not supported for flat_map, use get_or_make_var instead")
+    def __setitem__(self, attr: Expression, val: _IntVarImpl) -> None:
+        self.flat_map[attr] = val
 
     @overload
     def get(self, expr: Expression) -> Optional[_IntVarImpl]: ...
