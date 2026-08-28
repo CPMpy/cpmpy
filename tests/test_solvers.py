@@ -13,6 +13,7 @@ from cpmpy.expressions.utils import argvals
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.pumpkin import CPM_pumpkin
+from cpmpy.solvers.hermax import CPM_hermax
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
@@ -829,6 +830,16 @@ class TestSolvers:
         assert s.solve()
         assert sum(xi.value() for xi in x) in (2, 4)
 
+    @pytest.mark.skipif(not CPM_hermax.supported(), reason="Hermax not installed")
+    def test_hermax(self):
+        x = cp.intvar(0, 5, shape=3, name="x")
+        m = cp.Model(cp.AllDifferent(x), cp.sum(x) == 6)
+        m.minimize(x[0])
+        assert m.solve(solver="hermax")
+        assert len(set(xi.value() for xi in x)) == 3
+        assert sum(xi.value() for xi in x) == 6
+        assert m.objective_value() == x[0].value()
+
 
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
@@ -971,8 +982,8 @@ class TestSupportedSolvers:
 
         assert s.solve()
         assert s.objective_value() == 0
-        if solver == "rc2":
-            return # RC2 only supports setting obj once
+        if solver in ("rc2",):
+            return # MaxSAT soft objectives: only supports setting obj once before first opt solve
         s += x[0] == 5
         s.solve()
         assert s.objective_value() == 5
@@ -1292,16 +1303,17 @@ def test_objective_numexprs(solver, constraint):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     lb, ub = constraint.get_bounds()
+    kwargs = dict(time_limit=3)
     try:
         # Minimization
         model.minimize(constraint)
-        res = model.solve(solver=solver, time_limit=3)
+        res = model.solve(solver=solver, **kwargs)
         if res is True: # we found a solution
             assert constraint.value() < ub # assume solver finds feasible sol with value lower than ub
 
         # Maximization
         model.maximize(constraint)
-        res = model.solve(solver=solver, time_limit=3)
+        res = model.solve(solver=solver, **kwargs)
         if res is True: # we found a solution
             assert constraint.value() > lb # assume solver finds a feasible sol with value higher than lb
     
