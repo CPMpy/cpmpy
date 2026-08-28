@@ -7,6 +7,7 @@ from cpmpy.expressions.utils import is_any_list
 from cpmpy.exceptions import NotSupportedError
 from utils import skip_on_missing_pblib
 
+
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_empty_constructor(solver):
