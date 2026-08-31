@@ -5,6 +5,7 @@ import re
 import tempfile
 import pytest
 import numpy as np
+from shutil import which
 import cpmpy as cp
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 from cpmpy.expressions.globalconstraints import GlobalConstraint
@@ -829,29 +830,6 @@ class TestSolvers:
         m = cp.Model([x + y == 2, wsum == 9])
         assert m.solve(solver="minizinc")
 
-
-    @pytest.mark.skipif(not CPM_pumpkin.supported(), reason="Gurobi not installed")
-    def test_pumpkin_proof(self):
-        x = cp.intvar(0,10, shape=3)
-        m = cp.Model(cp.AllDifferent(x))
-        m += cp.sum(x) <= 2
-
-        # old version, does not work anymore
-        with pytest.raises(ValueError):
-            m.solve(solver="pumpkin", proof_name="test_proof.drcp")
-        
-        # need to supply proof in constructor
-        proof_name=tempfile.NamedTemporaryFile(suffix=".drcp", delete=False).name
-        s = cp.SolverLookup.get("pumpkin", m, proof=proof_name)
-        assert s.solve() is False
-        with open(proof_name, "r") as f:
-            proof = f.read()
-            assert ("UNSAT" in proof)
-
-        # cannot supply proof in solve
-        with pytest.raises(ValueError):
-            s.solve(proof=proof_name)
-
     @pytest.mark.requires_solver("pumpkin")
     def test_pumpkin_indomain_expression(self, solver):
         # InDomain on a non-variable expression (e.g. a sum) must be flattened 
@@ -1143,6 +1121,13 @@ class TestSupportedSolvers:
             pytest.skip("solver does not support this test context")
         if solver == 'cplex':
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
+
+        kwargs = dict()
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
+        else:
+            kwargs["solution_limit"] = 15
+            
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
@@ -1150,14 +1135,27 @@ class TestSupportedSolvers:
         m += x // y == d
         m += x % y == r
         sols = set()
-        solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        m.solveAll(solver=solver, **kwargs, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
             assert (cp.Division(xv, yv)).value() == dv
             assert (cp.Modulo(xv, yv)).value() == rv
 
+
+    def test_div_towards_zero(self, solver):
+        
+        x,y,z = cp.intvar(-10,10, shape=3)
+        cons = x // y == z
+        m = cp.Model(cons, x == -10, y == 3, z == -3)
+        assert m.solve(solver=solver)
+        
+        m = cp.Model(cons, x == 10, y == -3, z == -3)
+        assert m.solve(solver=solver)
+
+        m = cp.Model(cons, x == -10, y == -3, z == 3)
+        assert m.solve(solver=solver)
+        
 
     def test_status(self, solver):
 
@@ -1291,11 +1289,43 @@ class TestSupportedSolvers:
         kwargs = {}
         if solver in ("gurobi", "cplex"):
             kwargs["solution_limit"] = 10
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
         p, q = cp.boolvar(2)
         model = cp.Model(p.implies(3 * q == 2))
         assert model.solve(solver)
         assert model.solveAll(solver, **kwargs) == 2
 
+    def test_prooflogging(self, solver):
+
+        cls = cp.SolverLookup.lookup(solver)
+        args = inspect.signature(cls.__init__)
+        if "proof" not in args.parameters.keys():
+            pytest.skip(reason=f"{solver} does not support prooflogging")
+
+        basename = solver.split(":")[0]
+        if basename == "gcs" and which("veripb") is None:
+            pytest.skip(reason="veripb not on path")
+        if basename == "pysat" and which("drat-trim") is None:
+            pytest.skip(reason="drat-trim not on path")
+        
+        a,b,c,d = cp.intvar(1,3,shape=4)
+        m = cp.Model(a != b, a != c, a != d, b != c, b != d, c != d)
+    
+        prooffile = tempfile.NamedTemporaryFile(delete=False).name
+        s = cp.SolverLookup.get(solver, m, proof=prooffile)
+        assert s.solve() is False
+        assert s._proof is not None
+
+        for file in s.get_proof_files():
+            with open(file, "r") as f:
+                proof = f.read()
+                assert len(proof) > 0, f"proof file {file} is empty"
+
+        print(basename)
+        if basename != "pumpkin": # does not support external verification
+            assert s.verify() is True
+            assert hasattr(s, "verify_status"), "verify() should set verify_status on solver interface"
 
 @pytest.mark.generate_constraints.with_args(numexprs)
 @pytest.mark.flaky(reruns=3)

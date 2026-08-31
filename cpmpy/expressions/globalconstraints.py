@@ -1409,7 +1409,7 @@ class InDomain(GlobalConstraint):
         has_subexpr = not isinstance(expr, (_NumVarImpl, BoolVal))
 
         # args: tuple[Expression, np.ndarray]
-        super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
+        super().__init__("indomain", (expr, arr), has_subexpr=has_subexpr)
 
     @property
     def args(self) -> tuple[Expression, np.ndarray]:

@@ -36,10 +36,6 @@ class TypeError(CPMpyException):
     '''Raised when an expression receives sub-expressions of the wrong type'''
     pass
 
-class GCSVerificationException(CPMpyException):
-    '''Raised when GCS fails proof logging by VeriPB'''
-    pass
-
 class TransformationNotImplementedError(CPMpyException):
     '''Raised when a transformation is not implemented for a certain expression'''
     pass

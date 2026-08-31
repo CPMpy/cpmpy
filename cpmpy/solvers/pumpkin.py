@@ -72,7 +72,7 @@ class CPM_pumpkin(SolverInterface):
     - ``pum_solver``: the pumpkin.Model() object
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "InDomain",
+    supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
                                               "min", "max", "abs", "mul", "div", "element"})
     supported_reified_global_constraints = frozenset()
 
@@ -132,7 +132,7 @@ class CPM_pumpkin(SolverInterface):
         self.predicate_map = {} # cache predicates for reuse
         if proof is not None: # Table and friends are not supported when proof logging
             # see https://github.com/ConSol-Lab/Pumpkin/issues/354
-            self.disabled_global_constraints = {"table", "negative_table", "InDomain"}
+            self.disabled_global_constraints = {"table", "negative_table", "indomain"}
         else:
             self.disabled_global_constraints = set()
 
@@ -164,15 +164,12 @@ class CPM_pumpkin(SolverInterface):
         return self._solve_return(self.cpm_status)
 
 
-    def solve(self, time_limit:Optional[float]=None, prove=False, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
         Call the Pumpkin solver
 
         Arguments:
             time_limit (float, optional):  maximum solve time in seconds 
-            prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
-            proof_name: name for the the proof files.
-            proof_location: location for the proof files (default to current working directory).
             assumptions: iterable (e.g. list, set, tuple) of Boolean variables (or their negation) that are assumed to be true.
                             For repeated solving, and/or for use with :func:`s.get_core() <cpmpy.solvers.pumpkin.CPM_pumpkin.get_core>`: if the model is UNSAT,
                             `get_core()` returns a small subset of assumption variables that are unsat together.
@@ -182,10 +179,6 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_solver import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
         from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
         from pumpkin_solver.optimisation import OptimisationResult, Direction
-
-        if "proof" in kwargs or "prove" in kwargs or "prove_location" in kwargs or "proof_name" in kwargs:
-            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve."
-                             "`cpmpy.SolverLookup.get('pumpkin', model, proof='path/to/proof.drcp')`")
 
         if self.pum_solver.is_inconsistent():
             return self._unsat_at_rootlevel()
@@ -608,7 +601,7 @@ class CPM_pumpkin(SolverInterface):
                                                   constraint_tag=tag)
                         ]
             
-            elif cpm_expr.name == "InDomain":
+            elif cpm_expr.name == "indomain":
                 val, domain = cpm_expr.args
                 return [constraints.Table(self.to_pum_ivar([val]),
                                           [[d] for d in domain], # each domain value is its own row
@@ -701,3 +694,13 @@ class CPM_pumpkin(SolverInterface):
         """
         if self.pum_solver.is_inconsistent() is False: # otherwise, not guaranteed all variables are known
             self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
+
+        
+    def verify(self, verifier, verifier_args: list[str] = [], time_limit: Optional[float] = None, display_output: bool = False) -> bool:
+        raise NotSupportedError("Pumpkin does not support external proof verification, only through the MiniZinc interface.")
+
+    def get_proof_files(self) -> tuple[str]:
+        """
+        Returns the path where the proof is stored.
+        """
+        return (self._proof,)
