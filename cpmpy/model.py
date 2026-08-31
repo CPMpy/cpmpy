@@ -203,6 +203,7 @@ class Model(object):
         ret = s.solve(time_limit=remaining_time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
+        self.cpm_status.runtime = time.time() - start_time
         return ret
 
     def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
