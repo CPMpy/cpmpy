@@ -11,9 +11,18 @@ jobs:
           - solver: pysat
             install_commands: |
               pip install pypblib
+              git clone --depth 1 https://github.com/marijnheule/drat-trim.git /tmp/drat-trim
+              make -C /tmp/drat-trim drat-trim
+              sudo cp /tmp/drat-trim/drat-trim /usr/local/bin/
           - solver: choco
           - solver: exact
           - solver: gcs
+            install_commands: |
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+              source "$HOME/.cargo/env"
+              git clone --depth 1 https://gitlab.com/MIAOresearch/software/VeriPB.git /tmp/VeriPB
+              cargo install --locked --path /tmp/VeriPB
+              sudo cp "$HOME/.cargo/bin/veripb" /usr/local/bin/
           - solver: minizinc
             install_commands: |
               sudo snap install minizinc --classic
