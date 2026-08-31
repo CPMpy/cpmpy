@@ -196,14 +196,13 @@ class CPM_cvc5(SolverInterface):
             self.cvc5_solver.set("produce-unsat-cores", "true")
 
         self._proof = proof
-        self._proof_format = proof_format
+        self._proof_format = proof_format if proof_format is not None else "alethe"
         self._check_proofs = check_proofs
         if proof is not None:
             # must be set before the first constraint is posted
             self.cvc5_solver.set("produce-proofs", "true")
-            # set the proof format
-            if proof_format is not None:
-                self.cvc5_solver.set("proof-format-mode", proof_format)
+            # externally-checkable proof format (default "cpc" is cvc5-internal only)
+            self.cvc5_solver.set("proof-format-mode", self._proof_format)
             # after unsat, self-check the generated proof (raises if unsound); skip with
             # check_proofs=False if you will use an external checker instead
             if check_proofs:
@@ -671,7 +670,7 @@ class CPM_cvc5(SolverInterface):
             if cpm_con.name == "mod":
                 # mimic modulo with integer division (round towards 0)
                 x, y = self._cvc5_expr(cpm_con.args)
-                return cvc5.If(cvc5.And(x >= 0), x % y, -(-x % y))
+                return cvc5.If(x >= 0, x % y, -(-x % y))
 
             elif cpm_con.name == "mul":
                 x, y = self._cvc5_expr(cpm_con.args)
