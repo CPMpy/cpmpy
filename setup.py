@@ -20,7 +20,7 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 
 
 solver_dependencies = {
-    "ortools": ["ortools>=9.3.10497,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
+    "ortools": ["ortools>=9.12"],
     "z3": ["z3-solver>=5.0.0"],
     "choco": ["pychoco>=0.2.1,<0.3.0"],  # 0.3.0 breaks CPMpy tests
     "exact": ["exact>=2.1.0"], # older versions (<2.2.1) are bugged on py3.13

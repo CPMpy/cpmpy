@@ -50,7 +50,7 @@ import builtins
 import warnings
 import cpmpy as cp
 from cpmpy.tools.datasets.xcsp3 import XCSP3Dataset  # for easier importing
-from .parser import load_xcsp3 
+from .parser import load_xcsp3, _parse_xcsp3, _load_xcsp3
 
 
 # Backward compatibility alias
@@ -95,4 +95,7 @@ __all__ = [
     "XCSP3Dataset",
     "decompress_lzma",
     "read_xcsp3",
+    "load_xcsp3",
+    "_parse_xcsp3",
+    "_load_xcsp3",
 ]

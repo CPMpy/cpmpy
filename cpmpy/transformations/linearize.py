@@ -641,7 +641,7 @@ def get_linear_decompositions():
         element=lambda expr: expr.decompose_linear(), 
         table=lambda expr: expr.decompose_linear(), 
         short_table=lambda expr: expr.decompose(),
-        InDomain=lambda expr: expr.decompose_linear(),
+        indomain=lambda expr: expr.decompose_linear(),
         regular=lambda expr: expr.decompose_linear(),
     )
 
