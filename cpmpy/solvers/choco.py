@@ -195,14 +195,14 @@ class CPM_choco(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         # translate exit status
         # A) Found a solution
         if sol is not None:
             # COP
             if self.has_objective():
-                if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
+                if time_limit is None or self.cpm_status.solve_time < time_limit: # solved to optimality
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
                 else: # solved, but optimality not proven
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -210,7 +210,7 @@ class CPM_choco(SolverInterface):
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         # B) Found unsat
-        elif time_limit is None or self.cpm_status.runtime < time_limit: # proven unsat
+        elif time_limit is None or self.cpm_status.solve_time < time_limit: # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         # C) Timeout
         else:
@@ -276,17 +276,17 @@ class CPM_choco(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         if len(sols): # solutions found
             if (len(sols) == solution_limit): # matched the set limit (if given)
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            elif (time_limit is None) or (self.cpm_status.runtime < time_limit): # found all solutions
+            elif (time_limit is None) or (self.cpm_status.solve_time < time_limit): # found all solutions
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else: # reached timeout
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else: # no solutions found
-            if (time_limit is None) or (self.cpm_status.runtime < time_limit): # unsat problem
+            if (time_limit is None) or (self.cpm_status.solve_time < time_limit): # unsat problem
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             else: # timeout
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN

@@ -200,11 +200,12 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # new status, translate runtime
+        t0 = time.time()
         self.hex_model.close() # model must be closed
         self.hex_solver.solve()
         self.hex_sol = self.hex_solver.get_solution()
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
+        self.cpm_status.solve_time = time.time() - t0 # wallclock time in (float) seconds
 
         # unregister solution callback
         if callback is not None:
