@@ -7,6 +7,7 @@ from numpy import logaddexp
 import cpmpy as cp
 from cpmpy.expressions.utils import flatlist
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
+from cpmpy.solvers.solver_interface import ExitStatus
 
 
 class TestModel:
@@ -113,3 +114,21 @@ class TestModel:
         model = cp.Model(cp.any(cp.boolvar(shape=3)))
 
         pytest.raises(ValueError, lambda : model.solve(solver="notasolver"))
+
+    def test_timeout_during_transform(self):
+
+        # deeply nested model, should time out transformations
+        depth = 100
+
+        bvs = cp.boolvar(shape=3)
+        expr = cp.any(bvs)
+        for i in range(depth):
+            if i % 2 == 0:
+                expr = expr | cp.all(bvs)
+            else:
+                expr = expr & cp.any(bvs)
+
+        model = cp.Model(expr == 10)
+        model.solve(time_limit=0)
+        assert model.status().exitstatus == ExitStatus.UNKNOWN
+
