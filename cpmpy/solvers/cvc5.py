@@ -43,9 +43,11 @@
     Module details
     ==============
 """
+import time
+import warnings
 from typing import Optional, Iterable
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
@@ -254,6 +256,72 @@ class CPM_cvc5(SolverInterface):
                 cpm_var.clear()
 
         return has_sol
+
+
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+        """
+            Compute all solutions and optionally display the solutions.
+
+            Arguments:
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                **kwargs: any keyword argument, sets parameters of solver object (see `solve()`)
+
+            Returns:
+                number of solutions found
+        """
+        # Uses cvc5's native ``blockModelValues()`` to exclude a found solution, instead of the
+        # generic (slower) approach of building and posting a CPMpy "nogood" constraint for it.
+
+        if self.has_objective():
+            raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
+
+        if not call_from_model:
+            warnings.warn("Adding constraints to solver object to find all solutions, "
+                          "solver state will be invalid after this call!")
+
+        self.cpm_status = SolverStatus(self.name)
+
+        # ensure all vars are known to the solver, and collect their cvc5 terms once
+        user_vars = list(self.user_vars)
+        cvc5_terms = [v.ast for v in self.solver_vars(user_vars)]
+
+        solution_count = 0
+        start = time.time()
+        while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
+            # display if needed
+            self.print_display(display)
+
+            # count and stop
+            solution_count += 1
+            if solution_count == solution_limit:
+                break
+
+            # natively block the values found for the user variables, instead of posting a nogood
+            if len(cvc5_terms) > 0:
+                self.cvc5_solver.solver.blockModelValues(cvc5_terms)
+            else:
+                # nothing to block on (e.g. no user variables): this one solution represents them all
+                break
+
+            if time_limit is not None: # update remaining time
+                time_limit -= self.status().runtime
+        end = time.time()
+
+        # update solver status
+        self.cpm_status.runtime = end - start
+        if solution_count:
+            if solution_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+
+        return solution_count
 
 
     def solver_var(self, cpm_var):
