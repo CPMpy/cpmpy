@@ -154,12 +154,9 @@ def test_minimize(solver):
 
     ivar = cp.intvar(1, 10)
 
-    if solver_name == "cvc5":
-        return # TODO: should be skipped instead, need to rework pytest decorators / markers
-
     try:
         solver.minimize(ivar)
-    except NotImplementedError:
+    except (NotImplementedError, NotSupportedError):
         return
 
     assert hasattr(solver, "objective_value_")
@@ -180,7 +177,7 @@ def test_maximize(solver):
 
     try:
         solver.maximize(ivar)
-    except NotImplementedError:
+    except (NotImplementedError, NotSupportedError):
         return
 
     assert solver.solve()

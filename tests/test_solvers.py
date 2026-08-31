@@ -16,7 +16,6 @@ from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.pumpkin import CPM_pumpkin
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
-from cpmpy.solvers.cvc5 import CPM_cvc5
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
@@ -511,8 +510,7 @@ class TestSolvers:
         assert s.z3_solver.lower(s.obj_handle) == s.z3_solver.upper(s.obj_handle)
         assert x[n - 1].value() == obj_bound
 
-    @pytest.mark.skipif(not CPM_cvc5.supported(),
-                    reason="cvc5 not installed")
+    @pytest.mark.requires_solver("cvc5")
     def test_cvc5(self):
         bv = cp.boolvar(shape=3)
         iv = cp.intvar(0, 9, shape=3)
@@ -523,24 +521,24 @@ class TestSolvers:
             bv[2].implies(iv[2] > iv[0])
         ])
         s = cp.SolverLookup.get("cvc5", m)
-        self.assertFalse(s.solve(assumptions=bv))
+        assert not s.solve(assumptions=bv)
 
         m = cp.Model(~(iv[0] != iv[1]))
         s = cp.SolverLookup.get("cvc5", m)
-        self.assertTrue(s.solve())
+        assert s.solve()
 
         m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
         s = cp.SolverLookup.get("cvc5", m)
-        self.assertTrue(s.solve())
+        assert s.solve()
 
         m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
         s = cp.SolverLookup.get("cvc5", m)
-        self.assertTrue(s.solve())
+        assert s.solve()
 
         x = cp.intvar(0, 1)
         m = cp.Model((x >= 0.1) & (x != 1))
         s = cp.SolverLookup.get("cvc5", m)
-        self.assertFalse(s.solve()) # TODO: same bug as z3?
+        assert not s.solve() # TODO: same bug as z3?
 
 
     def test_pow(self):
@@ -1006,12 +1004,13 @@ class TestSupportedSolvers:
 
     def test_incremental_assumptions(self, solver):
         x, y, z = cp.boolvar(shape=3, name=["x","y","z"])
-        s = cp.SolverLookup.get(solver)
+        init_kwargs = {"unsat_cores": True} if solver == "cvc5" else {}
+        s = cp.SolverLookup.get(solver, **init_kwargs)
         if "assumptions" not in inspect.signature((s.solve)).parameters:
             return # solver does not support solving under assumptions
         
-        if solver == "pysdd" or solver == "cvc5":
-            return # not implemented in pysdd or cvc5
+        if solver == "pysdd":
+            return # not implemented in pysdd
         
         s += x | y
         assert s.solve(assumptions=[x])
