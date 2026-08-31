@@ -191,6 +191,9 @@ class Model(object):
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("time_limit must be positive")
+
         t0 = time.time()
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
