@@ -117,18 +117,15 @@ class TestModel:
 
     def test_timeout_during_transform(self):
 
-        # deeply nested model, should time out transformations
-        depth = 100
-
+        # huge model with many consrtaints, should time out transformations
         bvs = cp.boolvar(shape=3)
-        expr = cp.any(bvs)
-        for i in range(depth):
-            if i % 2 == 0:
-                expr = expr | cp.all(bvs)
-            else:
-                expr = expr & cp.any(bvs)
+        constraints = [cp.any(bvs)] * int(1e6)
 
-        model = cp.Model(expr == 10)
-        model.solve(time_limit=0)
+        model = cp.Model(constraints)
+        model.solve(time_limit=0.1)
         assert model.status().exitstatus == ExitStatus.UNKNOWN
+        assert model.status().runtime is not None
+        assert model.status().solve_time is None
+
+        print(model.status())
 
