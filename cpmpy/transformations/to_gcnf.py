@@ -24,7 +24,7 @@ def to_gcnf(
         disjoint: bool = True
     ) -> tuple[cp.Model, list[Expression], list[Expression], list[_BoolVarImpl]]:
     """
-    Similar to `make_assump_model`, but the returned model is in (grouped) CNF.
+    Similar to :func:`~cpmpy.tools.explain.utils.make_assump_model`, but the returned model is in (grouped) CNF.
 
     Follows https://satisfiability.org/competition/2011/rules.pdf. 
     To guarentee that the groups are disjoint, set `disjoint` to True.
