@@ -214,7 +214,7 @@ class CPM_cvc5(SolverInterface):
                 else:
                     self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             # can happen when timeout is reached...
-            except cvc5.Exception: # no model has been initialized, not even an empty one
+            except cvc5.SMTException: # no model has been initialized, not even an empty one
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:  # another?
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
