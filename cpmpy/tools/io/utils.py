@@ -17,7 +17,6 @@ _format_map = {
     "wcnf"  : "wcnf",
     "cnf"   : "cnf",
     "opb"   : "opb",
-    # Corpus files use ``.sdk.txt``; map the ``sdk`` suffix to the sudoku loader.
     "sdk"   : "sudoku",
 }
 
