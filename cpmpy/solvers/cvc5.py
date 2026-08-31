@@ -73,6 +73,22 @@ class CPM_cvc5(SolverInterface):
 
     .. note::
         Terminology note: a 'model' for cvc5 is a solution!
+
+    .. warning::
+
+        **Division/modulo semantics:** cvc5's native integer ``/`` and ``%`` implement
+        `Euclidean division <https://en.wikipedia.org/wiki/Euclidean_division>`_ (the
+        SMT-LIB semantics): the remainder is always in ``[0, |y|)``, regardless of the
+        sign of ``x`` or ``y``. CPMpy's :class:`~cpmpy.expressions.globalfunctions.Division`
+        and :class:`~cpmpy.expressions.globalfunctions.Modulo`, however, round
+        :ref:`towards zero <integer-division-and-modulo-semantics>`,
+        so the sign of the remainder follows the sign of ``x`` instead. The two 
+        disagree whenever ``x`` and ``y`` have different signs. (e.g. ``-7 div 3`` is 
+        ``-3`` in cvc5's native semantics but ``-2`` in CPMpy's and ``-7 mod 3`` is ``2`` 
+        vs. ``-1`` respectively). Be carefull when you post a 
+        :class:`~cpmpy.expressions.globalconstraints.DirectConstraint` yourself and use 
+        cvc5's ``/`` or ``%`` directly, you get cvc5's native (Euclidean) semantics, 
+        not CPMpy's.
     """
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mul", "mod", "pow"})
