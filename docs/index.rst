@@ -68,9 +68,9 @@ Supported solvers
      - 
    * - :doc:`cvc5 <api/solvers/cvc5>`
      - SMT
-     - SAT
+     - SAT ASAT ALLSAT - PROOF
      - pip
-     - 
+     -
    * - :doc:`Hexaly <api/solvers/hexaly>`
      - Global Opt.
      - SAT ISAT ALLSAT - OPT IOPT FLOBJ

@@ -28,6 +28,25 @@
     See detailed installation instructions at:
     https://cvc5.github.io/docs/latest/api/python/python.html
 
+    ==============
+    Proof logging
+    ==============
+
+    Proof logging is available for UNSAT results, no extra dependency required.
+    Enable it with ``cp.SolverLookup.get("cvc5", model, proof="path/to/proof")``.
+    ``solve()`` writes ``path/to/proof.<proof_format>`` and ``path/to/proof.smt2``. By
+    default this is already a checked proof: after an unsat result, cvc5 self-checks
+    the generated proof internally (``check-proofs``) and raises rather than returning
+    a bad proof if it were ever unsound — nothing further to install or configure.
+    Pass ``check_proofs=False`` to skip that internal check (e.g. if you will run an
+    external checker instead).
+
+    Optionally, for a check independent of cvc5 itself, hand the two files to an external
+    checker of your choice for the ``proof_format`` you picked (see the ``proof_format``
+    constructor argument), or use the :meth:`CPM_cvc5.verify` convenience wrapper if you
+    have one installed — e.g. `Carcara <https://github.com/ufmg-smite/carcara>`_ for the
+    default ``"alethe"`` format.
+
     The rest of this documentation is for advanced users.
 
     ===============
@@ -67,6 +86,7 @@ class CPM_cvc5(SolverInterface):
     Creates the following attributes (see parent constructor for more):
 
     - ``cvc5_solver``: object, cvc5's Solver() object
+    - ``_proof``: optional path prefix of the last proof log (``<proof>.<proof_format>`` and ``<proof>.smt2``)
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `cvc5` namespace and ``cvc5_solver.add()``'s the result.
 
@@ -89,8 +109,20 @@ class CPM_cvc5(SolverInterface):
         ``-3`` in cvc5's native semantics but ``-2`` in CPMpy's and ``-7 mod 3`` is ``2`` 
         vs. ``-1`` respectively). Be carefull when you post a 
         :class:`~cpmpy.expressions.globalconstraints.DirectConstraint` yourself and use 
-        cvc5's ``/`` or ``%`` directly, you get cvc5's native (Euclidean) semantics, 
+        cvc5's ``/`` or ``%`` directly, you get cvc5's native (Euclidean) semantics,
         not CPMpy's.
+
+    .. note::
+
+        **Proof verification, two independent layers:**
+
+        1. On by default when ``proof=...`` is set, no extra tooling: after unsat, cvc5
+           self-checks the generated proof (``check-proofs``); if it were ever unsound,
+           ``solve()`` itself raises rather than returning a bad proof. Pass
+           ``check_proofs=False`` to skip this.
+        2. Optional, external, for a check independent of cvc5 itself: hand the two proof
+           files to a checker for your chosen ``proof_format``, e.g. :meth:`verify` with
+           `Carcara <https://github.com/ufmg-smite/carcara>`_ for the default ``"alethe"``.
     """
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mul", "mod", "pow"})
@@ -118,7 +150,8 @@ class CPM_cvc5(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None, unsat_cores: bool = False):
+    def __init__(self, cpm_model=None, subsolver=None, unsat_cores: bool = False, proof: Optional[str] = None,
+                 proof_format: Optional[str] = None, check_proofs: bool = True):
         """
         Constructor of the native solver object
 
@@ -129,6 +162,20 @@ class CPM_cvc5(SolverInterface):
                                 after :func:`solve(assumptions=...) <solve>`. Off by default: this option
                                 must be set before the first constraint is posted, and it enables proof
                                 production which can slow the solver down.
+            proof (str, optional): path prefix for the proof log (writes ``<proof>.<proof_format>`` and
+                                ``<proof>.smt2``). Off by default: this option must be set before the
+                                first constraint is posted, and it enables proof production which can
+                                slow the solver down. Also enables cvc5's own internal proof self-check
+                                unless ``check_proofs=False``; see :meth:`verify` for how to check
+                                the files independently, and :meth:`get_proof_files` to get their names.
+            proof_format (str): which of cvc5's proof formats to produce, only used when ``proof`` is
+                                set. One of ``"alethe"`` (default, checkable with e.g. `Carcara
+                                <https://github.com/ufmg-smite/carcara>`_), ``"lfsc"`` (checkable with
+                                an LFSC checker), ``"cpc"`` (cvc5's own internal calculus, not checked by
+                                an external tool), or ``"dot"`` (for visualization, not a checkable
+                                proof).
+            check_proofs (bool): when ``proof`` is set, run cvc5's internal proof check after an unsat
+                                result (``check-proofs``). On by default; pass ``False`` to skip it.
         """
         if not self.supported():
             raise ModuleNotFoundError("CPM_cvc5: Install the python package 'cpmpy[cvc5]' to use this solver interface.")
@@ -142,10 +189,29 @@ class CPM_cvc5(SolverInterface):
 
         # initialise the native solver object
         self.cvc5_solver = cvc5.Solver()
+        self.assumption_dict = {}
         self._unsat_cores = unsat_cores
         if unsat_cores:
             # must be set before the first constraint is posted
             self.cvc5_solver.set("produce-unsat-cores", "true")
+
+        self._proof = proof
+        self._proof_format = proof_format
+        self._check_proofs = check_proofs
+        if proof is not None:
+            # must be set before the first constraint is posted
+            self.cvc5_solver.set("produce-proofs", "true")
+            # set the proof format
+            if proof_format is not None:
+                self.cvc5_solver.set("proof-format-mode", proof_format)
+            # after unsat, self-check the generated proof (raises if unsound); skip with
+            # check_proofs=False if you will use an external checker instead
+            if check_proofs:
+                self.cvc5_solver.set("check-proofs", "true")
+            # disable let-abbreviation when printing terms (default: shared subterms get
+            # folded into "let" bindings), so the .smt2 file written by _write_proof_files()
+            # stays in the same flat/expanded form the Alethe proof itself uses
+            self.cvc5_solver.set("dag-thresh", "0")
 
         # initialise everything else and post the constraints
         super().__init__(name="cvc5", cpm_model=cpm_model)
@@ -185,6 +251,12 @@ class CPM_cvc5(SolverInterface):
         """
 
         import cvc5.pythonic as cvc5
+
+        if "proof" in kwargs:
+            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve. "
+                             "`cpmpy.SolverLookup.get('cvc5', model, proof='path/to/proof')`")
+        if "verify" in kwargs or "verifier" in kwargs or "verifier_args" in kwargs or "display_output" in kwargs:
+            raise ValueError("Proof-verification is only supported through the `verify()` method, not as a keyword argument to solve.")
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -237,6 +309,9 @@ class CPM_cvc5(SolverInterface):
         else:  # another?
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
+        if self._proof is not None:
+            self._write_proof_files()
+
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
 
@@ -256,6 +331,67 @@ class CPM_cvc5(SolverInterface):
                 cpm_var.clear()
 
         return has_sol
+
+
+    def _write_proof_files(self):
+        """
+            Writes the proof (``<proof>.<proof_format>``) and SMT-LIB2 problem (``<proof>.smt2``)
+            files for the last ``solve()`` call, for use with :meth:`verify` and :meth:`get_proof_files`.
+
+            cvc5 can only produce a proof of unsatisfiability: when the last result was UNSAT, both
+            files are filled in; otherwise the ``.smt2`` file is still written (for inspection) but
+            the proof file is left empty and a warning is raised.
+        """
+        import cvc5.pythonic as cvc5
+
+        native = self.native_model.solver
+        assertions = list(native.getAssertions())
+
+        proof_text = ""
+        if self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+            proof_nodes = native.getProof()
+            if proof_nodes is None or len(proof_nodes) == 0:
+                warnings.warn("CVC5 produced an empty proof; proof logging may not work here")
+            else:
+                raw = native.proofToString(proof_nodes[0]).decode().strip()
+                if self._proof_format == "alethe" and raw.startswith("(") and raw.endswith(")"):
+                    # proofToString wraps the whole proof in one enclosing s-expression (a
+                    # "list of proof nodes"); externally-checkable Alethe scripts are instead
+                    # a flat sequence of top-level (assume ...)/(step ...) commands. Other
+                    # formats (e.g. lfsc) are themselves a single s-expression, so this
+                    # unwrapping is Alethe-specific and must not be applied to them.
+                    raw = raw[1:-1].strip()
+                proof_text = raw
+        else:
+            warnings.warn(f"CVC5 only produces proofs of unsatisfiability, but the solve status was "
+                          f"'{self.cpm_status.exitstatus}': no proof was produced, only the "
+                          f"'{self._proof}.smt2' problem file was written")
+
+        with open(f"{self._proof}.{self._proof_format}", "w") as f:
+            if proof_text:
+                f.write(proof_text + "\n")
+
+        # collect all declared constants (variables) appearing in the assertions,
+        # by walking each assertion's term tree (mirrors cvc5.pythonic's own ModelRef.vars())
+        seen, consts = set(), []
+        stack = list(assertions)
+        while stack:
+            t = stack.pop()
+            if t in seen:
+                continue
+            seen.add(t)
+            if t.getKind() == cvc5.Kind.CONSTANT:
+                consts.append(t)
+            else:
+                stack.extend(list(t))
+
+        with open(f"{self._proof}.smt2", "w") as f:
+            f.write("(set-logic ALL)\n")
+            for c in sorted(consts, key=str):
+                f.write(f"(declare-fun {c} () {c.getSort()})\n")
+            for a in assertions:
+                f.write(f"(assert {a})\n")
+            f.write("(check-sat)\n")
 
 
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
@@ -278,6 +414,11 @@ class CPM_cvc5(SolverInterface):
 
         if self.has_objective():
             raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
+
+        if self._proof is not None:
+            raise NotSupportedError("CPM_cvc5: proof logging (proof=...) is not supported by solveAll(): "
+                                    "a proof only certifies a single solve() call, not repeated solving "
+                                    "under solution-blocking constraints.")
 
         if not call_from_model:
             warnings.warn("Adding constraints to solver object to find all solutions, "
@@ -445,9 +586,10 @@ class CPM_cvc5(SolverInterface):
                 return bool(cpm_con)
             elif is_int(cpm_con):
                 return cvc5.IntVal(int(cpm_con))
-            # cvc5 truncates Python floats to integers in Int comparisons;
-            # post non-integral constants as reals so thresholds like x >= 0.1 stay exact
-            return cvc5.RealVal(str(float(cpm_con)))
+            raise NotSupportedError(f"CVC5: non-integral constant {cpm_con} not supported "
+                                    f"(CPMpy has no float decision variables, and this interface "
+                                    f"does not support float constants either, e.g. in comparisons "
+                                    f"such as 'x >= 0.1')")
 
         elif is_any_list(cpm_con):
             # arguments can be lists
@@ -600,3 +742,44 @@ class CPM_cvc5(SolverInterface):
 
         return [self.assumption_dict[cvc5_var] for cvc5_var in self.cvc5_solver.unsat_core()
                 if cvc5_var in self.assumption_dict]
+
+    def verify(self, verifier: str = "carcara", verifier_args: list[str] = ["check"], time_limit: Optional[float] = None, display_output: bool = False):
+        """
+        Verify the last solver-generated proof using an external checker.
+        Proof files are retrieved through the get_proof_files helper.
+
+        Saves a `verify_status` attribute to the solver instance with the result and statistics of the verification run as a dictionary.
+        See :func:`verify_prooflog` for more details.
+
+        .. note::
+            cvc5's proofs can be "holey" and still verify successfully: 
+            Carcara accepts untranslated internal rewrite steps on trust.
+
+        Arguments:
+            - verifier (str):           name or path of the proof checker executable (must be on the system path if a name).
+                                        Default ("carcara") only makes sense for the default ``proof_format="alethe"``;
+                                        pass your own verifier/verifier_args if you constructed the solver with a
+                                        different ``proof_format``.
+            - verifier_args (list[str]):  extra command line arguments to pass to the checker (default: ["check"], a Carcara argument)
+            - time_limit (float):       time limit for verification (default: None)
+            - display_output (bool):    whether to print the output from the checker (default: False)
+
+        Returns:
+            bool: True if the proof is valid (or holey), False otherwise.
+        """
+        from ..tools.verify import verify_prooflog # avoid circular import
+        self.verify_status = verify_prooflog(verifier, self.get_proof_files(),
+                                          time_limit=time_limit,
+                                          display_output=display_output,
+                                          verifier_args=verifier_args)
+        return self.verify_status["result"]
+
+    def get_proof_files(self) -> tuple[str, str]:
+        """
+        Returns a tuple with the proof files generated during the last solve call:
+        - proof, in the constructor's ``proof_format`` (``"alethe"`` by default)
+        - SMT-LIB2 problem file
+        """
+        if self._proof is None:
+            raise ValueError("No proof file generated, set `proof=<proof_name>` in the constructor and call solve() before calling verify()")
+        return (f"{self._proof}.{self._proof_format}", f"{self._proof}.smt2")

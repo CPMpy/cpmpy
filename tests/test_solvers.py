@@ -1307,6 +1307,8 @@ class TestSupportedSolvers:
             pytest.skip(reason="veripb not on path")
         if basename == "pysat" and which("drat-trim") is None:
             pytest.skip(reason="drat-trim not on path")
+        if basename == "cvc5" and which("carcara") is None:
+            pytest.skip(reason="carcara not on path")
         
         a,b,c,d = cp.intvar(1,3,shape=4)
         m = cp.Model(a != b, a != c, a != d, b != c, b != d, c != d)
