@@ -506,7 +506,7 @@ class CPM_cvc5(SolverInterface):
 
             CPMpy will return only those variables that are False (in the UNSAT core)
 
-            Note that there is no guarantee that the core is minimal, though this interface does upon up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+            Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiable Subset algorithms on top. All contributions welcome!
         """
         if not self._unsat_cores:
             raise NotSupportedError("CPM_cvc5: get_core() requires unsat_cores=True in the constructor "
