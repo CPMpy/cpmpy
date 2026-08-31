@@ -1153,6 +1153,11 @@ class TestSupportedSolvers:
         # normally, should not be able to solve within 1s...
         assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
+        s = cp.SolverLookup.get(solver, m)
+        s.solve(time_limit=1)
+        # normally, should not be able to solve within 1s, ensure status is set by solver interface here
+        assert s.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
+
         # now trivally unsat
         m += cp.sum(bv) <= 0
         m.solve(solver=solver)
@@ -1182,7 +1187,6 @@ class TestSupportedSolvers:
         assert model.status().runtime > model.status().solve_time # model overrides runttime with wallclock time
 
         # test via solver interface
-
         s = cp.SolverLookup.get(solver, model)
         s.solve(time_limit=1)
         assert s.status().runtime is not None
