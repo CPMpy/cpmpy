@@ -87,6 +87,7 @@ class CPM_z3(SolverInterface):
         # try to import the package
         try:
             import z3
+            CPM_z3._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

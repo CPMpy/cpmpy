@@ -101,6 +101,7 @@ class CPM_cplex(SolverInterface):
             return False
         try:
             import cplex
+            CPM_cplex._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError as e:
             return False

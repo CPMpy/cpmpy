@@ -117,6 +117,7 @@ class CPM_minizinc(SolverInterface):
         try:
             #  check if MiniZinc Python is installed
             import minizinc
+            CPM_minizinc._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

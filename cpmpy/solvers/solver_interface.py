@@ -23,6 +23,7 @@ from typing import Any, Optional, List, Callable, TypeAlias, Iterable
 import warnings
 import time
 from enum import Enum
+from functools import lru_cache
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike
@@ -35,6 +36,25 @@ from ..transformations.normalize import toplevel_list
 
 Callback: TypeAlias = Expression | ListLike[Expression] | Callable[[], None] # type alias to as display argument in solve and solveAll
 
+
+@lru_cache(maxsize=1)
+def _cpmpy_requirements() -> tuple:
+    """
+    The requirements (incl. extras) declared by the installed ``cpmpy``
+    distribution, as parsed :class:`packaging.requirements.Requirement` objects.
+
+    Empty when running from an uninstalled source tree.
+    """
+    from importlib.metadata import PackageNotFoundError, requires
+    from packaging.requirements import Requirement
+
+    try:
+        reqs = requires("cpmpy") or []
+    except PackageNotFoundError:
+        return ()
+    return tuple(Requirement(r) for r in reqs)
+
+
 class SolverInterface(object):
     """
         Abstract class for defining solver interfaces. All classes implementing
@@ -43,6 +63,10 @@ class SolverInterface(object):
 
     supported_global_constraints: frozenset[str] = frozenset()  # global constraints supported by the solver (e.g., AllDifferent...)
     supported_reified_global_constraints: frozenset[str] = frozenset()  # global constraints supported in reified context
+    # Key in ``setup.py``'s ``extras_require``, used to warn about incompatible
+    # installed package versions. Defaults to the class name without its
+    # ``CPM_`` prefix (e.g. ``CPM_z3`` -> ``"z3"``); only set to override that.
+    dependency_extra: Optional[str] = None
 
     # REQUIRED functions:
     @staticmethod
@@ -55,7 +79,38 @@ class SolverInterface(object):
                 [bool]: Solver support by current system setup.
         """
         return False
-    
+
+    @classmethod
+    def _warn_outdated_dependencies(cls) -> None:
+        """
+        Warn if installed solver packages do not satisfy the version constraints
+        declared for this solver's ``extras_require`` entry in ``setup.py``
+        (read back from the installed distribution metadata).
+
+        Does not block use: older/newer optional solver deps can still be tried
+        at the user's own risk. Prefer calling this from ``supported()`` /
+        ``installed()`` after a successful import.
+        """
+        extra = cls.dependency_extra or cls.__name__.removeprefix("CPM_").lower()
+
+        from importlib.metadata import PackageNotFoundError, version
+
+        for req in _cpmpy_requirements():
+            if req.marker is None or not req.marker.evaluate({"extra": extra}):
+                continue
+            if not req.specifier:
+                continue
+            try:
+                installed = version(req.name)
+            except PackageNotFoundError:
+                continue
+            if not req.specifier.contains(installed, prereleases=True):
+                warnings.warn(
+                    f"CPMpy's '{extra}' extra expects '{req.name}{req.specifier}', "
+                    f"but you have {req.name}=={installed}. You may encounter issues. "
+                    f"Consider: pip install -U 'cpmpy[{extra}]'"
+                )
+
     @classmethod
     def version(cls) -> Optional[str]:
         """

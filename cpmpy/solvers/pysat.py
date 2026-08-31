@@ -120,6 +120,7 @@ class CPM_pysat(SolverInterface):
                 except (ModuleNotFoundError, NameError):  # pysat returns the wrong error type (latter i/o former)
                     CPM_pysat._pb = None  # not installed, avoid reimporting
 
+            CPM_pysat._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

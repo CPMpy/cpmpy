@@ -50,10 +50,7 @@
 
         CPM_gcs
 """
-import warnings
 from typing import Optional, Callable, Iterable, Any
-
-from packaging.version import Version
 
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
@@ -103,11 +100,7 @@ class CPM_gcs(SolverInterface):
         # try to import the package
         try:
             import gcspy
-            gcs_version = CPM_gcs.version()
-            if Version(gcs_version) < Version("0.1.8"):
-                warnings.warn(f"CPMpy requires GCS version >=0.1.8 but you have version "
-                              f"{gcs_version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
-                return False
+            CPM_gcs._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

@@ -79,6 +79,7 @@ class CPM_scip(SolverInterface):
         # try to import the package
         try:
             import pyscipopt
+            CPM_scip._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False

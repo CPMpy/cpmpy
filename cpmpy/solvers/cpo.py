@@ -97,6 +97,7 @@ class CPM_cpo(SolverInterface):
         # try to import the package
         try:
             import docplex.cp as docp
+            CPM_cpo._warn_outdated_dependencies()
             return True
         except ModuleNotFoundError:
             return False
