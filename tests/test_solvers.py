@@ -1159,6 +1159,40 @@ class TestSupportedSolvers:
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
+    def test_status_runtime(self, solver):
+        
+        n = 500
+        seed = 42
+        np.random.seed(seed)
+
+        bv = cp.boolvar(shape=n)
+        model = cp.Model()
+        for _ in range(round(4.26 * n)):
+            lits = [x if np.random.random() < 0.5 else ~x for x in np.random.choice(bv, size=3)]
+            model += cp.any(lits)
+
+        model.solve(solver=solver, time_limit=1)
+        print(model.status())
+        assert model.status().runtime is not None
+        assert model.status().runtime > 0
+
+        assert model.status().solve_time is not None
+        assert model.status().solve_time > 0
+        
+        assert model.status().runtime > model.status().solve_time # model overrides runttime with wallclock time
+
+        # test via solver interface
+
+        s = cp.SolverLookup.get(solver, model)
+        s.solve(time_limit=1)
+        assert s.status().runtime is not None
+        assert s.status().runtime > 0
+
+        assert s.status().solve_time is not None
+        assert s.status().solve_time > 0
+        
+        assert s.status().runtime == s.status().solve_time # solver interfce patches runtime to solve time for backwards compatibility
+
 
 
     def test_hidden_user_vars(self, solver):
