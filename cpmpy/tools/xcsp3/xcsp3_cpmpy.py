@@ -46,7 +46,7 @@ from __future__ import annotations
 import argparse
 import lzma
 import warnings
-import psutil
+import psutil  # type: ignore[import-untyped]
 import signal
 import time
 import sys, os
@@ -545,7 +545,7 @@ def solver_arguments(solver: str,
         return cpo_arguments(model=model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
     else:
         print_comment(f"setting parameters of {solver} is not (yet) supported")
-        return dict()
+        return {}, None
 
 @contextmanager
 def prepend_print():
@@ -644,7 +644,7 @@ def xcsp3_cpmpy(
         added_natives = {
             "ortools": {
                 "no_overlap2d": globals.OrtNoOverlap2D,
-                "subcircuit": globals.OrtNoOverlap2D,
+                "subcircuit": globals.OrtSubcircuit,
                 "subcircuitwithstart": lambda args: globals.OrtSubcircuitWithStart(args[:-1], args[-1]),
             },
             "choco": {
@@ -657,7 +657,10 @@ def xcsp3_cpmpy(
         }
 
         # Loop through all constraints and replace with native if supported
+        # Model.add() may leave nested lists (e.g. element-matrix index bounds); flatten first
         if solver in added_natives:
+            from cpmpy.transformations.normalize import toplevel_list
+            model.constraints = toplevel_list(model.constraints)
             for i, constraint in enumerate(model.constraints):
                 if constraint.name in added_natives[solver]:
                     model.constraints[i] = added_natives[solver][constraint.name](constraint.args)

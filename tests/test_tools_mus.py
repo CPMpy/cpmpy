@@ -1,19 +1,16 @@
-import unittest
-from unittest import TestCase
+import pytest
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
-from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive
+from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
-
-class MusTests(TestCase):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+@pytest.mark.requires_solver("exact")
+class TestMus:
+    def setup_method(self):
         self.mus_func = mus
         self.naive_func = mus_naive
 
-    def test_circular(self):
+    def test_circular(self, solver):
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
         cons = [
@@ -25,10 +22,10 @@ class MusTests(TestCase):
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        self.assertEqual(set(self.mus_func(cons)), set(cons[:3]))
-        self.assertEqual(set(self.naive_func(cons)), set(cons[:3]))
+        assert set(self.mus_func(cons, hard=[], solver=solver)) == set(cons[:3])
+        assert set(self.naive_func(cons)) == set(cons[:3])
 
-    def test_bug_191(self):
+    def test_bug_191(self, solver):
         """
         Original Bug request: https://github.com/CPMpy/cpmpy/issues/191
         When assum is a single boolvar and candidates is a list (of length 1), it fails.
@@ -37,12 +34,12 @@ class MusTests(TestCase):
         hard = [~bv]
         soft = [bv]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver="ortools") # crashes
-        self.assertEqual(set(mus_cons), set(soft))
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
+        assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
-        self.assertEqual(set(mus_naive_cons), set(soft))
+        assert set(mus_naive_cons) == set(soft)
 
-    def test_bug_191_many_soft(self):
+    def test_bug_191_many_soft(self, solver):
         """
         Checking whether bugfix 191  doesn't break anything in the MUS tool chain,
         when the number of soft constraints > 1.
@@ -55,12 +52,12 @@ class MusTests(TestCase):
             y == 4
         ]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard) # crashes
-        self.assertEqual(set(mus_cons), set(soft))
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
+        assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
-        self.assertEqual(set(mus_naive_cons), set(soft))
+        assert set(mus_naive_cons) == set(soft)
 
-    def test_wglobal(self):
+    def test_wglobal(self, solver):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
 
@@ -79,19 +76,35 @@ class MusTests(TestCase):
 
         # non-determinstic
         #self.assertEqual(set(mus(cons)), set(cons[1:3]))
-        ms = self.mus_func(cons)
-        self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        ms = self.mus_func(cons, solver=solver)
+        assert len(ms) < len(cons)
+        assert not cp.Model(ms).solve()
         ms = self.naive_func(cons)
-        self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        assert len(ms) < len(cons)
+        assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
+        
+    def test_decomposed_global(self, solver):
+        x = cp.intvar(1, 5, shape=3, name="x")
+        soft = [x[0] == x[1], x[1] == x[2]]
+        hard = [cp.AllDifferent(x)]
+
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
+        assert len(set(mus_cons)) == 1
+        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
+        assert len(set(mus_naive_cons)) == 1
+
+@pytest.mark.requires_solver("exact", "gurobi")
+class TestNativeMus(TestMus):
+    def setup_method(self):
+        solver = None
+        self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
+        self.naive_func = mus_naive
 
 
-class QuickXplainTests(MusTests):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+@pytest.mark.requires_solver("exact")
+class TestQuickXplain(TestMus):
+    def setup_method(self):
         self.mus_func = quickxplain
         self.naive_func = quickxplain_naive
 
@@ -104,21 +117,21 @@ class QuickXplainTests(MusTests):
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.mus_func([a,b,c,d],hard)
-        self.assertSetEqual(set(subset), {a,b,c})
+        assert set(subset) == {a,b,c}
         subset2 = self.mus_func([d,c,b,a], hard)
-        self.assertSetEqual(set(subset2), {b,d})
+        assert set(subset2) == {b,d}
 
         subset = self.naive_func([a, b, c, d], hard)
-        self.assertSetEqual(set(subset), {a, b, c})
+        assert set(subset) == {a, b, c}
         subset2 = self.naive_func([d, c, b, a], hard)
-        self.assertSetEqual(set(subset2), {b, d})
+        assert set(subset2) == {b, d}
 
-class OptimalMUSTests(MusTests):
+@pytest.mark.requires_solver("exact")
+class TestOptimalMUS(TestMus):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup_method(self):
         self.mus_func = optimal_mus
-        self.mus_func_naive = optimal_mus_naive
+        self.naive_func = optimal_mus_naive
 
     def test_weighted(self):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
@@ -128,23 +141,23 @@ class OptimalMUSTests(MusTests):
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.mus_func([a, b, c, d], hard, weights = [1,1,2,4])
-        self.assertSetEqual(set(subset), {a, b, c})
+        assert set(subset) == {a, b, c}
         subset2 = self.mus_func([a,b,c,d], hard, weights= [2,3,4,2])
-        self.assertSetEqual(set(subset2), {b, d})
+        assert set(subset2) == {b, d}
         subset3 = self.mus_func([a,b,c,d], hard)
-        self.assertEqual(set(subset3), {b,d})
+        assert set(subset3) == {b,d}
 
-        subset = self.mus_func_naive([a, b, c, d], hard, weights=[1, 1, 2, 4])
-        self.assertSetEqual(set(subset), {a, b, c})
-        subset2 = self.mus_func_naive([a, b, c, d], hard, weights=[2, 3, 4, 2])
-        self.assertSetEqual(set(subset2), {b, d})
-        subset3 = self.mus_func_naive([a, b, c, d], hard)
-        self.assertEqual(set(subset3), {b, d})
+        subset = self.naive_func([a, b, c, d], hard, weights=[1, 1, 2, 4])
+        assert set(subset) == {a, b, c}
+        subset2 = self.naive_func([a, b, c, d], hard, weights=[2, 3, 4, 2])
+        assert set(subset2) == {b, d}
+        subset3 = self.naive_func([a, b, c, d], hard)
+        assert set(subset3) == {b, d}
 
-class OCUSTests(OptimalMUSTests):
+@pytest.mark.requires_solver("exact")
+class TestOCUS(TestOptimalMUS):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup_method(self):
         self.mus_func = ocus
         self.naive_func = ocus_naive
 
@@ -156,21 +169,21 @@ class OCUSTests(OptimalMUSTests):
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.mus_func([a, b, c, d], hard=hard, meta_constraint = ~b | d)
-        self.assertSetEqual(set(subset), {b,d})
+        assert set(subset) == {b,d}
         subset2 = self.mus_func([a,b,c,d], hard, meta_constraint = a & d)
-        self.assertSetEqual(set(subset2), {a,b,d}) # not subset-minimal
-        self.assertRaises(OCUSException, lambda: self.mus_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+        assert set(subset2) == {a,b,d}# not subset-minimal
+        pytest.raises(OCUSException, lambda: self.mus_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.naive_func([a, b, c, d], hard=hard, meta_constraint = ~b | d)
-        self.assertSetEqual(set(subset), {b,d})
+        assert set(subset) == {b,d}
         subset2 = self.naive_func([a,b,c,d], hard, meta_constraint = a & d)
-        self.assertSetEqual(set(subset2), {a,b,d}) # not subset-minimal
-        self.assertRaises(OCUSException, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+        assert set(subset2) == {a,b,d}# not subset-minimal
+        pytest.raises(OCUSException, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
 
 
-
-class MARCOMUSTests(MusTests):
+@pytest.mark.requires_solver("exact")
+class TestMARCOMUS(TestMus):
 
     def test_php(self):
         x = cp.boolvar(shape=(5,3), name="x")
@@ -181,38 +194,19 @@ class MARCOMUSTests(MusTests):
         subsets = list(marco(soft=model.constraints))
         musses = [ss for kind, ss in subsets if kind == "MUS"]
         mcses = [ss for kind, ss in subsets if kind == "MCS"]
-        self.assertEqual(len(musses), 5)
-        self.assertEqual(len(mcses), 13)
+        assert len(musses) == 5
+        assert len(mcses) == 13
 
         # also works when only enumerating MUSes?
         musses = list(marco(soft=model.constraints, return_mcs=False))
-        self.assertEqual(len(musses), 5)
+        assert len(musses) == 5
         # or only MCSes?
         mcses = list(marco(soft=model.constraints, return_mus=False))
-        self.assertEqual(len(mcses), 13) # any combination of 3 pigeon constraints + 3 mcses with the hole constraints
+        assert len(mcses) == 13# any combination of 3 pigeon constraints + 3 mcses with the hole constraints
 
 
 
-
-class MSSTests(unittest.TestCase):
-
-    def test_circular(self):
-        x = cp.intvar(0, 3, shape=4, name="x")
-        # circular "bigger then", UNSAT
-        cons = [
-            x[0] > x[1],
-            x[1] > x[2],
-            x[2] > x[0],
-
-            x[3] > x[0],
-            (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
-        ]
-
-        self.assertLess(len(mss(cons)), len(cons))
-        self.assertIn(cons[4], set(mss_opt(cons, weights=[1,1,1,1,5]))) # weighted version
-
-
-class MCSTests(unittest.TestCase):
+class TestMSS:
 
     def test_circular(self):
         x = cp.intvar(0, 3, shape=4, name="x")
@@ -225,9 +219,21 @@ class MCSTests(unittest.TestCase):
             x[3] > x[0],
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
-        self.assertEqual(len(mcs(cons)), 1)
 
+        assert len(mss(cons)) < len(cons)
+        assert cons[4] in set(mss_opt(cons, weights=[1,1,1,1,5]))# weighted version
 
+class TestMCS:
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_circular(self):
+        x = cp.intvar(0, 3, shape=4, name="x")
+        # circular "bigger then", UNSAT
+        cons = [
+            x[0] > x[1],
+            x[1] > x[2],
+            x[2] > x[0],
+
+            x[3] > x[0],
+            (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
+        ]
+        assert len(mcs(cons)) == 1

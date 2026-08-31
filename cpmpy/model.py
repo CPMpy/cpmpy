@@ -12,7 +12,7 @@
     the constraints or objective stored in the model.
 
     A model can be solved multiple times, and constraints can be added inbetween solve calls.
-    Note that constraints are added using the ``+=`` operator (implemented by :meth:`__add__() <cpmpy.model.Model.__add__>`).
+    Note that constraints are added using :meth:`.add(...) <cpmpy.model.Model.add>` or using the ``+=`` operator (implemented by :meth:`__add__()`).
 
     See the full list of functions below.
 
@@ -25,18 +25,17 @@
 
         Model
 """
+from __future__ import annotations
 import copy
 import warnings
 import time
-
-import numpy as np
+from typing import Optional
 
 from .exceptions import NotSupportedError
-from .expressions.core import Expression
-from .expressions.variables import NDVarArray
+from .expressions.core import Expression, NestedBoolExprLike
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solvers.solver_interface import SolverInterface, SolverStatus, Callback
 
 import pickle
 
@@ -45,14 +44,14 @@ class Model(object):
     CPMpy Model object, contains the constraint and objective expressions
     """
 
-    def __init__(self, *args, minimize=None, maximize=None):
+    def __init__(self, *args: NestedBoolExprLike, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
         """
             Arguments of constructor:
 
             Arguments:
-                `*args`: Expression object(s) or list(s) of Expression objects
-                `minimize`: Expression object representing the objective to minimize
-                `maximize`: Expression object representing the objective to maximize
+                *args (NestedBoolExprLike): constraints passed to :meth:`add`
+                minimize (Expression): The objective to minimize
+                maximize (Expression): The objective to maximize
 
             At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
         """
@@ -60,19 +59,20 @@ class Model(object):
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
         # init list of constraints and objective
-        self.constraints = []
-        self.objective_ = None
-        self.objective_is_min = None
+        self.constraints: list[NestedBoolExprLike] = []
+        self.objective_: Optional[Expression] = None
+        self.objective_is_min: Optional[bool] = None
 
         if len(args) == 1 and is_any_list(args):
             args = args[0]  # historical shortcut, treat as *args
-        # use `__add__()` for typecheck
+
+        # pass by `add()` for typecheck
         if is_any_list(args):
-            # add (and type-check) one by one
+            # user intention is that each argument is a separate constraint
             for a in args:
-                self += a
+                self.add(a)
         else:
-            self += args
+            self.add(args)
 
         # store objective if present
         if maximize is not None:
@@ -81,26 +81,26 @@ class Model(object):
             self.minimize(minimize)
 
         
-    def add(self, con):
+    def add(self, con: NestedBoolExprLike) -> "Model":
         """
         Add one or more constraints to the model.
 
         Arguments:
-            con (Expression or list): Expression object(s) or list(s) of Expression objects representing constraints
+            con (NestedBoolExprLike): Boolean constraint expression or constant, or nested list/tuple thereof
 
         Returns:
-            Model: Returns self to allow for method chaining
+            self
 
         Example:
             .. code-block:: python
 
                 m = Model()
-                m += [x > 0]
+                m.add([x > 0])
         """
         if is_any_list(con):
             # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
             for elem in con:
-                if isinstance(elem, Expression) and not elem.is_bool() and not isinstance(elem, NDVarArray):
+                if isinstance(elem, Expression) and not elem.is_bool():
                     raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
 
             if len(con) == 0:
@@ -119,58 +119,62 @@ class Model(object):
     __add__ = add  # Make __add__() (for the += operation) be the same as add() 
 
 
-    def minimize(self, expr):
+    def minimize(self, expr: Expression) -> None:
         """
             Minimize the given objective function
 
-            `minimize()` can be called multiple times, only the last one is stored
+            ``minimize()`` can be called multiple times, only the last one is stored
         """
         self.objective(expr, minimize=True)
 
-    def maximize(self, expr):
+    def maximize(self, expr: Expression) -> None:
         """
             Maximize the given objective function
 
-            `maximize()` can be called multiple times, only the last one is stored
+            ``maximize()`` can be called multiple times, only the last one is stored
         """
         self.objective(expr, minimize=False)
 
-    def objective(self, expr, minimize):
+    def objective(self, expr: Expression, minimize: bool) -> None:
         """
             Users will typically use :meth:`minimize() <cpmpy.model.Model.minimize>` or :meth:`maximize() <cpmpy.model.Model.maximize>` to set the objective function,
             this is the generic implementation for both.
 
             Arguments:
                 expr (Expression):      the CPMpy expression that represents the objective function
-                minimize (bool):        whether it is a minimization problem (True) or maximization problem (False)
+                minimize (bool):        whether it is a minimization problem (``True``) or maximization problem (``False``)
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
         """
+        assert isinstance(expr, Expression), f"Model only accepts an Expression as objective, got {type(expr)} instead"
         self.objective_ = expr
         self.objective_is_min = minimize
 
-    def has_objective(self):
+    def has_objective(self) -> bool:
         """
             Check if the model has an objective function
 
             Returns:
-                bool: True if the model has an objective function, False otherwise
+                bool: ``True`` if the model has an objective function, ``False`` otherwise
         """
         return self.objective_ is not None
 
-    def objective_value(self):
+    def objective_value(self) -> Optional[int]:
         """
             Returns the value of the objective function of the last solver run on this model
 
             Returns:
-                an integer or 'None' if it is not run or is a satisfaction problem
+                int, optional:  The objective value as an integer or ``None`` if it is not run or is a satisfaction problem
         """
+        if self.objective_ is None:
+            return None
         return self.objective_.value()
 
-    def solve(self, solver=None, time_limit=None, **kwargs):
-        """ Send the model to a solver and get the result.
+    def solve(self, solver:Optional[str]=None, time_limit:Optional[int|float]=None, **kwargs):
+        """ 
+        Send the model to a solver and get the result.
 
-            Run :func:`SolverLookup.solvernames() <cpmpy.solvers.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
+        Run :func:`SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
 
         Arguments:
             solver (string or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!), optional): 
@@ -181,8 +185,8 @@ class Model(object):
         Returns:
             bool: the computed output:
 
-            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
-            - False     if no solution is found
+            - ``True``      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - ``False``     if no solution is found
         """
         start_time = time.time()
         if kwargs and solver is None:
@@ -201,7 +205,7 @@ class Model(object):
         self.cpm_status = s.status()
         return ret
 
-    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -209,9 +213,9 @@ class Model(object):
             If at least one solution was found and the solver exhausted all possible solutions, the solver status will be 'Optimal', otherwise 'Feasible'.
 
             Arguments:
-                display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                                    default/None: nothing displayed
-                solution_limit:     stop after this many solutions (default: None)
+                display:                            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                                    default/None: nothing displayed
+                solution_limit (int, optional):     stop after this many solutions (default: None)
 
             Returns:
                 int: number of solutions found (within the time and solution limit)
@@ -266,7 +270,7 @@ class Model(object):
 
     def to_file(self, fname):
         """
-            Serializes this model to a ``.pickle`` format
+            Serializes this model to a `.pickle` format
 
             Arguments:
                 fname (FileDescriptorOrPath): Filename of the resulting serialized model
@@ -281,33 +285,12 @@ class Model(object):
             Reads a Model instance from a binary pickled file
 
             Returns:
-                an object of :class: `Model`
+                an object of :class:`Model`
         """
         with open(fname, "rb") as f:
             m = pickle.load(f)
             # bug 158, we should increase the boolvar/intvar counters to avoid duplicate names
-            from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
-            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX # avoid circular import
-            vs = get_variables_model(m)
-            bv_counter = 0
-            iv_counter = 0
-            for v in vs:
-                if v.name.startswith(_BV_PREFIX):
-                    try:
-                        bv_counter = max(bv_counter, int(v.name[2:])+1)
-                    except:
-                        pass
-                elif v.name.startswith(_IV_PREFIX):
-                    try:
-                        iv_counter = max(iv_counter, int(v.name[2:])+1)
-                    except:
-                        pass
-
-            if (_BoolVarImpl.counter > 0 and bv_counter > 0) or \
-                    (_IntVarImpl.counter > 0 and iv_counter > 0):
-                warnings.warn(f"from_file '{fname}': contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
-            _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
-            _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
+            _update_variable_counters(m)
             return m
 
     def copy(self):
@@ -322,7 +305,27 @@ class Model(object):
 
 
 
-    # keep for backwards compatibility
-    def deepcopy(self, memodict={}):
-        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
-        return copy.deepcopy(self, memodict)
+def _update_variable_counters(model: Model):
+    from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
+    from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX # avoid circular import
+            
+    vs = get_variables_model(model)
+    bv_counter = 0
+    iv_counter = 0
+    for v in vs:
+        if v.name.startswith(_BV_PREFIX):
+            try:
+                bv_counter = max(bv_counter, int(v.name[2:])+1)
+            except: # When name starts with _BV_PREFIX but is not a valid integer (user created name), ignore
+                pass
+        elif v.name.startswith(_IV_PREFIX):
+            try:
+                iv_counter = max(iv_counter, int(v.name[2:])+1)
+            except: # When name starts with _IV_PREFIX but is not a valid integer (user created name), ignore
+                pass
+
+    if (_BoolVarImpl.counter > 0 and bv_counter > 0) or (_IntVarImpl.counter > 0 and iv_counter > 0):
+        warnings.warn(f"Model contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
+    # update counters for future variables
+    _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
+    _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)

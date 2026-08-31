@@ -1,311 +1,404 @@
 """
-    Decompose global constraints not supported by the solver.
+Functions to decompose global constraints and global functions not supported by the solver.
+
+This transformation is necessary for all non-CP solvers, and also used to decompose
+global constraints and global functions not implemented in a CP-solver.
+
+While a solver may natively support a global constraint, it may not support it natively in a reified context.
+In this case, we will als also decompose the global constraint.
+
+For numerical global functions, we will only decompose them if they are not supported in non-reified context.
+Even if the solver does not explicitely support them in a subexpression,
+we can rewrite them using func:`cpmpy.transformations.reification.reify_rewrite` to a non-reified version when the function is total.
+E.g., bv <-> max(a,b,c) >= 4 can be rewritten as [bv <-> IV0 >= 4, IV0 == max(a,b,c)]
+
+Unsupported global constraints and global functions are decomposed in-place and the resulting set of constraints
+is wrapped in a conjunction.
+Negation is pushed down into the decomposition when the global constraint is decomposed
+E.g., x + ~AllDifferent(a,b,c) >= 2 is decomposed into x + ~((a) != (b) & (a) != (c) & (b) != (c)) >= 2 and in turn written to x + (a == b) | (a == c) | (b == c)
+This allows to post the decomposed expression tree to the solver if it supports it (e.g., SMT-solvers, MiniZinc, CPO)
 """
 
 import copy
-import warnings  # for deprecation warning
+from typing import AbstractSet, Optional, Dict, Any, Callable, Protocol, cast, overload
+import warnings
+import numpy as np
 
-from .normalize import toplevel_list
+
+from .cse import CSEMap
+from ..expressions.core import Expression, BoolVal, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.variables import intvar, cpm_array, NDVarArray
-from ..expressions.utils import is_any_list, eval_comparison
-from ..expressions.python_builtins import all
-from .flatten_model import flatten_constraint, normalized_numexpr
+from ..expressions.variables import NDVarArray, cpm_array
+from ..expressions.python_builtins import all as cpm_all
+from ..transformations.negation import recurse_negation
 
+class CustomDecomp(Protocol):
+    @overload
+    def __call__(self, expr: GlobalConstraint, /) -> tuple[list[Expression], list[Expression]]: ...
+    @overload
+    def __call__(self, expr: GlobalFunction, /) -> tuple[Expression, list[Expression]]: ...
 
-def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False, csemap=None):
+def decompose_in_tree(lst_of_expr: list[Expression],
+                      supported: Optional[AbstractSet[str]] = None,
+                      supported_reified: Optional[AbstractSet[str]] = None,
+                      _toplevel=None, nested=False,
+                      csemap: Optional[CSEMap] = None,
+                      decompose_custom: Optional[Dict[str, CustomDecomp]] = None,
+                      decompose_custom_positive: Optional[Dict[str, CustomDecomp]] = None,
+                      ) -> list[Expression]:
     """
-        Decomposes any global constraint not supported by the solver.
-        Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions.
-            
-        :param supported: a set of supported global constraints or global functions
-        :param supported_reified: a set of supported reified global constraints (globals with Boolean return type only)
-        :param _toplevel: a list of constraints that should be added toplevel, carried as pass by reference to recursive calls
-        :param nested: if True, new constraints will have been added to the `_toplevel` list too
-        
-        Special care taken for unsupported global constraints in reified contexts and for numeric global constraints
-        in a comparison.
+    Decomposes global constraint or global function not supported by the solver.
 
-        Supported numerical global functions remain in the expression tree as is. They can be rewritten using
-        :func:`cpmpy.transformations.reification.reify_rewrite`
-        The following ``bv -> NumExpr <comp> Var/Const`` can be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
-        So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
+    Accepts a list of CPMpy expressions as input and returns a (new) list of CPMpy expressions.
+
+    :param lst_of_expr: list of CPMpy expressions that may contain global constraints or global functions.
+    :param supported: a set of names of supported global constraints and global functions (will not be decomposed).
+    :param supported_reified: a set of names of supported reified global constraints (those with Boolean return type only).
+    :param _toplevel: DEPRECATED
+    :param nested: DEPRECATED
+    :param csemap: CSEMap object used to avoid decomposing the same global constraint twice
+    :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
+    :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
+
+    To decompose a global constraint in positive context:
+    1. Check `decompose_positive_custom`
+    2. Check `decompose_custom`
+    3. Call `global.decompose_positive()`
+
+    The assumption is that `decompose_custom` generally works better compared to the standard global decomposition,
+    even if the custom decomposition is not specialized for positive-only use.
+
+    Supported numerical global functions remain in the expression tree as is. They can be rewritten using
+    :func:`cpmpy.transformations.reification.reify_rewrite`
+    E.g. ``bv -> NumExpr <comp> Var/Const`` will then be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
     """
-    if _toplevel is None:
-        _toplevel = []
+    if _toplevel is not None:
+        warnings.warn("decompose_in_tree: argument '_toplevel' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+    if nested:
+        warnings.warn("decompose_in_tree: argument 'nested' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
 
-    # swap the arguments of a comparison while maintaining its semantics
-    flipmap = {"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
+    if supported is None:
+        supported = frozenset[str]()
+    if supported_reified is None:
+        supported_reified = frozenset[str]()
 
-    newlist = []  # decomposed constraints will go here
+    todolist: list[Expression] = []  # these still need to be decomposed
+    newlist: list[Expression] = []
+    changed = False
     for expr in lst_of_expr:
-
-        if is_any_list(expr):
-            assert nested is True, "Cannot have nested lists without passing trough an expression, make sure to run " \
-                                   "cpmpy.transformations.normalize.toplevel_list first. "
-            if isinstance(expr, NDVarArray):  # NDVarArray is also an expression,
-                                              # so we can call has_subexpr on it for a possible early-exit
-                if expr.has_subexpr():
-                    newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
-                    newlist.append(cpm_array(newexpr))
-                else:
-                    newlist.append(expr)
-            else: # a normal list-like (list, tuple, np.ndarray), must be called recursively and check all elements
-                newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
-                newlist.append(newexpr)
-            continue
-
-        elif isinstance(expr, Operator):
-
-            if not expr.has_subexpr(): # Only recurse if there are nested expressions
-                newlist.append(expr)
-                continue
-
-            if any(isinstance(a,GlobalFunction) for a in expr.args):
-                expr, base_con = normalized_numexpr(expr, csemap=csemap)
-                _toplevel.extend(base_con)  # should be added toplevel
-            # recurse into arguments, recreate through constructor (we know it stores no other state)
-            args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
-            newlist.append(Operator(expr.name, args))
-
-        elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
-            # Can't early-exit here, need to check if constraint in itself is even supported
-            if nested and expr.is_bool():
-                # special case: reified (Boolean) global
-                is_supported = (expr.name in supported_reified)
-            else:
-                is_supported = (expr.name in supported)
-
-            if is_supported:
-                # If no nested expressions, don't recurse the arguments
-                if not expr.has_subexpr():
-                    newlist.append(expr)
-                    continue
-                # Recursively decompose the subexpression arguments
-                else:
-                    expr = copy.copy(expr)
-                    expr.update_args(decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap))
-                    newlist.append(expr)
-
-            else:
-                if expr.is_bool():
-                    assert isinstance(expr, GlobalConstraint)
-                    # boolean global constraints
-                    dec = expr.decompose()
-                    if not isinstance(dec, tuple):
-                        warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
-                                      "deprecated. Support for old-style globals will be removed in stable version",
-                                      DeprecationWarning)
-                        dec = (dec, [])
-                    decomposed, define = dec
-
-                    _toplevel.extend(define)  # definitions should be added toplevel
-                    # the `decomposed` expression might contain other global constraints, check it
-                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=nested, csemap=csemap)
-                    newlist.append(all(decomposed))
-
-                else:
-                    # global function, replace by a fresh variable and decompose the equality to this
-                    assert isinstance(expr, GlobalFunction)
-                    lb,ub = expr.get_bounds()
-                    
-                    if csemap is not None and expr in csemap:
-                        aux = csemap[expr]
+        if isinstance(expr, GlobalConstraint) and expr.name not in supported:
+            # toplevel/positive global constraint, decompose
+            changed = True
+            if csemap is not None:
+                decomp = csemap.get_decomposition(expr)
+                if decomp is not None:
+                    assert isinstance(decomp, Expression)
+                    if decomp.name == "and":
+                        newlist.extend(decomp.args)
                     else:
-                        aux = intvar(lb, ub)
-                        if csemap is not None:
-                            csemap[expr] = aux
+                        newlist.append(decomp)
+                    continue
 
-                    # NOTE Do we need to decompose here (the expr's args)? As done in the Comparison's section?
+            # First see if a custom decomposition is provided for positive context, then for any context, otherwise use the default
+            if decompose_custom_positive is not None and expr.name in decompose_custom_positive:
+                exprs, toplevel_exprs = decompose_custom_positive[expr.name](expr)
+            elif decompose_custom is not None and expr.name in decompose_custom:
+                exprs, toplevel_exprs = decompose_custom[expr.name](expr)
+            else:
+                exprs, toplevel_exprs = expr.decompose_positive()
+            # we merge the list toplevel rather than create an 'and'
+            # we add them to todolist because both might contain globals
+            if len(toplevel_exprs) > 0:
+                todolist.extend(toplevel_exprs)
+            if len(exprs) > 0:
+                todolist.extend(exprs)
+                # don't save toplevel decompositions to the csemap, 
+                # we currently don't have a way of distinguishing positive and negative in the csemap ... TODO
+                # if csemap is not None:
+                #     if len(exprs) == 1: # dont wrap in conjunction
+                #         csemap.save_decomposition(expr, exprs[0])
+                #     else:
+                #         csemap.save_decomposition(expr, Operator("and", exprs))
+        
+        elif isinstance(expr, (bool, np.bool_)):
+            # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
+            changed = True
+            newlist.append(BoolVal(expr))
 
-                    dec = expr.decompose_comparison("==", aux)
-                    if not isinstance(dec, tuple):
-                        warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
-                                      "deprecated. Support for old-style globals will be removed in stable version",
-                                      DeprecationWarning)
-                        dec = (dec, [])
-                    auxdef, otherdef = dec
+        elif expr.name == "not":  # not(global) or negation left by a decomposition
+            args_changed, expr_newargs, expr_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if len(expr_toplevel) > 0:
+                todolist.extend(expr_toplevel)
+            if not args_changed:
+                expr_newargs = expr.args  # lets be sure its set
 
-                    _toplevel.extend(auxdef + otherdef)  # all definitions should be added toplevel
-                    newlist.append(aux)  # replace original expression by aux
-
-        elif isinstance(expr, Comparison):
-            if not expr.has_subexpr(): # Only recurse if there are nested expressions
-                newlist.append(expr)
-                continue
-
-            # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
-            # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
-            lhs, rhs = expr.args
-            exprname = expr.name  # can change when rhs needs decomp
-
-            decomp_lhs = isinstance(lhs, GlobalFunction) and not lhs.name in supported
-            decomp_rhs = isinstance(rhs, GlobalFunction) and not rhs.name in supported
-
-            if not decomp_lhs:
-                if not decomp_rhs:
-                    # nothing special, create a fresh version and recurse into arguments
+            assert len(expr_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {expr_newargs}"
+            if isinstance(expr_newargs[0], GlobalConstraint):
+                if args_changed:
+                    changed = True
+                    # supported nested global whose args have changed
                     expr = copy.copy(expr)
-                    expr.update_args(decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap))
-                    newlist.append(expr)
-
-                else:
-                    # only rhs needs decomposition, so flip comparison to make lhs needing the decomposition
-                    exprname = flipmap[expr.name]
-                    lhs, rhs = rhs, lhs
-                    decomp_lhs, decomp_rhs = True, False  # continue into next 'if'
-
-            if decomp_lhs:
-                if lhs.has_subexpr():
-                    # recurse into lhs args and decompose nested subexpressions
-                    lhs = copy.copy(lhs)
-                    lhs.update_args(decompose_in_tree(lhs.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap))
-
-                # decompose comparison of lhs and rhs
-                dec = lhs.decompose_comparison(exprname, rhs)
-                if not isinstance(dec, tuple):
-                    warnings.warn(f"Decomposing an old-style global ({lhs}) that does not return a tuple, which is "
-                                  f"deprecated. Support for old-style globals will be removed in stable version",
-                                  DeprecationWarning)
-                    dec = (dec, [])
-                decomposed, define = dec
-
-                _toplevel.extend(define)  # definitions should be added toplevel
-                # the `decomposed` expression (and rhs) might contain other global constraints, check it
-                decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
-                newlist.append(all(decomposed))
-
-        else:  # constants, variables, direct constraints
+                    expr.update_args(expr_newargs)
+            else:
+                changed = True
+                # decomposed global or boolean expr from decomposition; push negation down
+                expr = recurse_negation(expr_newargs[0])
             newlist.append(expr)
 
-    if nested:
+        elif expr.has_subexpr():
+            # first, special case for positive reified
+            decomposed_positive = False
+            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
+                changed = True
+                subexpr = expr.args[1]
+                if decompose_custom_positive is not None and subexpr.name in decompose_custom_positive:
+                    exprs, toplevel_exprs = decompose_custom_positive[subexpr.name](subexpr)
+                elif decompose_custom is not None and subexpr.name in decompose_custom:
+                    exprs, toplevel_exprs = decompose_custom[subexpr.name](subexpr)
+                else:
+                    exprs, toplevel_exprs = subexpr.decompose_positive()
+                if len(toplevel_exprs) > 0:
+                    todolist.extend(toplevel_exprs)
+                expr = Operator("->", [expr.args[0], cpm_all(exprs)])   
+                decomposed_positive = True
+
+            # decompose its arguments
+            args_changed, expr_newargs, expr_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if args_changed:
+                changed = True
+                if len(expr_toplevel) > 0:
+                    todolist.extend(expr_toplevel)
+
+                # if decompose_positive: we know 'expr' is a fresh expression
+                if not decomposed_positive:
+                    expr = copy.copy(expr)
+                expr.update_args(expr_newargs)
+
+            newlist.append(expr)
+        else:
+            newlist.append(expr)
+
+    # recurse on any newly generated toplevel expressions
+    if len(todolist) > 0:
+        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    elif changed:
         return newlist
+    else:  # not changed
+        return lst_of_expr
 
-    if len(_toplevel) == 0:
-        return toplevel_list(newlist)
+
+def decompose_objective(expr: Expression,
+                        supported: Optional[AbstractSet[str]] = None,
+                        supported_reified: Optional[AbstractSet[str]] = None,
+                        csemap: Optional[CSEMap] = None,
+                        decompose_custom: Optional[Dict[str, CustomDecomp]]=None) -> tuple[Expression, list[Expression]]:
+    """
+    Decompose any global constraint or global function not supported by the solver
+    in the objective function expression (numeric or global).
+
+    Accepts a single objective expression and returns the decomposed expression plus
+    a list of auxiliary constraints to add as model constraints.
+
+    :param expr: objective expression (e.g. ``min(x)``, ``sum(arr)``).
+    :param supported: a set of names of supported global constraints and global functions (will not be decomposed).
+    :param supported_reified: a set of names of supported reified global constraints (those with Boolean return type only).
+    :param csemap: a dictionary of 'expr: expr' mappings, for Common Subexpression Elimination
+
+    :returns: ``(decomp_expr, toplevel)`` where ``decomp_expr`` is the decomposed
+        objective and ``toplevel`` is the list of auxiliary constraints.
+
+    .. warning::
+        The returned ``toplevel`` list may itself contain global constraints or
+        functions. When adding these to the solver, the solver should still
+        decompose them.
+    """
+    assert isinstance(expr, Expression), "decompose_objective: expected a single expression as objective but got {expr}"
+    if supported is None:
+        supported = frozenset[str]()
+    if supported_reified is None:
+        supported_reified = frozenset[str]()
+
+    changed, newexprs, todo_toplevel = _decompose_in_tree_args((expr,), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    if changed:
+        assert len(newexprs) == 1, "decompose_objective: expected a single expression as decomposed objective but got {newexprs}"
+        return newexprs[0], todo_toplevel
     else:
-        # we are toplevel and some new constraints are introduced, decompose new constraints!
-        return toplevel_list(newlist) + decompose_in_tree(toplevel_list(_toplevel), supported, supported_reified, nested=False, csemap=csemap)
+        return expr, []
 
-
-# DEPRECATED!
-# old way of doing decompositions post-flatten
-# will be removed in any future version!
-def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
+def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
+                            supported: AbstractSet[str],
+                            supported_reified: AbstractSet[str],
+                            csemap: Optional[CSEMap]=None,
+                            decompose_custom:Optional[Dict[str, CustomDecomp]]=None) -> tuple[bool, list[Any]|tuple[Any], list[Expression]]:
     """
-    .. deprecated:: 0.9.16
-          Please use :func:`decompose_in_tree()` instead.
+    Well-typed recursive helper function to decompose unsupported global constraints
+    and global functions in the arguments of an Expression.  
+
+    INTERNAL function, not guaranteed to remain backward compatible.
+
+    :param args: list of Expressions arguments (list[Any] | tuple[Any, ...])
+    :param supported: a set of names of supported global constraints and global functions (will not be decomposed).
+    :param supported_reified: a set of names of supported reified global constraints (those with Boolean return type only).
+    :param csemap: a dictionary of 'expr: expr' mappings, for Common Subexpression Elimination
+
+    Returns:  
+        tuple[bool, list[Any], list[Expression]]: (changed, newargs, toplevel)  
+        - ``changed`` is True if a decomposition was done (or a recursive call changed something).
+        - ``newargs`` is the decomposed sequence (same length as ``args``).
+        - ``toplevel`` is the list of auxiliary constraints to post at top level.
     """
-    warnings.warn("Deprecated, use `decompose_in_tree()` instead, will be removed in stable version", DeprecationWarning)
-    """
-        DEPRECATED!!! USE `decompose_in_tree()` instead!
-        Decomposes any global constraint not supported by the solver
-        Accepts a list of flat constraints as input
-        Returns a list of flat constraints
+    toplevel: list[Expression] = []
+    newargs: list[Any] = []
+    changed = False
+    for arg in args:
+        if isinstance(arg, Expression):
+            # a nested expression (its inside an args)
+            if isinstance(arg, GlobalConstraint) and arg.name not in supported_reified:
+                changed = True
+                if csemap is not None:
+                    decomp = csemap.get_decomposition(arg)
+                    if decomp is not None:
+                        newargs.append(decomp)
+                        changed = True
+                        continue
+                arg_orig = arg
 
-        - supported: a set of supported global constraints or global functions
-        - supported_reified: a set of supported global constraints within a reification
+                # new global constraint, decompose
+                if decompose_custom is not None and arg.name in decompose_custom:
+                    exprs, toplevel_exprs = decompose_custom[arg.name](arg)
+                else:
+                    exprs, toplevel_exprs = arg.decompose()
+                if len(toplevel_exprs) > 0:
+                    toplevel.extend(toplevel_exprs)
+            
+                # a decomposition may contain globals, recurse into the exprs
+                # we have to do this here anyway, hence we do not recurse into the args upfront
+                # (the csemap catches duplicate effort anyway)
+                rec_changed, rec_newexprs, rec_toplevel = _decompose_in_tree_args(exprs, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                if rec_changed:
+                    exprs = cast(list[Expression], rec_newexprs)
+                    if len(rec_toplevel) > 0:
+                        toplevel.extend(rec_toplevel)
 
-        Unsupported global constraints are decomposed into equivalent simpler constraints.
-        Numerical global constraints are left reified even if not part of the `supported_reified` set
-            as they can be rewritten using `cpmpy.transformations.reification.reify_rewrite`...
-                ... reified partial functions are decomposed when unsupported by `supported_reified`
-                The following `bv -> NumExpr <comp> Var/Const` can always be rewritten as ...
-                                [bv -> IV0 <comp> Var/Const, NumExpr == IV0].
-                So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions.
-                TODO: decide if we want to do the rewrite of unsupported globals here or leave it to `reify_rewrite`.
-                    Currently, we left it for `reify_rewrite`
+                if len(exprs) == 0:
+                    # empty decomposition (e.g. alldifferent over 0/1 elements)
+                    # is a trivially-true conjunction
+                    arg = BoolVal(True)
+                elif len(exprs) == 1:
+                    arg = exprs[0]
+                else:
+                    # replace arg by conjunction of decompose
+                    arg = Operator("and", exprs)
 
+                if csemap is not None:
+                    csemap.save_decomposition(arg_orig, arg)
+                newargs.append(arg)
+                continue
+            
+            elif isinstance(arg, GlobalFunction) and arg.name not in supported:
+                changed = True
+                if csemap is not None:
+                    decomp = csemap.get_decomposition(arg)
+                    if decomp is not None:
+                        newargs.append(decomp)
+                        continue
+                arg_orig2 = arg
 
+                # a decomposition may consist of a new GlobFunc to decompose...
+                while isinstance(arg, GlobalFunction) and arg.name not in supported:
+                    if decompose_custom is not None and arg.name in decompose_custom:
+                        newarg, toplevel_exprs = decompose_custom[arg.name](arg)
+                    else:
+                        newarg, toplevel_exprs = arg.decompose()
+                    arg = newarg
+                    if len(toplevel_exprs) > 0:
+                        toplevel.extend(toplevel_exprs)
+                            
+                # TODO: violates type!!!
+                # apparently in #630 we decided that decompose may return an int (e.g. for element)...
+                # we should change that (Element constructor requires variable index; the []/__get__ override can still take anything)
+                if isinstance(arg, int):
+                    # can't store ints in csemap
+                    newargs.append(arg)
+                    continue
+            
+                # if the new decomposed arg has subexprs, decompose its arguments too
+                if arg.has_subexpr():
+                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    if rec_changed:
+                        changed = True
+                        # XXX exception! here we know 'arg' is a new expression, so we don't need to copy
+                        arg.update_args(rec_newargs)
+                        if len(rec_toplevel) > 0:
+                            toplevel.extend(rec_toplevel)
 
-    """
-    def _is_supported(cpm_expr, reified):
-        if isinstance(cpm_expr, GlobalConstraint):
-            if reified and cpm_expr.name not in supported_reif:
-                return False
-            if not reified and cpm_expr.name not in supported:
-                return False
-        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalFunction):
-            if not cpm_expr.args[0].name in supported:
-                # reified numerical global constraints can be rewritten to non-reified versions
-                #  so only have to check for 'supported' set
-                return False
-            if reified and not cpm_expr.args[0].is_total() and cpm_expr.args[0].name not in supported_reif:
-                # edge case for partial functions as they cannot be rewritten to non-reified versions
-                #  have to decompose to total functions
-                #  ASSUMPTION: the decomposition for partial global functions is total! (for now only Element)
-                return False
+                if csemap is not None:
+                    csemap.save_decomposition(arg_orig2, arg)
+                newargs.append(arg)
+                continue
 
-        return True
+            else:  # any other expression
+                # if it has subexprs, decompose its arguments
+                if arg.has_subexpr():
+                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    if len(rec_toplevel) > 0:
+                        toplevel.extend(rec_toplevel)
+                    if not rec_changed:
+                        rec_newargs = arg.args  # let's be sure its set
 
-    assert supported_reif <= supported, "`supported_reif` set is assumed to be a subset of the `supported` set"
-    if not is_any_list(lst_of_expr):
-        lst_of_expr= [lst_of_expr]
+                    if arg.name == "not":  # not(global) or negation left by a decomposition
+                        assert len(rec_newargs) == 1, f"decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
+                        if isinstance(rec_newargs[0], GlobalConstraint):
+                            if rec_changed:
+                                changed = True
+                                arg = copy.copy(arg)
+                                arg.update_args(rec_newargs)
+                        else:
+                            changed = True
+                            arg = recurse_negation(rec_newargs[0])
+                    elif rec_changed:
+                        changed = True
+                        arg = copy.copy(arg)
+                        arg.update_args(rec_newargs)
+                            
+                    newargs.append(arg)
+                    continue
+        
+        elif isinstance(arg, np.ndarray) and arg.dtype == object:
+            if isinstance(arg, NDVarArray):
+                if arg.has_subexpr():
+                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    if rec_changed:
+                        changed = True
+                        # we reconstruct it as a cpm_array here
+                        newargs.append(cpm_array(rec_newargs).reshape(arg.shape))
+                        if len(rec_toplevel) > 0:
+                            toplevel.extend(rec_toplevel)
+                        continue
+            else:  # regular np.array
+                rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                if rec_changed:
+                    changed = True
+                    # we reconstruct it as a np.array here
+                    newargs.append(np.array(rec_newargs).reshape(arg.shape))
+                    if len(rec_toplevel) > 0:
+                        toplevel.extend(rec_toplevel)
+                    continue
+        
+        elif isinstance(arg, (list, tuple)):
+            rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg, supported=supported,
+                                                                             supported_reified=supported_reified,
+                                                                             csemap=csemap,
+                                                                             decompose_custom=decompose_custom)
+            if rec_changed:
+                changed = True
+                newargs.append(rec_newargs)
+                if len(rec_toplevel) > 0:
+                    toplevel.extend(rec_toplevel)
+                continue
+        
+        # all the rest: not allowed to contain expressions so just append
+        newargs.append(arg)
 
-    newlist = []
-    for cpm_expr in lst_of_expr:
-        assert isinstance(cpm_expr, Expression), f"Expected CPMpy expression but got {cpm_expr}, run 'cpmpy.transformations.normalize.toplevel_list' first"
-        decomp_idx = None
-
-        if hasattr(cpm_expr, "decompose") and not _is_supported(cpm_expr, reified=False):
-            cpm_expr = cpm_expr.decompose() # base boolean global constraints
-        elif isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
-            if cpm_expr.name == "==" and not _is_supported(lhs, reified=True): # rhs will always be const/var
-                decomp_idx = 0 # this means it is an unsupported reified boolean global
-
-            if not _is_supported(cpm_expr, reified=False):
-                cpm_expr = do_decompose(cpm_expr) # unsupported numerical constraint in comparison
-                decomp_idx = None
-
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            lhs, rhs = cpm_expr.args # BV -> Expr or Expr -> BV as flat normal form is required
-            if not _is_supported(rhs, reified=True):
-                decomp_idx = 1 # reified (numerical) global constraint, probably most frequent case
-            elif not _is_supported(lhs, reified=True):
-                decomp_idx = 0
-
-        if decomp_idx is not None:
-            cpm_expr = copy.deepcopy(cpm_expr) # need deepcopy as we are changing args of list inplace
-            cpm_expr.args[decomp_idx] = all(do_decompose(cpm_expr.args[decomp_idx]))
-            cpm_expr = [cpm_expr]
-
-        if isinstance(cpm_expr, list): # some decomposition happened, have to run again as decomp can contain new global
-            flat = flatten_constraint(cpm_expr) # most of the time will already be flat... do check here?
-            newlist.extend(decompose_global(flat, supported=supported))
-        else:
-            # default
-            newlist.append(cpm_expr)
-
-    return newlist
-
-def do_decompose(cpm_expr):
-    """
-    .. deprecated:: 0.9.13
-          Please use :func:`decompose_in_tree()` instead.
-    """
-    warnings.warn("Deprecated, never meant to be used outside this transformation; will be removed in stable version",
-                  DeprecationWarning)
-    """
-        DEPRECATED
-        Helper function for decomposing global constraints
-        - cpm_expr: Global constraint or comparison containing a global constraint on lhs
-    """
-    if isinstance(cpm_expr, Comparison):
-        lhs, rhs = cpm_expr.args
-        if lhs.is_bool():
-            return [eval_comparison(cpm_expr.name, all(lhs.decompose()), rhs)]
-        else:
-            dec = lhs.decompose_comparison(cpm_expr.name, rhs)
-            # new style is a tuple of size 2, old style is a single list (which captures less cases)
-            if isinstance(dec, tuple):
-                dec = dec[0]+dec[1]
-            return dec
-
-    dec = cpm_expr.decompose()
-    # new style is a tuple of size 2, old style is a single list (which captures less cases)
-    if isinstance(dec, tuple):
-        dec = dec[0]+dec[1]
-    return dec
+    return (changed, newargs, toplevel)

@@ -1,4 +1,4 @@
-from cpmpy.tools.explain.mss import *
+from cpmpy.tools.explain.mss import mss_opt, mss_grow, mss_grow_naive
 from cpmpy.transformations.normalize import toplevel_list
 
 
