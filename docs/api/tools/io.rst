@@ -27,6 +27,9 @@ Available formats
    * - ``dimacs``
      - ✓
      - ✓
+   * - ``gdimacs``
+     - ✓
+     - ✓
    * - ``fzn``
      - ✓
      - ✓
