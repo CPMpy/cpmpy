@@ -839,7 +839,7 @@ class TestSupportedSolvers:
         assert m.solve(solver=solver, time_limit=1)
 
         try:
-            m.solve(solver=solver, time_limit=-1)
+            cp.SolverLookup.get(solver, m).solve(time_limit=-1)
             assert False
         except ValueError:
             pass
