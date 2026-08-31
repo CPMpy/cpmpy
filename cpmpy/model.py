@@ -201,13 +201,13 @@ class Model(object):
         # call solver
         if time_limit is not None:
             remaining_time_limit = time_limit - (time.time() - t0)
+            if remaining_time_limit <= 0:
+                self.cpm_status.runtime = time.time() - t0
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                return False
         else:
             remaining_time_limit = None
 
-        if remaining_time_limit <= 0:
-            self.cpm_status.runtime = time.time() - t0
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-            return False
             
         ret = s.solve(time_limit=remaining_time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
