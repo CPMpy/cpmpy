@@ -371,15 +371,13 @@ class SolverInterface(object):
 
     # shared helper functions
 
-    def _solve_return(self, cpm_status, objective_value=None):
+    def _solve_return(self, cpm_status):
         """
             Take a CPMpy Model and SolverStatus object and return
             the proper answer (True/False/objective_value)
 
             :param cpm_status: status extracted from the solver
             :type cpm_status: SolverStatus
-
-            :param objective_value: None or Int, as computed by solver [DEPRECATED]
 
             :return: Bool
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)

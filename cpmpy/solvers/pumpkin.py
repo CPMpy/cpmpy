@@ -72,7 +72,7 @@ class CPM_pumpkin(SolverInterface):
     - ``pum_solver``: the pumpkin.Model() object
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "InDomain",
+    supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
                                               "min", "max", "abs", "mul", "div", "element"})
     supported_reified_global_constraints = frozenset()
 
@@ -132,7 +132,7 @@ class CPM_pumpkin(SolverInterface):
         self.predicate_map = {} # cache predicates for reuse
         if proof is not None: # Table and friends are not supported when proof logging
             # see https://github.com/ConSol-Lab/Pumpkin/issues/354
-            self.disabled_global_constraints = {"table", "negative_table", "InDomain"}
+            self.disabled_global_constraints = {"table", "negative_table", "indomain"}
         else:
             self.disabled_global_constraints = set()
 
@@ -608,7 +608,7 @@ class CPM_pumpkin(SolverInterface):
                                                   constraint_tag=tag)
                         ]
             
-            elif cpm_expr.name == "InDomain":
+            elif cpm_expr.name == "indomain":
                 val, domain = cpm_expr.args
                 return [constraints.Table(self.to_pum_ivar([val]),
                                           [[d] for d in domain], # each domain value is its own row

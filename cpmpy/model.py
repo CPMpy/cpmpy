@@ -302,12 +302,6 @@ class Model(object):
 
 
 
-    # keep for backwards compatibility
-    def deepcopy(self, memodict={}):
-        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
-        return copy.deepcopy(self, memodict)
-
-
 def _update_variable_counters(model: Model):
     from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
     from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX # avoid circular import

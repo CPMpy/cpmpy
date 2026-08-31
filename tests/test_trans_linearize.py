@@ -761,3 +761,24 @@ class TestLinearizeReifiedVariablesThreshold:
         b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
         out = linearize_reified_variables(self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]), min_values=2, csemap=self.csemap)
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([BV[b == 1], BV[b == 2], BV[b == 3]]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
+
+
+class TestLinearDecompositionDispatch:
+
+    def test_table_dispatches_to_subclass(self):
+        # The "table" entry in decompose_linear must dispatch on the instance, 
+        # so Table subclasses that override decompose_linear 
+        # (e.g. NonReifiedTable in the XCSP3 tooling) are used
+        from cpmpy.expressions.globalconstraints import Table
+        from cpmpy.transformations.linearize import get_linear_decompositions
+
+        sentinel = [cp.BoolVal(True)]
+        class SubTable(Table):
+            def decompose_linear(self, heuristic="domain"):
+                return sentinel, []
+
+        x = cp.intvar(0, 2, shape=2)
+        expr = SubTable(x, [[0, 1]])
+        decomposed, defining = get_linear_decompositions()["table"](expr)
+        assert decomposed is sentinel
+        assert defining == []

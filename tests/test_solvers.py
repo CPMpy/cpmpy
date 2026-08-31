@@ -485,6 +485,30 @@ class TestSolvers:
         s = cp.SolverLookup.get("z3", m)
         assert not s.solve()
 
+    @pytest.mark.requires_solver("z3")
+    @pytest.mark.skip(reason="test is extremely slow on z3 v5.0.0")
+    def test_z3_optimize_inconsistent_model_values(self, solver):
+        # Minimal Golomb-ruler-style problem: Z3 proves objective 20 but returns x9=500.
+        # issue tracked in: https://github.com/CPMpy/cpmpy/issues/1036
+        # resolved in z3 version 5.0.0
+        n = 10
+        U = 500
+        x = cp.intvar(0, U, shape=n)
+        ds = [x[j] - x[i] for i in range(n) for j in range(i + 1, n)]
+        m = cp.Model([
+            x[0] == 0,
+            cp.IncreasingStrict(x),
+            cp.AllDifferent(ds),
+        ])
+        m.minimize(x[n - 1])
+
+        s = cp.SolverLookup.get("z3:opt", m)
+        assert s.solve()
+        assert s.status().exitstatus == ExitStatus.OPTIMAL
+        obj_bound = s.z3_solver.lower(s.obj_handle)
+        assert s.z3_solver.lower(s.obj_handle) == s.z3_solver.upper(s.obj_handle)
+        assert x[n - 1].value() == obj_bound
+
     def test_pow(self):
         iv1 = cp.intvar(2,9)
         for i in [0,1,2]:
@@ -727,6 +751,12 @@ class TestSolvers:
         s = cp.SolverLookup.get("cplex", m)
         assert s.solve()
 
+        x, y = cp.intvar(0, 10, shape=2)
+        m = cp.Model(x * y == 1)
+        s = cp.SolverLookup.get("cplex", m)
+        assert s.solve()
+        assert x.value() * y.value() == 1
+
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
@@ -788,6 +818,16 @@ class TestSolvers:
         # cannot supply proof in solve
         with pytest.raises(ValueError):
             s.solve(proof=proof_name)
+
+    @pytest.mark.requires_solver("pumpkin")
+    def test_pumpkin_indomain_expression(self, solver):
+        # InDomain on a non-variable expression (e.g. a sum) must be flattened 
+        # into an auxiliary variable before handing it to Pumpkin's native Table encoding
+        x = cp.intvar(0, 5, shape=3)
+        m = cp.Model(cp.InDomain(cp.sum(x), [2, 4]))
+        s = cp.SolverLookup.get(solver, m)
+        assert s.solve()
+        assert sum(xi.value() for xi in x) in (2, 4)
 
 
 @pytest.mark.usefixtures("solver")
@@ -1070,6 +1110,13 @@ class TestSupportedSolvers:
             pytest.skip("solver does not support this test context")
         if solver == 'cplex':
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
+
+        kwargs = dict()
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
+        else:
+            kwargs["solution_limit"] = 15
+            
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
@@ -1077,14 +1124,27 @@ class TestSupportedSolvers:
         m += x // y == d
         m += x % y == r
         sols = set()
-        solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        m.solveAll(solver=solver, **kwargs, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
             assert (cp.Division(xv, yv)).value() == dv
             assert (cp.Modulo(xv, yv)).value() == rv
 
+
+    def test_div_towards_zero(self, solver):
+        
+        x,y,z = cp.intvar(-10,10, shape=3)
+        cons = x // y == z
+        m = cp.Model(cons, x == -10, y == 3, z == -3)
+        assert m.solve(solver=solver)
+        
+        m = cp.Model(cons, x == 10, y == -3, z == -3)
+        assert m.solve(solver=solver)
+
+        m = cp.Model(cons, x == -10, y == -3, z == 3)
+        assert m.solve(solver=solver)
+        
 
     def test_status(self, solver):
 
@@ -1218,6 +1278,8 @@ class TestSupportedSolvers:
         kwargs = {}
         if solver in ("gurobi", "cplex"):
             kwargs["solution_limit"] = 10
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
         p, q = cp.boolvar(2)
         model = cp.Model(p.implies(3 * q == 2))
         assert model.solve(solver)
@@ -1239,7 +1301,7 @@ def test_objective_numexprs(solver, constraint):
 
         # Maximization
         model.maximize(constraint)
-        res = model.solve(solver=solver)
+        res = model.solve(solver=solver, time_limit=3)
         if res is True: # we found a solution
             assert constraint.value() > lb # assume solver finds a feasible sol with value higher than lb
     

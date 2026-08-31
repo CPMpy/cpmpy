@@ -247,14 +247,6 @@ class Expression(object):
             return 0, 1  # default for boolean expressions
         raise NotImplementedError(f"`get_bounds` is not implemented for type {self}")
 
-    def deepcopy(self, memodict={}):
-        """ DEPRECATED: use copy.deepcopy() instead
-
-        Will be removed in stable version.
-        """
-        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
-        return copy.deepcopy(self, memodict)
-
     def implies(self, other: BoolExprLike, simplify: bool = False) -> "Expression":
         """Implication constraint: ``self -> other``.
 

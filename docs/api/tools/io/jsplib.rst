@@ -1,4 +1,4 @@
-JSP-LIB (:mod:`cpmpy.tools.io.jsplib`)
+JSPLib (:mod:`cpmpy.tools.io.jsplib`)
 ======================================
 
 .. automodule:: cpmpy.tools.io.jsplib

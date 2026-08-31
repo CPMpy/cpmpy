@@ -360,7 +360,7 @@ class CPM_gcs(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
 
         # clear user vars if no solution found
-        if self._solve_return(self.cpm_status, self.objective_value_) is False:
+        if self._solve_return(self.cpm_status) is False:
             for var in self.user_vars:
                 var._value = None
 

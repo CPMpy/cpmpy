@@ -87,7 +87,7 @@
 import sys
 import warnings  # for deprecation warning
 import math
-from typing import Optional, Iterable, NoReturn, Final, cast
+from typing import Any, Optional, Iterable, NoReturn, Final, cast
 import numpy as np
 import cpmpy as cp
 
@@ -111,6 +111,16 @@ class GlobalFunction(Expression):
             bool: False, global functions are numeric
         """
         return False
+
+    def value(self) -> Optional[int]:
+        """
+        Returns whether the global function can be evaluated under the current variable assignment.
+
+        Returns:
+            Optional[int]: The numeric value when all variables within its scope are assigned;
+            None if any variable within its scope is unassigned.
+        """
+        raise NotImplementedError(f"`value` is not implemented for {self}")
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -137,8 +147,12 @@ class GlobalFunction(Expression):
 
     def decompose_comparison(self, cmp_op: str, cmp_rhs: Expression) -> tuple[list[Expression], list[Expression]]:
         """
-            DEPRECATED: returns a list of constraints representing the decomposed
-            comparison of the global function (and any auxiliary variables introduced).
+
+        .. deprecated:: 1.0.0
+            Please use :meth:`decompose` instead.
+
+        Returns a list of constraints representing the decomposed
+        comparison of the global function (and any auxiliary variables introduced).
 
         Arguments:
             cmp_op (str): Comparison operator
@@ -196,7 +210,7 @@ class Minimum(GlobalFunction):
     
     @property
     def args(self) -> tuple[int|Expression, ...]:
-        """ READ-ONLY, well-typed argument of this global function, no numpy ints"""
+        """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
     def value(self) -> Optional[int]:
@@ -258,7 +272,7 @@ class Maximum(GlobalFunction):
 
     @property
     def args(self) -> tuple[int|Expression, ...]:
-        """ READ-ONLY, well-typed argument of this global function, no numpy ints"""
+        """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
     def value(self) -> Optional[int]:
@@ -308,17 +322,22 @@ class Abs(GlobalFunction):
             expr (Expression): Expression of which to compute the absolute value
         """
         super().__init__("abs", (expr,))
+    
+    @property
+    def args(self) -> tuple[Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The absolute value of the argument, or None if the argument is not assigned
         """
-        varg = argval(self.args[0])
-        if varg is None:
+        val = self.args[0].value()
+        if val is None:
             return None
 
-        return abs(varg)
+        return abs(val)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -332,7 +351,7 @@ class Abs(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the expression representing the absolute value (may be the argument itself, its negation, or an auxiliary variable), and a list of constraints defining it (empty if no auxiliary variable is needed)
         """
         arg = self.args[0]
-        lb, ub = get_bounds(arg)
+        lb, ub = arg.get_bounds()
         if lb >= 0: # always positive
             return arg, []
         if ub <= 0: # always negative
@@ -348,7 +367,7 @@ class Abs(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the absolute value
         """
-        lb, ub = get_bounds(self.args[0])
+        lb, ub = self.args[0].get_bounds()
         if lb >= 0:
             return lb, ub
         if ub <= 0:
@@ -374,40 +393,47 @@ class Multiplication(GlobalFunction):
 
         Normalizes so a constant is first when one factor is numeric (sets .is_lhs_num).
         """
+        if not isinstance(y, Expression):
+            (x, y) = (y, x)
+            if not isinstance(y, Expression):
+                raise TypeError(f"Multiplication: expected at least one of the args to be an Expression, got: {type(y), type(x)}")
+
         is_lhs_num = False
         if is_int(x):
             is_lhs_num = True
-        elif is_int(y):
-            (x, y) = (y, x)
-            is_lhs_num = True
-        elif isinstance(x, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {x}")
-        elif isinstance(y, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {y}")
-
-        super().__init__("mul", (x, y))
+            if not isinstance(x, int):
+                x = int(x)
+        else:
+            if not isinstance(x, Expression):
+                raise TypeError(f"Multiplication only supports integers or Expressions, but got {x} of type {type(x)}")
+        
+        args: tuple[int|Expression, Expression] = (x, y)
+        super().__init__("mul", args)
         self.is_lhs_num = is_lhs_num
+    
+    @property
+    def args(self) -> tuple[int|Expression, Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
-    def update_args(self, args):
+    def update_args(self, args: Iterable[Any], has_subexpr: Optional[bool] = None):
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
         """
         x, y = args
         is_lhs_num = False
-        if is_int(x):
+        if isinstance(x, int):
             is_lhs_num = True
-        elif is_int(y):
+        elif isinstance(y, int):
             (x, y) = (y, x)
             is_lhs_num = True
-        elif isinstance(x, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {x}")
-        elif isinstance(y, (float, np.floating)):
-            raise TypeError(f"Multiplication does not support float constants, got: {y}")
+        if not isinstance(y, Expression):
+            raise TypeError(f"Multiplication: expected at least one of the args to be an Expression, got: {type(y), type(x)}")
 
-        super().update_args((x, y))
+        super().update_args((x, y), has_subexpr=has_subexpr)
         self.is_lhs_num = is_lhs_num
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         x, y = self.args
 
         if self.is_lhs_num:
@@ -422,16 +448,27 @@ class Multiplication(GlobalFunction):
         return super().__neg__()
 
     def value(self) -> Optional[int]:
-        x, y = argvals(self.args)
-        if x is None or y is None:
+        x, y = self.args
+        val_y = y.value()
+        if val_y is None:
             return None
-        return x * y
+
+        if isinstance(x, int):
+            return x * val_y
+        val_x = x.value()
+        if val_x is None:
+            return None
+        return val_x * val_y
 
     def get_bounds(self) -> tuple[int, int]:
         """Bounds of the product from bounds of the factors."""
-        lb1, ub1 = get_bounds(self.args[0])
-        lb2, ub2 = get_bounds(self.args[1])
-        candidates = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
+        x, y = self.args
+        lb_y, ub_y = y.get_bounds()
+        if isinstance(x, int):
+            candidates = [x*lb_y, x*ub_y]
+        else:
+            lb_x, ub_x = x.get_bounds()
+            candidates = [lb_x * lb_y, lb_x * ub_y, ub_x * lb_y, ub_x * ub_y]
         return min(candidates), max(candidates)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -444,21 +481,23 @@ class Multiplication(GlobalFunction):
         - If both int: take the factor with smallest domain, encode it with one bool per value, then
           decompose into b_i*other_int constraints and sum(i*z_i)
         """
-        from cpmpy.transformations.negation import recurse_negation
-
-        a, b = self.args[0], self.args[1]
-        if self.is_lhs_num:
+        a, b = self.args
+        if isinstance(a, int):
             # const*expr -> wsum([const], [expr])
             return Operator("wsum", ([a], [b])), []
-        a_bool, b_bool = is_boolexpr(a), is_boolexpr(b)
+        # else: a is Expression
+
+        a_bool, b_bool = a.is_bool(), b.is_bool()
         if a_bool and b_bool:
             # bool*bool with 0/1 semantics is logical AND
             return Operator("and", [a, b]), []
 
         if a_bool or b_bool:
+            from cpmpy.transformations.negation import recurse_negation
+
             # bool * int: z = bv*iv via (bv -> z==iv) & (~bv -> z==0)
             bv, iv = (a, b) if a_bool else (b, a)
-            lb_y, ub_y = get_bounds(iv)
+            lb_y, ub_y = iv.get_bounds()
             lb_z = min(0, lb_y)  # make sure it can take 0
             ub_z = max(0, ub_y)  # make sure it can take 0
             z = intvar(lb_z, ub_z)
@@ -466,13 +505,13 @@ class Multiplication(GlobalFunction):
                        recurse_negation(bv).implies(z == 0)]
 
         # let a be the one with the smallest domain, leading to the fewest auxiliariy variables
-        lb_a, ub_a = get_bounds(a)
-        lb_b, ub_b = get_bounds(b)
+        lb_a, ub_a = a.get_bounds()
+        lb_b, ub_b = b.get_bounds()
         if ub_b - lb_b + 1 < ub_a - lb_a + 1:
             a, b = b, a
             lb_a, lb_b = lb_b, lb_a
             ub_a, ub_b = ub_b, ub_a
-        dom_a = list[ExprLike](range(lb_a, ub_a + 1))
+        dom_a = list(range(lb_a, ub_a + 1))
 
         # int*int linear decomposition:
         # a*b == sum_v(v * (a==v)) * b  with 'v' in dom(a)
@@ -480,10 +519,10 @@ class Multiplication(GlobalFunction):
         #     == sum_v(v * z_v) and all_v( (a==v)->(z_v == b) & (a!=v)->(z_v == 0) )
 
         # encoding z_v == (a == v)*b via (a==v)->(z_v == b) & (a!=v)->(z_v == 0)
-        encoding = []
-        z_lb = min(0, lb_b) # make sure it can take 0
-        z_ub = max(0, ub_b) # make sure it can take 0
-        zs = cp.intvar(z_lb, z_ub, shape=(len(dom_a),))
+        encoding: list[Expression] = []
+        lb_z = min(0, lb_b) # make sure it can take 0
+        ub_z = max(0, ub_b) # make sure it can take 0
+        zs = cp.intvar(lb_z, ub_z, shape=(len(dom_a),))
         for v, z_v in zip(dom_a, zs):
             encoding.append((a == v).implies(z_v == b))
             encoding.append((a != v).implies(z_v == 0))
@@ -989,7 +1028,8 @@ class NDElement(GlobalFunction):
 
 def element(arg_list):
     """
-    DEPRECATED: Use Element(arr,idx) instead of element([arr,idx]).
+    .. deprecated:: 1.0.0
+        Please use :meth:`Element(arr,idx)` instead of :meth:`element([arr,idx])`.
 
     Arguments:
         arg_list (list[Expression]): List containing array and index (2 elements)
@@ -997,7 +1037,7 @@ def element(arg_list):
     Returns:
         Element: An Element global function instance
     """
-    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
 

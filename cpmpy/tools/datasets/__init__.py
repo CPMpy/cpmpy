@@ -27,6 +27,13 @@ List of datasets
 .. autosummary::
     :nosignatures:
 
+    JSPLibDataset
+    MaxSATEvalDataset
+    MIPLibDataset
+    NurseRosteringDataset
+    OPBDataset
+    PSPLibDataset
+    SATDataset
     XCSP3Dataset
 """
 
@@ -35,6 +42,13 @@ from .core import (
     FileDataset,
 )
 from .xcsp3 import XCSP3Dataset
+from .jsplib import JSPLibDataset
+from .psplib import PSPLibDataset
+from .miplib import MIPLibDataset
+from .mse import MaxSATEvalDataset
+from .opb import OPBDataset
+from .sat import SATDataset
+from .nurserostering import NurseRosteringDataset
 
 
 __all__ = [
@@ -43,5 +57,12 @@ __all__ = [
     "FileDataset",
     # Datasets
     "XCSP3Dataset",
+    "JSPLibDataset",
+    "PSPLibDataset",
+    "MIPLibDataset",
+    "MaxSATEvalDataset",
+    "OPBDataset",
+    "SATDataset",
+    "NurseRosteringDataset",
 ]
 

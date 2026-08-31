@@ -86,7 +86,7 @@ class CPM_cplex(SolverInterface):
     Documentation of the solver's own Python API:
     https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
-    supported_global_constraints = frozenset({"min", "max", "abs", "mul"})
+    supported_global_constraints = frozenset({"min", "max", "abs"})
 
     @staticmethod
     def supported():
@@ -467,6 +467,10 @@ class CPM_cplex(SolverInterface):
                         self.cplex_model.add_constraint(self.cplex_model.max(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'abs':
                         self.cplex_model.add_constraint(self.cplex_model.abs(self.solver_var(lhs.args[0])) == cplexrhs)
+                    elif lhs.name == 'mul': 
+                        raise ValueError("CPLEX only supports convex multiplication constraints, should be decomposed and linearized already. Please report on github.")
+                        cplexlhs = self._make_numexpr(lhs)
+                        self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                     else:
                         raise NotImplementedError(
                         "Not a known supported cplex comparison '{}' {}".format(lhs.name, con))

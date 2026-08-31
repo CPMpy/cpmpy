@@ -5,6 +5,13 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
 **Available datasets:**
 
 - :doc:`XCSP3Dataset </api/tools/datasets/xcsp3>`: XCSP3 competition benchmark instances for constraint satisfaction and optimization.
+- :doc:`JSPLibDataset </api/tools/datasets/jsplib>`: Job Shop Scheduling Problem benchmark library.
+- :doc:`PSPLibDataset </api/tools/datasets/psplib>`: Project Scheduling Problem Library (RCPSP) benchmark instances.
+- :doc:`MIPLibDataset </api/tools/datasets/miplib>`: Mixed Integer Programming Library benchmark instances.
+- :doc:`MaxSATEvalDataset </api/tools/datasets/mse>`: MaxSAT Evaluation competition benchmark instances.
+- :doc:`OPBDataset </api/tools/datasets/opb>`: Pseudo-Boolean Competition benchmark instances.
+- :doc:`SATDataset </api/tools/datasets/sat>`: SAT competition benchmark instances (DIMACS CNF).
+- :doc:`NurseRosteringDataset </api/tools/datasets/nurserostering>`: Nurse rostering benchmark instances.
 
 
 .. note::
@@ -17,6 +24,13 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
     Dataset (ABC)
     └── FileDataset (ABC)
         └── XCSP3Dataset
+        └── JSPLibDataset
+        └── PSPLibDataset
+        └── MIPLibDataset
+        └── MaxSATEvalDataset
+        └── OPBDataset
+        └── SATDataset
+        └── NurseRosteringDataset
         └── (your dataset here)
 
 Whilst the class hierarchy will support more exotic dataset types in the future, with a structure put in place 
@@ -105,7 +119,7 @@ import pathlib
 import io
 import sys
 import tempfile
-from typing import Any, Optional, Tuple, List, Dict, Iterator, Callable, ClassVar
+from typing import Any, Optional, Tuple, List, Iterator, Callable, ClassVar, Union
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
 
@@ -196,7 +210,7 @@ class Dataset(ABC):
         pass
 
     @abstractmethod
-    def instance_metadata(self, instance: Any) -> Dict[str, Any]:
+    def instance_metadata(self, instance: Any) -> dict[str, Any]:
         """
         Return the metadata for a given instance.
 
@@ -214,7 +228,7 @@ class Dataset(ABC):
     # ---------------------------------------------------------------------------- #
 
     @classmethod
-    def dataset_metadata(cls) -> Dict[str, Any]:
+    def dataset_metadata(cls) -> dict[str, Any]:
         """
         Return dataset-level metadata as a dictionary.
 
@@ -363,12 +377,10 @@ class FileDataset(Dataset):
 
 
     @abstractmethod
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         """
-        Labels to distinguish instances into categories matching to those of the dataset.
-        E.g.
-            - year
-            - track
+        Labels to distinguish instances into categories matching to those of the dataset,
+        e.g. ``year`` or ``track``.
         """
         pass
 
@@ -384,7 +396,7 @@ class FileDataset(Dataset):
     #                        Methods to optionally overwrite                       #
     # ---------------------------------------------------------------------------- #
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Provide domain-specific instance metadata.
         Called once after download for each instance.
@@ -450,7 +462,7 @@ class FileDataset(Dataset):
     # ---------------------------------------------------------------------------- #
 
 
-    def instance_metadata(self, instance: os.PathLike) -> Dict[str, Any]:
+    def instance_metadata(self, instance: os.PathLike) -> dict[str, Any]:
         """
         Return the metadata for a given instance file.
 
@@ -507,10 +519,22 @@ class FileDataset(Dataset):
         """
         return len(self._list_instances())
 
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+    def __getitem__(self, index: Union[int, str]) -> Tuple[Any, Any]:
         """
         Return the instance and metadata at the given index.
+
+        Arguments:
+            index (Union[int, str]): The index or name (without extension) of the instance to return.
+
+        Returns:
+            Tuple[Any, Any]: The instance and metadata.
         """
+        if isinstance(index, str):
+            try:
+                index = [f.name[:-len(self.extension)] if len(self.extension) > 0 else f.name for f in self._list_instances()].index(index)
+            except ValueError:
+                raise ValueError(f"Instance '{index}' not found in dataset")
+
         if index < 0 or index >= len(self):
             raise IndexError("Index out of range")
 
@@ -605,7 +629,7 @@ class FileDataset(Dataset):
             # Build structured, self-contained sidecar. Let exceptions from
             # collect_instance_metadata() propagate: a failure signals a corrupt
             # instance or a bug, which should surface rather than be buried.
-            sidecar: Dict[str, Any] = {
+            sidecar: dict[str, Any] = {
                 "dataset": self.dataset_metadata(),
                 "instance_name": self._instance_name(file_path),
                 "source_file": str(file_path.relative_to(self.dataset_dir)),
@@ -738,7 +762,7 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
         def __init__(self, dataset_dir: os.PathLike, extension: str = ".txt"):
             super().__init__(dataset_dir=dataset_dir, extension=extension)
 
-        def categories(self) -> Dict[str, Any]:
+        def categories(self) -> dict[str, Any]:
             return {}
 
         def download(self):

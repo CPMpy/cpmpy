@@ -91,11 +91,12 @@ def load_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins
     Loads an XCSP3 instance (.xml or .xml.lzma) and returns its matching CPMpy model.
 
     Arguments:
-        xcsp3 (str or os.PathLike):
-            - A file path to an WCNF file (optionally LZMA-compressed with `.lzma`)
-            - OR a string containing the WCNF content directly
+        xcsp3 (str or os.PathLike or TextIO):
+            - A file path to an XML file (optionally LZMA-compressed with `.lzma`), or
+            - A string containing the XML content directly, or
+            - A TextIO object already open for reading
         open: (callable):
-            If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
+            If xcsp3 is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         The XCSP3 instance loaded as a CPMpy model.
@@ -107,19 +108,19 @@ def load_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins
 
         
 def main():
-    parser = argparse.ArgumentParser(description="Parse and solve a WCNF model using CPMpy")
-    parser.add_argument("model", help="Path to a WCNF file (or raw WCNF string if --string is given)")
+    parser = argparse.ArgumentParser(description="Parse and solve a XCSP3 model using CPMpy")
+    parser.add_argument("model", help="Path to a XCSP3 file (or raw XCSP3 string if --string is given)")
     parser.add_argument("-s", "--solver", default=None, help="Solver name to use (default: CPMpy's default)")
-    parser.add_argument("--string", action="store_true", help="Interpret the first argument (model) as a raw WCNF string instead of a file path")
+    parser.add_argument("--string", action="store_true", help="Interpret the first argument (model) as a raw XCSP3 string instead of a file path")
     parser.add_argument("-t", "--time-limit", type=int, default=None, help="Time limit for the solver in seconds (default: no limit)")
     args = parser.parse_args()
 
     # Build the CPMpy model
     try:
         if args.string:
-            model = read_xcsp3(args.model)
+            model = load_xcsp3(args.model)
         else:
-            model = read_xcsp3(os.path.expanduser(args.model))
+            model = load_xcsp3(os.path.expanduser(args.model))
     except Exception as e:
         sys.stderr.write(f"Error reading model: {e}\n")
         sys.exit(1)

@@ -73,8 +73,10 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :func:`cpmpy.transformations.reification.reify_rewrite`
     E.g. ``bv -> NumExpr <comp> Var/Const`` will then be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
     """
-    assert _toplevel is None, "decompose_in_tree: argument '_toplevel' is deprecated, do not use/modify it"
-    assert nested is False, "decompose_in_tree: argument 'nested' is deprecated, do not use/modify it"
+    if _toplevel is not None:
+        warnings.warn("decompose_in_tree: argument '_toplevel' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
+    if nested:
+        warnings.warn("decompose_in_tree: argument 'nested' is deprecated and will be ignored, do not use/modify it", DeprecationWarning)
 
     if supported is None:
         supported = frozenset[str]()

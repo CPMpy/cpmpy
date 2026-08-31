@@ -47,30 +47,34 @@ def load_jsplib(jsp: Union[str, os.PathLike, TextIO], open:Callable=builtins.ope
     Returns:
         cp.Model: The CPMpy model of the JSPLib instance.
     """
-    with _handle_loader_input(jsp, open=open) as f:
-        task_to_machines, task_durations = _parse_jsplib(f)
+    task_to_machines, task_durations = _parse_jsplib(jsp, open=open)
     model, (start, makespan) = _model_jsplib(task_to_machines=task_to_machines, task_durations=task_durations)
     return model
 
 
-def _parse_jsplib(f: TextIO) -> tuple[np.ndarray, np.ndarray]:
+def _parse_jsplib(instance: Union[str, os.PathLike, TextIO], open: Callable = builtins.open) -> tuple[np.ndarray, np.ndarray]:
     """
     Parse a JSPLib instance file
 
     Arguments:
-        f (TextIO): The file to parse.
+        instance (str or os.PathLike or TextIO):
+            - A file path to a JSPLib file, or
+            - A string containing the JSPLib content directly, or
+            - A TextIO object already open for reading
+        open (Callable):
+            If instance is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         tuple[np.ndarray, np.ndarray]: Two matrices:
             - task to machines indicating on which machine to run which task
             - task durations: indicating the duration of each task
     """
-
-    line = f.readline()
-    while line.startswith("#"):
+    with _handle_loader_input(instance, open=open) as f:
         line = f.readline()
-    n_jobs, n_tasks = map(int, line.strip().split(" "))
-    matrix = np.fromstring(f.read(), sep=" ", dtype=int).reshape((n_jobs, n_tasks*2))
+        while line.startswith("#"):
+            line = f.readline()
+        n_jobs, n_tasks = map(int, line.strip().split(" "))
+        matrix = np.fromstring(f.read(), sep=" ", dtype=int).reshape((n_jobs, n_tasks*2))
 
     task_to_machines = np.empty(dtype=int, shape=(n_jobs, n_tasks))
     task_durations = np.empty(dtype=int, shape=(n_jobs, n_tasks))
@@ -102,9 +106,11 @@ def _model_jsplib(task_to_machines: np.ndarray, task_durations: np.ndarray) -> t
 
     n_jobs, n_tasks = task_to_machines.shape
 
-    start = cp.intvar(0, task_durations.sum(), name="start", shape=(n_jobs,n_tasks)) # extremely bad upperbound... TODO
-    end = cp.intvar(0, task_durations.sum(), name="end", shape=(n_jobs,n_tasks)) # extremely bad upperbound... TODO
-    makespan = cp.intvar(0, task_durations.sum(), name="makespan") # extremely bad upperbound... TODO
+    horizon = task_durations.sum() # TODO: improve with better upper bound?
+
+    start = cp.intvar(0, horizon, name="start", shape=(n_jobs,n_tasks))
+    end = cp.intvar(0, horizon, name="end", shape=(n_jobs,n_tasks))
+    makespan = cp.intvar(0, horizon, name="makespan") 
 
     model = cp.Model()
     model.add(end[:,:-1] <= start[:,1:]) # precedences
