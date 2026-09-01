@@ -92,17 +92,19 @@ class TestMus:
         
     def test_decomposed_global(self, solver):
 
-        if solver == "cpo":
-            pytest.skip("CPO does not support hard constraints")
-
         x = cp.intvar(1, 5, shape=3, name="x")
-        soft = [x[0] == x[1], x[1] == x[2]]
-        hard = [cp.AllDifferent(x)]
+        cons = cp.AllDifferent(x)
+        cons.name = "DummyAllDiff" # nonexisting name, force decompos
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
-        assert len(set(mus_cons)) == 1
-        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
-        assert len(set(mus_naive_cons)) == 1
+
+        soft = [cons, x[0] == x[1], x[1] == x[2]]
+
+        mus_cons = self.mus_func(soft=soft, hard=[], solver=solver)
+        assert len(set(mus_cons)) == 2
+        assert "DummyAllDiff(x[0],x[1],x[2])" in set(map(str, mus_cons))
+        mus_naive_cons = self.naive_func(soft=soft, hard=[])
+        assert len(set(mus_naive_cons)) == 2
+        assert "DummyAllDiff(x[0],x[1],x[2])" in set(map(str, mus_cons))
 
     def single_soft_constraint(self, solver):
         x = cp.intvar(1, 2, shape=3, name="x")
