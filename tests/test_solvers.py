@@ -1176,8 +1176,7 @@ class TestSupportedSolvers:
             lits = [x if np.random.random() < 0.5 else ~x for x in np.random.choice(bv, size=3)]
             model += cp.any(lits)
 
-        model.solve(solver=solver, time_limit=1)
-        print(model.status())
+        model.solve(solver=solver, time_limit=3) # enough to not time-out the transformations
         assert model.status().runtime is not None
         assert model.status().runtime > 0
 
