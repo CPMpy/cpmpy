@@ -94,12 +94,32 @@ class TestMus:
         mus_naive_cons = self.naive_func(soft=soft, hard=hard)
         assert len(set(mus_naive_cons)) == 1
 
+    def test_cse_shared_subexpr(self, solver):
+        """Example with CSE in the defining constraints.
+
+        Reproducer from https://github.com/CPMpy/cpmpy/pull/986
+        """
+        x = cp.intvar(-10, 10, name="x")
+        y = cp.intvar(-10, 10, name="y")
+        soft = [
+            cp.abs(x) + y <= 15,  # satisfiable, not needed for the conflict
+            cp.abs(x) + y >= 11,  # the real conflict with hard
+        ]
+        hard = [x == 0]
+
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
+        assert set(mus_cons) == {soft[1]}
+        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
+        assert set(mus_naive_cons) == {soft[1]}
+
 @pytest.mark.requires_solver("exact", "gurobi", "cplex")
 class TestNativeMus(TestMus):
     def setup_method(self):
         solver = None
         self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
+
+
 
 
 @pytest.mark.requires_solver("exact")

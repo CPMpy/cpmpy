@@ -580,6 +580,11 @@ class CPM_gurobi(SolverInterface):
 
         # instantiate Gurobi solver
         s = cls()
+        # Disable CSE: a shared csemap would attach defining constraints
+        # (e.g. IV == abs(x)) to the first soft that created them. Later
+        # softs reuse IV without the definition, so any MUS involving them
+        # must also keep that first soft. See https://github.com/CPMpy/cpmpy/pull/986.
+        s._csemap = None
 
         # collect the Gurobi constraint objects
         grb_hard_cons = []
