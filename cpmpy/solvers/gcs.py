@@ -50,6 +50,8 @@
 
         CPM_gcs
 """
+import os
+import time
 import warnings
 from typing import Optional, Callable, Iterable, Any
 
@@ -57,7 +59,7 @@ from packaging.version import Version
 
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
-from ..exceptions import NotSupportedError, GCSVerificationException
+from ..exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, ExprLike, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl, NegBoolView, boolvar
@@ -70,12 +72,6 @@ from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
-
-# For proof file handling and verifying
-import sys
-from os import path
-from shutil import which
-import subprocess
 
 class CPM_gcs(SolverInterface):
     """
@@ -125,7 +121,7 @@ class CPM_gcs(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None):
         """
         Constructor of the native solver object
 
@@ -143,8 +139,8 @@ class CPM_gcs(SolverInterface):
         # initialise the native solver object
         self.gcs = gcspy.GCS()
         self.objective_var = None
-        self.proof_location = None
-        self.proof_name = None
+        self._proof = proof
+
         self.proof_check_timeout = True
         self.veripb_return_code = False
 
@@ -161,8 +157,7 @@ class CPM_gcs(SolverInterface):
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
-              verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
 
@@ -172,49 +167,43 @@ class CPM_gcs(SolverInterface):
                                                 either a list of CPMpy expressions, OR a callback function which
                                                 gets called after the variable-value mapping of the intermediate solution.
                                                 default/None: nothing is displayed
-                prove:                          whether to produce a VeriPB proof (.opb model file and .pbp proof file).
-                proof_name:                     name for the the proof files.
-                proof_location:                 location for the proof files (default to current working directory).
-                verify:                         whether to verify the result of the solve run (overrides prove if prove is False)
-                verify_time_limit:              time limit for verification (ignored if verify=False)
-                veripb_args:                    list of command line arguments to pass to veripb e.g. ``--trace --useColor`` (run ``veripb --help`` for a full list)
-                display_verifier_output:        whether to print the output from VeriPB
                 **kwargs:                       currently GCS does not support any additional keyword arguments.
 
             Returns:
                 whether a solution was found.
         """
+        if "proof" in kwargs or "prove" in kwargs or "proof_location" in kwargs or "proof_name" in kwargs:
+            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve."
+                             "`cpmpy.SolverLookup.get('gcs', model, proof='path/to/proof')`")
+        if "verify" in kwargs or "verify_time_limit" in kwargs or "veripb_args" in kwargs or "display_verifier_output" in kwargs:
+            raise ValueError("Proof-verification is only supported through the `verify()` method, not as a keyword argument to solve.")
+
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
 
         callback = None
         if display is not None:
             callback = self._get_callback(display)
-
-        # If we're verifying we must be proving
-        prove |= verify
-        # Set default proof name to name of file containing __main__
-        if prove and proof_name is None:
-            main_file = sys.modules['__main__'].__file__
-            if main_file is not None:
-                self.proof_name = path.splitext(path.basename(main_file))[0]
-            else:
-                self.proof_name = "gcs_proof"
-        else:
-            self.proof_name = proof_name
-        self.proof_location = proof_location
      
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        # call the solver, with parameters
+        if self._proof is not None:
+            proof_location, proof_name = os.path.split(self._proof)
+            if proof_location == "":
+                proof_location = "."
+        else:
+            proof_name = None
+            proof_location = None
+
+        # call the solver, with parameters    
         self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
             timeout=time_limit,
             callback=callback,
-            prove=prove,
-            proof_name=self.proof_name,
+            prove=self._proof is not None,
+            proof_name=proof_name,
             proof_location=proof_location,
             **kwargs)
 
@@ -255,20 +244,6 @@ class CPM_gcs(SolverInterface):
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
-
-        # Verify proof, if requested
-        if verify:
-
-            # set time limit
-            if verify_time_limit is not None:
-                if verify_time_limit <= 0:
-                    raise ValueError("Time limit for verifying must be positive")
-
-            self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit,
-                        veripb_args=veripb_args, display_output=display_verifier_output)
-            
-            if self.veripb_return_code > 0:
-                raise GCSVerificationException("Glasgow Constraint Solver: Proof failed to verify.")
             
         return has_sol
 
@@ -292,9 +267,7 @@ class CPM_gcs(SolverInterface):
 
         return callback
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False,
-                 prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
-                 verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Run the Glasgow Constraint Solver, and get a number of solutions, with optional solution callbacks. 
 
@@ -304,46 +277,47 @@ class CPM_gcs(SolverInterface):
                 solution_limit:                 stop after this many solutions (default: None)
                 time_limit (float, optional):   maximum solve time in seconds (default: None)
                 call_from_model:                whether the method is called from a CPMpy Model instance or not
-                prove:                          whether to produce a VeriPB proof (.opb model file and .pbp proof file).
-                proof_name:                     name for the the proof files.
-                proof_location:                 location for the proof files (default to current working directory).
-                verify:                         whether to verify the result of the solve run (overrides prove if prove is False)
-                verify_time_limit:              time limit for verification (ignored if verify=False)
-                veripb_args:                    list of command line arguments to pass to veripb e.g. ``--trace --useColor`` (run ``veripb --help`` for a full list)
-                display_verifier_output:        whether to print the output from VeriPB
                 **kwargs:                       currently GCS does not support any additional keyword arguments.
 
             Returns:
                 number of solutions found
         """
+        if "proof" in kwargs or "prove" in kwargs or "proof_location" in kwargs or "proof_name" in kwargs:
+            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solveAll."
+                             "`cpmpy.SolverLookup.get('gcs', model, proof='path/to/proof')`")
+        if "verify" in kwargs or "verify_time_limit" in kwargs or "veripb_args" in kwargs or "display_verifier_output" in kwargs:
+            raise ValueError("Proof-verification is only supported through the `verify()` method, not as a keyword argument to solveAll.")
+
         if self.has_objective():
             raise NotSupportedError("Glasgow Constraint Solver: does not support finding all optimal solutions.")
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-         # If we're verifying we must be proving
-        prove |= verify
-        # Set default proof name to name of file containing __main__
-        if prove and proof_name is None:
-            main_file = sys.modules['__main__'].__file__
-            if main_file is not None:
-                self.proof_name = path.splitext(path.basename(main_file))[0]
-            else:
-                self.proof_name = "gcs_proof"
-        self.proof_location = proof_location
-
         sol_callback = None
         if display is not None:
             sol_callback=self._get_callback(display)
+
+        # set time limit
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+
+        if self._proof is not None:
+            proof_location, proof_name = os.path.split(self._proof)
+            if proof_location == "":
+                proof_location = "."
+        else:
+            proof_name = None
+            proof_location = None
 
         self.gcs_result = self.gcs.solve(
             all_solutions=True, 
             timeout=time_limit, 
             solution_limit=solution_limit, 
             callback=sol_callback, 
-            prove=prove, 
-            proof_name=proof_name, 
-            proof_location=proof_location, **kwargs)
+            prove=self._proof is not None,
+            proof_name=proof_name,
+            proof_location=proof_location,
+            **kwargs)
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
@@ -363,11 +337,6 @@ class CPM_gcs(SolverInterface):
         if self._solve_return(self.cpm_status) is False:
             for var in self.user_vars:
                 var._value = None
-
-        # Verify proof, if requested
-        if verify:
-            self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 
-                        veripb_args=veripb_args, display_output=display_verifier_output)
 
         return num_sols
 
@@ -501,54 +470,6 @@ class CPM_gcs(SolverInterface):
         # e.g. (x > 3) -> constraint could in principle be supported in the future.
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         return cpm_cons
-
-    def verify(self, name=None, location=".", time_limit=None, display_output=False, veripb_args=[]):
-        """
-        Verify a solver-produced proof using VeriPB.
-
-        Requires that the 'veripb' tool is installed and on system path. 
-        See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions.
-
-        Arguments:
-            - name:             name for the the proof files (default to self.proof_name)
-            - location:         location for the proof files (default to current working directory).
-            - time_limit:       time limit for verification (ignored if verify=False) 
-            - veripb_args:      list of command line arguments to pass to veripb e.g. ``--trace --useColor`` (run ``veripb --help`` for a full list)
-            - display_output:   whether to print the output from VeriPB
-        """
-        if not which("veripb"):
-            raise Exception("Unable to run VeriPB: check it is installed and on system path - see https://gitlab.com/MIAOresearch/software/VeriPB#installation.")
-
-        if name is None:
-            name = self.proof_name
-        
-        if name is None: # Still None?
-            raise ValueError("No proof to verify")
-        
-        if not isinstance(veripb_args, list):
-            raise ValueError("veripb_args should be a list")
-        
-        opb_file = path.join(location, name +".opb")
-        pbp_file = path.join(location, name +".pbp")
-
-        if not path.isfile(opb_file):
-            raise FileNotFoundError("Can't find " + opb_file)
-        if not path.isfile(pbp_file):
-            raise FileNotFoundError("Can't find " + pbp_file)
-        
-        try:
-            result = subprocess.run(["veripb"] + veripb_args + [opb_file, pbp_file], 
-                                    capture_output=True, text=True, timeout=time_limit)
-            self.proof_check_timeout = False
-            self.veripb_return_code = result.returncode
-            if display_output:
-                print(result.stdout)
-                print(result.stderr)
-        except subprocess.TimeoutExpired:
-            self.proof_check_timeout = True
-            self.veripb_return_code = 0
-
-        return self.veripb_return_code
     
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_gcs":
         """
@@ -755,6 +676,44 @@ class CPM_gcs(SolverInterface):
 
         return self
     __add__ = add  # avoid redirect in superclass
+
+
+    def verify(self, verifier: str = "veripb", verifier_args: list[str] = [], time_limit: Optional[float] = None, display_output: bool = False):
+        """
+        Verify the last solver-generated proof using an external checker.
+        Proof files are retrieved through the get_proof_files helper.
+
+        Saves a `verify_status` attribute to the solver instance with the result and statistics of the verification run as a dictionary.
+        See :func:`verify_prooflog` for more details.
+
+        Arguments:
+            - verifier (str):           name or path of the proof checker executable (must be on the system path if a name) (default: veripb)
+            - time_limit (float):       time limit for verification (default: None)
+            - display_output (bool):    whether to print the output from the checker (default: False)
+            - verifier_args (list[str]):  extra command line arguments to pass to the checker (default: [])
+
+        Returns:
+            bool: True if the proof is valid, False otherwise.
+        """
+        from ..tools.verify import verify_prooflog # avoid circular import
+
+        opb_file, pbp_file, _varmap = self.get_proof_files()
+        self.verify_status = verify_prooflog(verifier, [opb_file, pbp_file],
+                                          time_limit=time_limit,
+                                          display_output=display_output,
+                                          verifier_args=verifier_args)
+        return self.verify_status["result"]
+
+    def get_proof_files(self) -> tuple[str,str,str]:
+        """
+        Returns a tuple with the proof files generated during the last solve call.
+        - opb file
+        - veripb proof file
+        - varmap linking Boolean variables to CP variables
+        """
+        if self._proof is None:
+            raise ValueError("No proof file generated, set `proof=<proof_name>` in the constructor and call solve() before calling verify()")
+        return (f"{self._proof}.opb", f"{self._proof}.pbp", f"{self._proof}.varmap")
 
 
         
