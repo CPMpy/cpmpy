@@ -757,13 +757,14 @@ class CPM_cpo(SolverInterface):
         refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
         assert refine_res.is_conflict(), "MUS: model must be UNSAT"
 
-        mus_idxs = {
-            native_to_soft_idx[native_con]
-            for native_con in (refine_res.get_member_constraints()
-                               + refine_res.get_possible_constraints())
-            if native_con in native_to_soft_idx
-        }
-        return [soft_cons[i] for i in mus_idxs]
+        core = []
+        cpo_core = refine_res.get_member_constraints()
+
+        for cpo_con in cpo_core:
+            soft_idx = native_to_soft_idx[cpo_con]
+            core.append(soft_cons[soft_idx])
+
+        return core
 
 
 # solvers are optional, so this file should be interpretable
