@@ -170,7 +170,7 @@ class TestWeightedSum:
     def test_reject_float_coefficients(self):
         m = cp.Model()
         x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        with pytest.raises(CPMpyTypeError, match="float constants"):
+        with pytest.raises(CPMpyTypeError, match="integers or Expressions"):
             m.add(0.7 * x + 0.8 * y >= 1)
 
     def test_floatsum_objective_only(self):
