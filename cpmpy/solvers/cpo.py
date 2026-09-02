@@ -741,10 +741,9 @@ class CPM_cpo(SolverInterface):
             raise ValueError("CP Optimizer does not support hard constraints for MUS extraction. " \
             "Please only use soft constraints or a different solver.")
 
-        # Disable CSE: a shared csemap would attach defining constraints
-        # (e.g. IV == abs(x)) to the first soft that created them. Later
-        # softs reuse IV without the definition, so any MUS involving them
-        # must also keep that first soft. See https://github.com/CPMpy/cpmpy/pull/986.
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
         s._csemap = None
 
         native_to_soft_idx = {}
