@@ -11,7 +11,7 @@ Prefer `python -m pip` / `python -m pytest` / `python -m mypy` so tools share th
 
 ## What this repo is
 
-CPMpy is a constraint modeling library (`import cpmpy as cp`). Typical flow: users build **expressions**, put them in a **Model**, then a **solver** **transforms** those expressions into forms it supports and posts them to the backend API.
+CPMpy is a constraint modeling library (`import cpmpy as cp`). Typical flow: users build **expressions**, put them in a **Model**, then a **solver** interface **transforms** those expressions into forms the solver supports and posts them to the backend API.
 
 | Area | Path | Notes |
 |------|------|--------|
@@ -21,7 +21,7 @@ CPMpy is a constraint modeling library (`import cpmpy as cp`). Typical flow: use
 | Expressions | `cpmpy/expressions/` | Variables, operators, globals |
 | Transformations | `cpmpy/transformations/` | Copy-on-write rewrites |
 | Solvers | `cpmpy/solvers/` | `CPM_<name>` interfaces |
-| Tools | `cpmpy/tools/` | Use CPMpy; not part of the core |
+| Tools | `cpmpy/tools/` | Tools that use CPMpy; not part of the core |
 | CLI | `cpmpy/cli.py` | `cpmpy version` and related entry points |
 | Tests | `tests/` | pytest |
 | Docs | `docs/` | Sphinx; publishes to readthedocs |
@@ -32,10 +32,10 @@ Public API is re-exported from `cpmpy/__init__.py`. Prefer `import cpmpy as cp` 
 
 ### Import map (library work)
 
-- Variables: `cpmpy.expressions.variables` (`boolvar`, `intvar`, `cpm_array`, `NegBoolView`, …). Names with a leading `_` (e.g. `_BoolVarImpl`) are private — do not use them from outside the package.
+- Variables: `cpmpy.expressions.variables` (`boolvar`, `intvar`, `cpm_array`, `NegBoolView`, …). Names with a leading `_` (e.g. `_BoolVarImpl`) are private — do not use them unless strictly necessary and where existing code already uses them. Use `boolvar` or `intvar` instead in examples and tests
 - Core expr: `cpmpy.expressions.core` (`Expression`, `Comparison`, `Operator`, `BoolVal`, …)
 - Globals: `globalconstraints.py` / `globalfunctions.py` (each global should implement `decompose()`; solvers may still post some natively via `supported_global_constraints`)
-- Builtins: `python_builtins.py` (`cp.sum`, `cp.all`, …)
+- Builtins: `python_builtins.py` (`cp.sum`, `cp.all`, …). Use these when building expressions (e.g. sum over decision variables)
 - Helpers: `expressions.utils` (`is_int`, `is_any_list`, `eval_comparison`, …)
 - Solvers: `SolverInterface` / `SolverLookup` in `solvers/`
 - Never import an optional solver package at module top level — only inside `supported()` and methods that need it
@@ -56,7 +56,7 @@ Canonical examples:
 
 `toplevel_list` → `no_partial_functions` → `push_down_negation` → `decompose_linear` → `simplify_boolean` → `flatten_constraint` → `linearize_reified_variables` → `only_bv_reifies` → `only_implies` → `linearize_constraint` → `int2bool` → `only_positive_coefficients`
 
-Shared early pattern across many solvers: normalize → safen → push negations → decompose unsupported globals → flatten; then solver-specific reification / comparison / linearize / int2bool steps.
+Shared early pattern across many solvers: normalize to list of constraints → eliminate partials → push negations → decompose unsupported globals → flatten; then solver-specific reification / comparison / linearize / int2bool steps.
 
 New solvers: copy `solvers/TEMPLATE.py`, follow `docs/adding_solver.md` (including registration in `SolverLookup.base_solvers()`, `solvers/__init__.py`, docs, and CI where applicable).
 
@@ -64,7 +64,7 @@ New solvers: copy `solvers/TEMPLATE.py`, follow `docs/adding_solver.md` (includi
 
 - Prefer small, focused diffs. No drive-by refactors.
 - Base PRs on current `master`. Only documentation changes land directly on `master`; everything else goes through a PR.
-- PRs must pass the test suite and mypy (`mypy cpmpy tests`, see `.github/workflows/python-linting.yml`). Bugfixes should include a regression test (typically the bug-report case).
+- PRs must pass the test suite and mypy (`mypy cpmpy tests`, see `.github/workflows/python-linting.yml`). When the PR is a bugfix, it should include a regression test (typically the bug-report case). Feature PRs should add test cases to cover all edge-cases as well.
 - WIP PRs are fine — most changes go through at least one review iteration.
 - If something should be usable as `cp.*`, re-export it from `cpmpy/__init__.py`. User-facing behavior changes should update Sphinx docs under `docs/` as well.
 - Do not git commit unless the user asks.
@@ -94,7 +94,7 @@ Public functions and methods should have type hints on arguments and return valu
 
 ### Docstrings
 
-Document non-obvious code: clarifying line comments where needed, plus docstrings on methods, classes, and modules. Google-ish layout (`cpmpy/model.py` is the reference):
+Document non-obvious code: clarifying line comments only where needed, plus docstrings on methods, classes, and modules. Google-ish layout (`cpmpy/model.py` is the reference):
 
 ```
 Description of the method
@@ -126,7 +126,7 @@ m.maximize(cp.sum(x))
 assert m.solve()
 ```
 
-- Integers only (no floats/fractions).
+- Integers and Booleans only (no floats/fractions).
 - Use CPMpy builtins for vectorized ops (`cp.sum`, `cp.any`, …).
 - Prefer global constraints/functions when they fit.
 - To index non-NDVarArrays with an expression, use `cp.cpm_array(...)[idx]`.
