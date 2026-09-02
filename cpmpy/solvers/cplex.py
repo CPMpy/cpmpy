@@ -746,7 +746,7 @@ class CPM_cplex(SolverInterface):
         for conflict in refine_res.iter_conflicts():
             if conflict.status in conflict_statuses:
                 soft_idx = native_to_soft_idx.get(conflict.element)
-                if soft_idx is not None:
+                if soft_idx is not None: # exclude hard constraints
                     mus_idxs.add(soft_idx)
 
         return [soft_cons[i] for i in sorted(mus_idxs)]
