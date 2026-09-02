@@ -704,10 +704,9 @@ class CPM_cplex(SolverInterface):
         
         soft_cons = toplevel_list(soft, merge_and=False)
         s = cls()
-        # Disable CSE: a shared csemap would attach defining constraints
-        # (e.g. IV == abs(x)) to the first soft that created them. Later
-        # softs reuse IV without the definition, so any MUS involving them
-        # must also keep that first soft. See https://github.com/CPMpy/cpmpy/pull/986.
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
         s._csemap = None
         model = s.native_model
         groups = []
