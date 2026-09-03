@@ -15,20 +15,41 @@
 """
 
 import copy
+from typing import Optional
+from cpmpy.transformations.cse import CSEMap
 from .flatten_model import get_or_make_var
-from ..expressions.core import Comparison, Operator
+from ..expressions.core import Comparison, Operator, Expression
 from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
-def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
+def only_numexpr_equality(constraints: list[Expression], supported=frozenset(), csemap: Optional[CSEMap]=None) -> list[Expression]:
     """
-        Transforms ``NumExpr <op> IV`` to ``(NumExpr == A) & (A <op> IV)`` if not supported.
-        Also for the reified uses of `NumExpr`
+    Transforms unsupported non-equality comparisons of numeric expressions into an equality
+    plus a comparison over an auxiliary variable.
 
-        :param supported:  a (frozen)set of expression names that supports all comparisons in the solver
+    In **Flat Normal Form**, numeric comparisons have the form ``NumExpr <op> IV``
+    (or a reification thereof). Solvers that only support ``NumExpr == IV`` need the
+    remaining operators rewritten. For example, ``max(x, y, z) < p`` becomes
+    ``[max(x, y, z) == iv, iv < p]``.
+
+    Also applied to reified comparisons:
+
+    - ``BoolVar -> (NumExpr <op> IV)`` :: ``BoolVar -> (NumExpr == A) & (A <op> IV)``
+    - ``(NumExpr <op> IV) -> BoolVar`` :: ``(NumExpr == A) & (A <op> IV) -> BoolVar``
+    - ``BoolVar == (NumExpr <op> IV)`` :: ``BoolVar == (NumExpr == A) & (A <op> IV)``
+
+    Accepts a list of CPMpy expressions as input and returns a (new) list of CPMpy expressions.
+    Input is expected to be free of partial functions and in Flat Normal Form
+    (after :func:`~cpmpy.transformations.safening.no_partial_functions` and :func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
+    Output will also be in Flat Normal Form.
+
+    Arguments:
+        constraints (list[Expression]): list of CPMpy expressions
+        supported (set[str]): names of numeric expressions that support all comparison operators
+        csemap (Optional[CSEMap]): csemap
     """
 
-    newlist = []
+    newlist: list[Expression] = []
     for cpm_expr in constraints:
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
@@ -46,9 +67,10 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                 cpm_expr = copy.copy(cpm_expr) # shallow copy
                 args = list(cpm_expr.args)
                 args[idx] = new_arg                
-                cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
+                cpm_expr.update_args(args, has_subexpr=cpm_expr.has_subexpr())
             
-            newlist += [cpm_expr] + new_cons
+            newlist.append(cpm_expr)
+            newlist.extend(new_cons)
 
             
         elif isinstance(cpm_expr, Comparison):
@@ -62,40 +84,50 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                     newlist.append(cpm_expr)
                     continue
 
-                # identical to the above, but keep for readability?
+                # identical to the above, but kept for readability
                 new_arg, new_cons = _rewrite_comparison(cpm_expr.args[idx], supported=supported,csemap=csemap)
                 if new_arg is not cpm_expr.args[idx]: # changed
                     cpm_expr = copy.copy(cpm_expr) # shallow copy
                     args = list(cpm_expr.args)
                     args[idx] = new_arg
-                    cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
+                    cpm_expr.update_args(args, has_subexpr=cpm_expr.has_subexpr())
 
-                newlist += [cpm_expr] + new_cons
+                newlist.append(cpm_expr)
+                newlist.extend(new_cons)
 
             elif cpm_expr.name != "==": # numerical comparison
                 new_expr, new_cons = _rewrite_comparison(cpm_expr, supported=supported,csemap=csemap)
-                newlist += [new_expr] + new_cons
+                newlist.append(new_expr)
+                newlist.extend(new_cons)
             
-            else:
-                newlist.append(cpm_expr) # equality constraint, keep
-
-        else:
-            # default, keep original
+            else: # equality constraint, keep, continue
+                newlist.append(cpm_expr) 
+        
+        else: # default, keep original
             newlist.append(cpm_expr)
                 
     return newlist
 
 
-def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):
+def _rewrite_comparison(cpm_expr: Expression, supported=frozenset(), csemap: Optional[CSEMap]=None) -> tuple[Expression, list[Expression]]:
     """
-    Rewrite a comparison to an equality comparison, and a defining constraint.
+    Rewrite a non-equality comparison of an unsupported numeric expression into an
+    equality plus a comparison over an auxiliary variable.
 
-    E.g., max(x,y,z) < p is rewritten to:
-        max(x,y,z) == iv & iv < p
+    For example, ``max(x, y, z) < p`` is rewritten to ``iv < p`` together with the
+    defining constraint ``max(x, y, z) == iv``.
 
-    :param cpm_expr: the comparison to rewrite
-    :param csemap: the cse map to use
-    :return: the rewritten comparison and the defining constraint
+    INTERNAL function, not guaranteed to remain backward compatible.
+
+    Arguments:
+        cpm_expr (Expression): the comparison to rewrite
+        supported (set[str]): names of numeric expressions that support all comparison operators
+        csemap (Optional[CSEMap]): csemap
+
+    Returns:
+        tuple[Expression, list[Expression]]
+        new_expr (Expression): the rewritten comparison (``A <op> IV``), or input cpm_expr if unchanged.
+        new_cons (list[Expression]): the defining constraint(s)
     """
     if not isinstance(cpm_expr, Comparison):
         return cpm_expr, []
@@ -103,12 +135,12 @@ def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):
     lhs, rhs = cpm_expr.args # flat, so expression will be on left hand side
     if cpm_expr.name != "==" and not isinstance(lhs, _NumVarImpl) and lhs.name not in supported:
         # lhs is unsupported, rewrite to `(LHS == A) & (A <op> RHS)`
-        cpm_expr = copy.copy(cpm_expr)
+        new_expr = copy.copy(cpm_expr)
         new_lhs, new_cons = get_or_make_var(lhs, csemap=csemap)
         args = list(cpm_expr.args)
         args[0] = new_lhs
-        cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
-        return cpm_expr, new_cons
+        new_expr.update_args(args, cpm_expr.has_subexpr())
+        return new_expr, new_cons
     
     return cpm_expr, []
 
