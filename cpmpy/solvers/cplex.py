@@ -55,12 +55,13 @@
 """
 import warnings
 from typing import Optional, List
+import cpmpy as cp
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num, is_int
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.globalfunctions import FloatSum
-from ..expressions.utils import eval_comparison, flatlist, is_bool, is_num, is_int
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -438,51 +439,59 @@ class CPM_cplex(SolverInterface):
       get_variables(cpm_expr, collect=self.user_vars)
 
       # transform and post the constraints
-      for con in self.transform(cpm_expr):
+      for cpm_cons in self.transform(cpm_expr):
+        self._add_transformed(cpm_cons)
+
+      return self
+
+    __add__ = add  # avoid redirect in superclass
+    
+    def _add_transformed(self, cpm_expr):
+        """Post a single already-transformed constraint to the CPLEX model. Returns the CPLEX constraint. Also used in for `mus_native` to post transformed CPMpy constraints and gain access to the CPLEX constraint."""
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
-        if isinstance(con, Comparison):
-            lhs, rhs = con.args
+        if isinstance(cpm_expr, Comparison):
+            lhs, rhs = cpm_expr.args
             cplexrhs = self.solver_var(rhs)
 
             # Thanks to `only_numexpr_equality()` only supported comparisons should remain
-            if con.name == '<=':
+            if cpm_expr.name == '<=':
                 cplexlhs = self._make_numexpr(lhs)
-                self.cplex_model.add_constraint(cplexlhs <= cplexrhs)
-            elif con.name == '>=':
+                return self.cplex_model.add_constraint(cplexlhs <= cplexrhs)
+            elif cpm_expr.name == '>=':
                 cplexlhs = self._make_numexpr(lhs)
-                self.cplex_model.add_constraint(cplexlhs >= cplexrhs)
-            elif con.name == '==':
+                return self.cplex_model.add_constraint(cplexlhs >= cplexrhs)
+            elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
                         or (isinstance(lhs, Operator) and (lhs.name in {'sum', 'wsum', 'sub'})):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
-                    self.cplex_model.add_constraint(cplexlhs == cplexrhs)
+                    return self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                 else:
                     # Global functions
                     if lhs.name == 'min':
-                        self.cplex_model.add_constraint(self.cplex_model.min(self.solver_vars(lhs.args)) == cplexrhs)
+                        return self.cplex_model.add_constraint(self.cplex_model.min(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'max':
-                        self.cplex_model.add_constraint(self.cplex_model.max(self.solver_vars(lhs.args)) == cplexrhs)
+                        return self.cplex_model.add_constraint(self.cplex_model.max(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'abs':
-                        self.cplex_model.add_constraint(self.cplex_model.abs(self.solver_var(lhs.args[0])) == cplexrhs)
+                        return self.cplex_model.add_constraint(self.cplex_model.abs(self.solver_var(lhs.args[0])) == cplexrhs)
                     elif lhs.name == 'mul': 
                         raise ValueError("CPLEX only supports convex multiplication constraints, should be decomposed and linearized already. Please report on github.")
                         cplexlhs = self._make_numexpr(lhs)
-                        self.cplex_model.add_constraint(cplexlhs == cplexrhs)
+                        return self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                     else:
                         raise NotImplementedError(
-                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, con))
+                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
             else:
                 raise NotImplementedError(
-                "Not a known supported cplex comparison '{}' {}".format(lhs.name, con))
+                "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
 
-        elif isinstance(con, Operator) and con.name == "->":
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             # Indicator constraints
             # Take form bvar -> sum(x,y,z) >= rvar
-            cond, sub_expr = con.args
-            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {con} must have BoolVar as lhs"
+            cond, sub_expr = cpm_expr.args
+            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
             assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
             if isinstance(cond, NegBoolView):
                 cond, trigger_val = self.solver_var(cond._bv), False
@@ -493,27 +502,24 @@ class CPM_cplex(SolverInterface):
             if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
                 lin_expr = self._make_numexpr(lhs)
             else:
-                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {con}")
+                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
             constraint = eval_comparison(sub_expr.name, lin_expr, self.solver_var(rhs))
-            self.cplex_model.add_indicator(cond, constraint, trigger_val)
+            return self.cplex_model.add_indicator(cond, constraint, trigger_val)
 
         # True or False
-        elif isinstance(con, BoolVal):
-            if con.args[0]: # just true
+        elif isinstance(cpm_expr, BoolVal):
+            if cpm_expr.args[0]: # just true
                 pass # do nothing
             else: # just false
                 a = self.cplex_model.binary_var()
-                self.cplex_model.add_constraint(a - a >= 1) # create a constraint that is always false
+                return self.cplex_model.add_constraint(a - a >= 1) # create a constraint that is always false
 
         # a direct constraint, pass to solver
-        elif isinstance(con, DirectConstraint):
-            con.callSolver(self, self.cplex_model)
+        elif isinstance(cpm_expr, DirectConstraint):
+            cpm_expr.callSolver(self, self.cplex_model)
 
         else:
-            raise NotImplementedError(con)  # if you reach this... please report on github
-
-      return self
-    __add__ = add  # avoid redirect in superclass
+            raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
@@ -684,3 +690,63 @@ class CPM_cplex(SolverInterface):
                 raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented. Please report on GitHub")
 
         return opt_sol_count
+    
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using CPLEX's native Conflict Refiner (IIS).
+
+        More about the native Conflict Refiner:
+        https://www.ibm.com/docs/en/icos/22.1.0?topic=conflicts-more-about-conflict-refiner
+        """
+        from docplex.mp.conflict_refiner import ConflictRefiner, ConstraintsGroup
+        from docplex.mp.constants import ConflictStatus
+        
+        soft_cons = toplevel_list(soft, merge_and=False)
+        s = cls()
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
+        s._csemap = None
+        model = s.native_model
+        groups = []
+        
+        # 1. Add hard constraints as a required group.
+        for cpm_con in s.transform(hard):
+            hard_native = s._add_transformed(cpm_con)
+            if hard_native is not None:
+                groups.append(ConstraintsGroup(preference=0.0, cts=[hard_native]))
+        
+        # 2. Create ConstraintsGroup for each soft constraint
+        native_to_soft_idx = {}
+
+        for i, soft_con in enumerate(soft_cons):
+            transformed_cons = s.transform(soft_con)
+            native_cons = [s._add_transformed(c) for c in transformed_cons]
+            
+            if native_cons:
+                # ConstraintsGroup(preference, cts=list_of_constraints)
+                grp = ConstraintsGroup(preference=1.0, cts=native_cons)
+                groups.append(grp)
+                for native_con in native_cons:
+                    native_to_soft_idx[native_con] = i
+
+        # 3. Invoke Conflict Refiner
+        cr = ConflictRefiner()
+        # Passing the list of groups specifically
+        refine_res = cr.refine_conflict(model, groups=groups)
+        
+        # 4. Extract the MUS
+        # The conflict refiner result expands groups back to their native docplex
+        # constraints, so map each returned conflict element to its CPMpy source.
+        conflict_statuses = {
+            ConflictStatus.Member,
+        }
+        mus_idxs = set()
+        for conflict in refine_res.iter_conflicts():
+            if conflict.status in conflict_statuses:
+                soft_idx = native_to_soft_idx.get(conflict.element)
+                if soft_idx is not None: # exclude hard constraints
+                    mus_idxs.add(soft_idx)
+
+        return [soft_cons[i] for i in sorted(mus_idxs)]
