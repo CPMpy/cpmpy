@@ -7,6 +7,7 @@
     - Native MUS for given solvers:
         - Exact: deletion-based MUS extraction
         - Gurobi: IIS-based MUS extraction
+        - CPO: MUS extraction with CP constraints
 """
 import warnings
 import numpy as np
