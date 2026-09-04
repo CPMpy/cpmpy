@@ -35,7 +35,9 @@ solver_dependencies = {
     "pindakaas": ["pindakaas>=0.5.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
     "scip": ["pyscipopt>=6.1"],
-    "rc2": ["python-sat>=1.9.dev5", "pypblib"]
+    "rc2": ["python-sat>=1.9.dev5", "pypblib"],
+    "cvc5": ["cvc5>=1.3.4"],  # older releases have proof-export quirks that trip up
+                              # external Alethe checkers like Carcara
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
