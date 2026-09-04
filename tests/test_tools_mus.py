@@ -6,9 +6,8 @@ from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
 
-# Each shared case runs twice: assumption-based (or native) MUS, and the naive variant.
-# Unsupported solvers skip only the non-naive case; naive still runs.
-mus_or_naive = pytest.mark.parametrize("naive", [False, True], ids=["mus", "naive"])
+# annotation to run both MUS and naive varaint for the test
+run_mus_and_naive = pytest.mark.parametrize("naive", [False, True], ids=["mus", "naive"])
 
 
 class TestMus:
@@ -38,7 +37,7 @@ class TestMus:
 
     # test cases
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_circular(self, solver, naive):
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
@@ -54,7 +53,7 @@ class TestMus:
         self._test_mus(cons, hard=[], solver=solver, naive=naive,
                        verify_func=lambda ms: set(ms) == set(cons[:3]))
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_bug_191(self, solver, naive):
         """
         Original Bug request: https://github.com/CPMpy/cpmpy/issues/191
@@ -67,7 +66,7 @@ class TestMus:
         self._test_mus(soft, hard=hard, solver=solver, naive=naive,
                        verify_func=lambda ms: set(ms) == set(soft))
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_bug_191_many_soft(self, solver, naive):
         """
         Checking whether bugfix 191  doesn't break anything in the MUS tool chain,
@@ -84,7 +83,7 @@ class TestMus:
         self._test_mus(soft, hard=hard, solver=solver, naive=naive,
                        verify_func=lambda ms: set(ms) == set(soft))
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_wglobal(self, solver, naive):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
@@ -106,7 +105,7 @@ class TestMus:
         self._test_mus(cons, hard=[], solver=solver, naive=naive,
                        verify_func=lambda ms: len(ms) < len(cons) and not cp.Model(ms).solve())
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_decomposed_global(self, solver, naive):
         x = cp.intvar(1, 5, shape=3, name="x")
         soft = [x[0] == x[1], x[1] == x[2]]
@@ -115,7 +114,7 @@ class TestMus:
         self._test_mus(soft, hard=hard, solver=solver, naive=naive,
                        verify_func=lambda ms: len(set(ms)) == 1)
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_cse_shared_subexpr(self, solver, naive):
         """Example with CSE in the defining constraints.
 
@@ -152,7 +151,7 @@ class TestQuickXplain(TestMus):
         self.mus_func = quickxplain
         self.naive_func = quickxplain_naive
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_prefered(self, solver, naive):
         a,b,c,d = [cp.boolvar(name=n) for n in "abcd"]
 
@@ -172,7 +171,7 @@ class TestOptimalMUS(TestMus):
         self.mus_func = optimal_mus
         self.naive_func = optimal_mus_naive
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_weighted(self, solver, naive):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
@@ -194,7 +193,7 @@ class TestOCUS(TestOptimalMUS):
         self.mus_func = ocus
         self.naive_func = ocus_naive
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_constrained(self, solver, naive):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
@@ -207,7 +206,7 @@ class TestOCUS(TestOptimalMUS):
         self._test_mus([a, b, c, d], hard=hard, solver=solver, naive=naive,
                        meta_constraint=a & d, verify_func=lambda ms: set(ms) == {a, b, d})  # not subset-minimal
 
-    @mus_or_naive
+    @run_mus_and_naive
     def test_no_such_mus(self, solver, naive):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
