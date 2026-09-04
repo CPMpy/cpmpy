@@ -20,7 +20,7 @@ def run_incr_xor(solvername, num_vars, xor_size, iter, use_solver=False, seed=42
         r = m.solve(*solveargs)
         if not r:
             print("Unsat after ", _+1, " iterations")
-        total_time += m.status().runtime
+        total_time += m.status().solve_time
     
     return total_time
 
@@ -48,7 +48,7 @@ def run_incr_obj(solvername, num_vars, num_xor, xor_size, num_obj, iter, use_sol
         r = m.solve(*solveargs)
         if not r:
             print("Unsat after ", _+1, " iterations")
-        total_time += m.status().runtime
+        total_time += m.status().solve_time
     
     return total_time
 

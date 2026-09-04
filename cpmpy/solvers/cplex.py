@@ -218,7 +218,7 @@ class CPM_cplex(SolverInterface):
         
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.cplex_model.solve_details.time
+        self.cpm_status.solve_time = self.cplex_model.solve_details.time
 
         # translate solver exit status to CPMpy exit status
         cplex_status = self.cplex_model.solve_details.status

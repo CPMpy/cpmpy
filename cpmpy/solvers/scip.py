@@ -137,7 +137,7 @@ class CPM_scip(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.scip_model.getSolvingTime()
+        self.cpm_status.solve_time = self.scip_model.getSolvingTime()
 
         # We have not implemented finding all solutions, so the "bestsollimit" status is unexpected (arguably we should set `cpm_status` to OPTIMAL in this case)
         assert scip_status != "bestsollimit", f"Unexpected status {scip_status}, this SCIP usage was not implemented"
