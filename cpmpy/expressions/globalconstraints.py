@@ -228,15 +228,21 @@ class GlobalConstraint(Expression):
 # Global Constraints (with Boolean return type)
 class AllDifferent(GlobalConstraint):
     """
-    Enforces that all arguments have a different (distinct) value
+    Enforces that all arguments have a different (distinct) value.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike|ListLike[ExprLike]):
         """
         Arguments:
             args (ExprLike|ListLike[ExprLike]): List of expressions or constants to be different from each other
+                (at least one required)
         """
-        super().__init__("alldifferent", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('AllDifferent constraint must be given at least one argument')
+        super().__init__("alldifferent", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -273,21 +279,30 @@ class AllDifferentExceptN(GlobalConstraint):
     """
     Enforces that all arguments, except those equal to a value in n, have a different (distinct) value.
 
+    Requires at least one argument in ``arr`` (arity >= 1) and a non-empty exception set ``n``.
+
     Arguments:
         arr (Sequence[Expression]): List of expressions to be different from each other, except those equal to a value in n
         n (int or list[int]): Value or list of values that are excluded from satisfying the alldifferent condition
+            (at least one required)
     """
 
     def __init__(self, arr: ListLike[ExprLike], n: int|np.integer|list[int|np.integer]):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to a value in n
+                (at least one required)
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the distinctness constraint
+                (at least one required)
         """
         flatarr = flatlist(arr)
+        if len(flatarr) == 0:
+            raise ValueError('AllDifferentExceptN constraint must be given at least one argument')
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
+        if len(n) == 0:
+            raise ValueError('AllDifferentExceptN constraint must be given at least one excluded value')
         super().__init__("alldifferent_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -322,24 +337,33 @@ class AllDifferentExceptN(GlobalConstraint):
 class AllDifferentExcept0(AllDifferentExceptN):
     """
     Enforces that all arguments, except those equal to 0, have a different (distinct) value.
+
+    Requires at least one argument (arity >= 1).
     """
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to 0
+                (at least one required)
         """
         super().__init__(flatlist(args), 0)
 
 class AllEqual(GlobalConstraint):
     """
-    Enforces that all arguments have the same value
+    Enforces that all arguments have the same value.
+
+    Requires at least one argument (arity >= 1).
     """
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to have the same value
+                (at least one required)
         """
-        super().__init__("allequal", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('AllEqual constraint must be given at least one argument')
+        super().__init__("allequal", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -365,18 +389,26 @@ class AllEqual(GlobalConstraint):
 class AllEqualExceptN(GlobalConstraint):
     """
     Enforces that all arguments, except those equal to a value in n, have the same value.
+
+    Requires at least one argument in ``arr`` (arity >= 1) and a non-empty exception set ``n``.
     """
 
     def __init__(self, arr: ListLike[ExprLike], n: int|np.integer|list[int|np.integer]):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to have the same value, except those equal to a value in n
+                (at least one required)
             n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the equality constraint
+                (at least one required)
         """
         flatarr = flatlist(arr)
+        if len(flatarr) == 0:
+            raise ValueError('AllEqualExceptN constraint must be given at least one argument')
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
+        if len(n) == 0:
+            raise ValueError('AllEqualExceptN constraint must be given at least one excluded value')
         super().__init__("allequal_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -408,11 +440,14 @@ class AllEqualExceptN(GlobalConstraint):
 class Circuit(GlobalConstraint):
     """
     Enforces that the sequence of variables form a circuit, where x[i] = j means that node j is the successor of node i.
+
+    Requires at least two variables (arity >= 2).
     """
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants representing the successors of the nodes to form the circuit
+                (at least two required)
         """
         flatargs = flatlist(args)
         if len(flatargs) < 2:
@@ -501,15 +536,21 @@ class Inverse(GlobalConstraint):
     I.e., fwd[i] == x <==> rev[x] == i
 
     Also known as channeling / assignment constraint.
+
+    Requires non-empty equal-length arrays (arity >= 1).
     """
     def __init__(self, fwd: ListLike[ExprLike], rev: ListLike[ExprLike]):
         """
         Arguments:
             fwd (ListLike[ExprLike]): List of expressions or constants representing the forward function
+                (at least one required)
             rev (ListLike[ExprLike]): List of expressions or constants representing the reverse function
+                (same length as ``fwd``)
         """
         if len(fwd) != len(rev):
             raise ValueError("Length of fwd and rev must be equal for Inverse constraint")
+        if len(fwd) == 0:
+            raise ValueError('Inverse constraint must be given at least one argument')
         super().__init__("inverse", (fwd, rev))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -555,12 +596,16 @@ class Inverse(GlobalConstraint):
 class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
+
+    Requires a non-empty ``array`` of variables (arity >= 1) and a non-empty ``table`` (at least one row).
     """
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
-            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
+                (at least one required)
+            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table
+                (at least one row required)
         """
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
@@ -573,12 +618,19 @@ class Table(GlobalConstraint):
                     has_subexpr = True
                     break
 
+        if len(array) == 0:
+            raise ValueError('Table constraint must be given at least one argument in array')
+
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array with integers
             table = np.array(table, dtype=int)
         elif table.dtype.kind != 'i':  # dtype int
             table = table.astype(int, copy=False)
-        assert table.ndim == 2, "Table's table must be a 2D array"
-        assert table.shape[1] == len(array), f"Table width {table.shape[1]} != array length {len(array)}"
+        if table.ndim != 2:
+            raise ValueError("Table's table must be a 2D array")
+        if table.shape[0] == 0:
+            raise ValueError('Table constraint must be given at least one row')
+        if table.shape[1] != len(array):
+            raise ValueError(f"Table width {table.shape[1]} != array length {len(array)}")
 
         # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("table", (array, table), has_subexpr=has_subexpr)
@@ -653,9 +705,6 @@ class Table(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
          """
 
-        if len(self.args[1]) == 0: # empty table, does not allow any assignments
-            return [cp.BoolVal(False)], []
-
         arr, tab = self._variable_ordering(heuristic)
 
         mdd: dict[int, dict[int, int]] = {}
@@ -706,14 +755,18 @@ class ShortTable(GlobalConstraint):
     """
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
+
+    Requires a non-empty ``array`` of variables (arity >= 1) and a non-empty ``table`` (at least one row).
     """
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
+                (at least one required)
             table (ListLike[ListLike[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
                 STAR represents a wildcard (corresponding variable can take any value).
+                At least one row required.
         """
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
@@ -726,10 +779,17 @@ class ShortTable(GlobalConstraint):
                     has_subexpr = True
                     break
 
+        if len(array) == 0:
+            raise ValueError('ShortTable constraint must be given at least one argument in array')
+
         if not isinstance(table, np.ndarray):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
-        assert table.ndim == 2, "ShortTable's table must be a 2D array"
-        assert table.shape[1] == len(array), f"ShortTable width {table.shape[1]} != array length {len(array)}"
+        if table.ndim != 2:
+            raise ValueError("ShortTable's table must be a 2D array")
+        if table.shape[0] == 0:
+            raise ValueError('ShortTable constraint must be given at least one row')
+        if table.shape[1] != len(array):
+            raise ValueError(f"ShortTable width {table.shape[1]} != array length {len(array)}")
 
         # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
@@ -789,13 +849,17 @@ class ShortTable(GlobalConstraint):
 class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
+
+    Requires a non-empty ``array`` of variables (arity >= 1) and a non-empty ``table`` (at least one row).
     """
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
-            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
+                (at least one required)
+            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table
+                (at least one row required)
         """
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
@@ -808,12 +872,19 @@ class NegativeTable(GlobalConstraint):
                     has_subexpr = True
                     break
 
+        if len(array) == 0:
+            raise ValueError('NegativeTable constraint must be given at least one argument in array')
+
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
             table = np.array(table, dtype=int)
         elif table.dtype.kind != 'i':  # dtype int
             table = table.astype(int, copy=False)
-        assert table.ndim == 2, "NegativeTable's table must be a 2D array"
-        assert table.shape[1] == len(array), f"NegativeTable width {table.shape[1]} != array length {len(array)}"
+        if table.ndim != 2:
+            raise ValueError("NegativeTable's table must be a 2D array")
+        if table.shape[0] == 0:
+            raise ValueError('NegativeTable constraint must be given at least one row')
+        if table.shape[1] != len(array):
+            raise ValueError(f"NegativeTable width {table.shape[1]} != array length {len(array)}")
 
         # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("negative_table", (array, table), has_subexpr=has_subexpr)
@@ -857,6 +928,9 @@ class Regular(GlobalConstraint):
     Takes as input a sequence of variables and a automaton representation using a transition table.
     The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
 
+    Requires a non-empty input sequence (``array`` arity >= 1), at least one transition,
+    and at least one accepting state (OR-Tools ``AddAutomaton`` rejects all three empties).
+
     The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
     The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
     An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
@@ -873,16 +947,23 @@ class Regular(GlobalConstraint):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
+                (at least one required)
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
+                (at least one required)
             start (int | str): Starting node id
             accepting (ListLike[int | str]): List of accepting node ids
+                (at least one required)
         """
         array = flatlist(array)
+        if len(array) == 0:
+            raise ValueError('Regular constraint must be given at least one argument in array')
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
         
         if not is_any_list(transitions):
             raise TypeError("The second argument of a regular constraint should be a list of transitions")
+        if len(transitions) == 0:
+            raise ValueError('Regular constraint must be given at least one transition')
         _node_type = type(transitions[0][0])
         for s,v,e in transitions:
             if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
@@ -891,6 +972,8 @@ class Regular(GlobalConstraint):
             raise TypeError("The third argument of a regular constraint should be a node id")
         if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
             raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
+        if len(accepting) == 0:
+            raise ValueError('Regular constraint must be given at least one accepting state')
         super().__init__("regular", (list(array), list(transitions), start, list(accepting)))
 
         node_set = set()
@@ -917,8 +1000,6 @@ class Regular(GlobalConstraint):
         # Decompose to transition table using Table constraints
 
         arr, transitions, start, accepting = self.args
-        if len(accepting) == 0:
-            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
 
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
@@ -961,9 +1042,6 @@ class Regular(GlobalConstraint):
         """
 
         arr, transitions, start, accepting = self.args
-
-        if len(accepting) == 0:
-            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
 
         # Collect all nodes and all transition values in the DFA
         nodes_set = set()
@@ -1073,6 +1151,8 @@ class MDD(GlobalConstraint):
     The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and where the first variable
     in the array takes the value of the first edge, the second from the second edge, etc., ending in the accepting sink node.
 
+    Requires a non-empty input sequence (``array`` arity >= 1).
+
     The transitions/edges are given by a `n x 3` matrix, or more precisely a list of `n` tuples `(node_id1, value, node_id2)`.
     A node_id is an integer or string representing a state in the MDD, and value is an integer representing the value of the variable in the sequence.
     If not given explicitly, the root node is the node_id1 of the first entry in the transition table (i.e., transitions[0][0]).
@@ -1093,16 +1173,24 @@ class MDD(GlobalConstraint):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
+                (at least one required)
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
+                (at least one required)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
             reduce (bool, default=True): During decomposition, whether to reduce the MDD as a first decomposition step
                 by merging nodes with equivalent suffixes, reducing the size of the MDD
 
         """
         array = flatlist(array)
+        if len(array) == 0:
+            raise ValueError('MDD constraint must be given at least one argument in array')
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
 
+        if not is_any_list(transitions):
+            raise TypeError("The second argument of an MDD constraint should be a list of transitions")
+        if len(transitions) == 0:
+            raise ValueError('MDD constraint must be given at least one transition')
         _node_type = type(transitions[0][0])
         for id1, v, id2 in transitions:
             if not isinstance(id1, _node_type) or not isinstance(v, int) or not isinstance(id2, _node_type):
@@ -1394,6 +1482,8 @@ class IfThenElse(GlobalConstraint):
 class InDomain(GlobalConstraint):
     """
     Enforces the expression is assigned to a value in the given domain.
+
+    Requires a non-empty domain (``arr`` arity >= 1).
     """
 
     def __init__(self, expr: Expression, arr: Iterable[int|np.integer]):
@@ -1401,10 +1491,14 @@ class InDomain(GlobalConstraint):
         Arguments:
             expr (Expression): Expression to be assigned to a value in the given domain
             arr (Iterable[int | np.integer]): Iterable of integer constants representing the domain
+                (at least one required)
         """
         if not isinstance(arr, np.ndarray):
             arr = np.array(arr, dtype=int)
-        assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
+        if arr.ndim != 1:
+            raise ValueError("The second argument of an InDomain constraint should be a 1D array of integer constants")
+        if len(arr) == 0:
+            raise ValueError('InDomain constraint must be given at least one domain value')
 
         has_subexpr = not isinstance(expr, (_NumVarImpl, BoolVal))
 
@@ -1462,23 +1556,31 @@ class InDomain(GlobalConstraint):
 
         # complement of arr
         arr_set = frozenset(arr)
-        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr_set])
+        complement = [v for v in range(lb,ub+1) if v not in arr_set]
+        if len(complement) == 0:
+            return BoolVal(False)
+        return InDomain(expr, complement)
 
 
 class Xor(GlobalConstraint):
     """
     Enforces the exclusive-or relation of the arguments.
     Supports n-ary xor-constraints, which are treated as cascaed binary xor-constraints.
-    Equivalent to `sum(args) % 2 == 1`
+    Equivalent to `sum(args) % 2 == 1`.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, arg_list: ListLike[BoolExprLike]):
         """
         Arguments:
             arg_list (ListLike[BoolExprLike]): List of expressions or constants, to be xor'ed
+                (at least one required)
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
+        if len(arg_list) == 0:
+            raise ValueError('Xor constraint must be given at least one argument')
         # convention for commutative binary operators:
         # swap if right is constant and left is not
         arg_list = list(arg_list)
@@ -1567,11 +1669,14 @@ class Cumulative(GlobalConstraint):
 
     Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
     Supports both varying demand across tasks or equal demand for all jobs.
+
+    Requires at least one task (``start`` arity >= 1).
     """
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, demand: Optional[ListLike[ExprLike]|ExprLike] = None, capacity: Optional[ExprLike] = None):
         """
             Arguments:
                 start (ListLike[ExprLike]): Start times of the tasks
+                    (at least one required)
                 duration (ListLike[ExprLike]): Durations of the tasks
                 end (ListLike[ExprLike] | None): Optional end times of the tasks
                 demand (ListLike[ExprLike] | ExprLike): Per-task demands or a single constant demand, required
@@ -1595,6 +1700,8 @@ class Cumulative(GlobalConstraint):
             raise ValueError("Start and duration should have equal length")
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+        if len(start) == 0:
+            raise ValueError('Cumulative constraint must be given at least one task')
 
         demand_list = []
         if is_any_list(demand):
@@ -1762,6 +1869,8 @@ class CumulativeOptional(GlobalConstraint):
 
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlapOptional` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
+
+        Requires at least one task (``start`` arity >= 1).
     """
 
     def __init__(self, start: ListLike[ExprLike], 
@@ -1800,6 +1909,8 @@ class CumulativeOptional(GlobalConstraint):
             raise ValueError("Start and is_present should have equal length")
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+        if len(start) == 0:
+            raise ValueError('CumulativeOptional constraint must be given at least one task')
 
         demand_list = []
         if is_any_list(demand):
@@ -1959,12 +2070,15 @@ class NoOverlap(GlobalConstraint):
     Enforces that a set of tasks are scheduled without overlapping, and enforces:
         - duration >= 0
         - start + duration == end
+
+    Requires at least one task (``start`` arity >= 1).
     """
 
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None):
         """
         Arguments:
             start (ListLike[ExprLike]): Start times of the tasks
+                (at least one required)
             duration (ListLike[ExprLike]): Durations of the tasks
             end (ListLike[ExprLike] | None): Optional end times of the tasks
         """
@@ -1980,6 +2094,8 @@ class NoOverlap(GlobalConstraint):
             raise ValueError("Start and duration should have equal length")
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+        if len(start) == 0:
+            raise ValueError('NoOverlap constraint must be given at least one task')
         
         if end is None:
             super().__init__("no_overlap", (list(start), list(duration)))
@@ -2043,12 +2159,15 @@ class NoOverlapOptional(GlobalConstraint):
         - start + duration == end
 
         if the task is not present, it does not enforce any of the above.
+
+        Requires at least one task (``start`` arity >= 1).
     """
     
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[BoolExprLike]] = None):
         """
         Arguments:
             start (ListLike[ExprLike]): List of Expression objects representing the start times of the tasks
+                (at least one required)
             duration (ListLike[ExprLike]): List of Expression objects representing the durations of the tasks
             end (ListLike[ExpLike] | None): optional, list of Expression objects representing the end times of the tasks
             is_present (ListLike[BoolExprLike]): List of Boolean Expression objects representing the presence of the tasks
@@ -2069,6 +2188,8 @@ class NoOverlapOptional(GlobalConstraint):
             raise ValueError("Start and is_present should have equal length")
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+        if len(start) == 0:
+            raise ValueError('NoOverlapOptional constraint must be given at least one task')
 
         if end is None:
             super().__init__("no_overlap_optional", (list(start), list(duration), list(is_present)))
@@ -2127,6 +2248,8 @@ class Precedence(GlobalConstraint):
     Given an array of variables X and a list of values P, values in P must appear in X in the order specified by P.
     I.e., if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
 
+    Requires a non-empty variable array (``vars`` arity >= 1) and a non-empty precedence list (arity >= 1).
+
     Examples:
         - X = [1,2,1,3] satisfies the precedence [1,2,3].
         - X = [4,1,2,1,3] also satisfies the precedence, as values not appearing in P can appear in any order.
@@ -2136,12 +2259,17 @@ class Precedence(GlobalConstraint):
         """
         Arguments:
             vars (ListLike[ExprLike]): List of expressions or constants representing the variables
+                (at least one required)
             precedence (ListLike[int | np.integer]): List of integer precedence values
         """
         if not is_any_list(vars):
             raise TypeError("Precedence expects a list of variables as first argument, but got", vars)
         if not is_any_list(precedence) or not all(is_num(p) for p in precedence):
             raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
+        if len(vars) == 0:
+            raise ValueError('Precedence constraint must be given at least one variable')
+        if len(precedence) == 0:
+            raise ValueError('Precedence constraint must be given at least one precedence value')
         super().__init__("precedence", (list(vars), list(precedence)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -2189,13 +2317,17 @@ class Precedence(GlobalConstraint):
 class GlobalCardinalityCount(GlobalConstraint):
     """
     Enforces that the number of occurrences of each value `vals[i]` in the list of variables `vars` is equal to `occ[i]`.
+
+    Requires a non-empty ``vars`` list and a non-empty ``vals``/``occ`` list (arity >= 1).
     """
 
     def __init__(self, vars: ListLike[ExprLike], vals: ListLike[int|np.integer], occ: ListLike[ExprLike], closed: bool = False):
         """
         Arguments:
             vars (ListLike[ExprLike]): List of expressions or constants representing the variables
+                (at least one required)
             vals (ListLike[int | np.integer]): List of integer values
+                (at least one required)
             occ (ListLike[ExprLike]): List of expressions or constants representing the number of occurrences of each value
             closed (bool): Whether the constraint is closed, if true, `vars` can only take values in `vals`
         """
@@ -2205,8 +2337,12 @@ class GlobalCardinalityCount(GlobalConstraint):
             raise TypeError("GlobalCardinalityCount expects a list of values, but got", vals)
         if not is_any_list(occ):
             raise TypeError("GlobalCardinalityCount expects a list of variables as occurrences, but got", occ)
+        if len(vars) == 0:
+            raise ValueError('GlobalCardinalityCount constraint must be given at least one variable')
         if len(vals) != len(occ):
             raise ValueError(f"Number of values and occurrences must be equal, but got {len(vals)} and {len(occ)}")
+        if len(vals) == 0:
+            raise ValueError('GlobalCardinalityCount constraint must be given at least one value')
         super().__init__("gcc", (list(vars), list(vals), list(occ)))
         self.closed = closed
 
@@ -2254,14 +2390,20 @@ class GlobalCardinalityCount(GlobalConstraint):
 class Increasing(GlobalConstraint):
     """
     Enforces that the expressions are assigned to (non-strictly) increasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to increasing values
+                (at least one required)
         """
-        super().__init__("increasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('Increasing constraint must be given at least one argument')
+        super().__init__("increasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2287,14 +2429,20 @@ class Increasing(GlobalConstraint):
 class Decreasing(GlobalConstraint):
     """
     Enforces that the expressions are assigned to (non-strictly) decreasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to decreasing values
+                (at least one required)
         """
-        super().__init__("decreasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('Decreasing constraint must be given at least one argument')
+        super().__init__("decreasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2320,14 +2468,20 @@ class Decreasing(GlobalConstraint):
 class IncreasingStrict(GlobalConstraint):
     """
     Enforces that the expressions are assigned to strictly increasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly increasing values
+                (at least one required)
         """
-        super().__init__("strictly_increasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('IncreasingStrict constraint must be given at least one argument')
+        super().__init__("strictly_increasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2354,14 +2508,20 @@ class IncreasingStrict(GlobalConstraint):
 class DecreasingStrict(GlobalConstraint):
     """
     Enforces that the expressions are assigned to strictly decreasing values.
+
+    Requires at least one argument (arity >= 1).
     """
 
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly decreasing values
+                (at least one required)
         """
-        super().__init__("strictly_decreasing", tuple(flatlist(args)))
+        flatargs = flatlist(args)
+        if len(flatargs) == 0:
+            raise ValueError('DecreasingStrict constraint must be given at least one argument')
+        super().__init__("strictly_decreasing", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2388,15 +2548,20 @@ class DecreasingStrict(GlobalConstraint):
 class LexLess(GlobalConstraint):
     """ 
     Enforces that the first list is lexicographically smaller than the second list.
+
+    Requires non-empty equal-length lists (arity >= 1).
     """
     def __init__(self, list1: ListLike[ExprLike], list2: ListLike[ExprLike]):
         """
         Arguments:
             list1 (ListLike[ExprLike]): First List of expressions or constants to be compared lexicographically
+                (at least one required)
             list2 (ListLike[ExprLike]): Second List of expressions or constants to be compared lexicographically
         """ 
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLess must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
+        if len(list1) == 0:
+            raise ValueError('LexLess constraint must be given at least one argument')
         super().__init__("lex_less", (list1, list2))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -2420,9 +2585,6 @@ class LexLess(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         X, Y = cpm_array(self.args)
-
-        if len(X) == 0 == len(Y):
-            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
 
         bvar = boolvar(shape=(len(X) + 1))
 
@@ -2450,15 +2612,20 @@ class LexLess(GlobalConstraint):
 class LexLessEq(GlobalConstraint):
     """
     Enforces that the first list is lexicographically smaller than or equal to the second list.
+
+    Requires non-empty equal-length lists (arity >= 1).
     """
     def __init__(self, list1: ListLike[ExprLike], list2: ListLike[ExprLike]):
         """
         Arguments:
             list1 (ListLike[ExprLike]): First List of expressions or constants to be compared lexicographically
+                (at least one required)
             list2 (ListLike[ExprLike]): Second List of expressions or constants to be compared lexicographically
         """
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLessEq must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
+        if len(list1) == 0:
+            raise ValueError('LexLessEq constraint must be given at least one argument')
         super().__init__("lex_lesseq", (list1, list2))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -2483,9 +2650,6 @@ class LexLessEq(GlobalConstraint):
         """
         X, Y = cpm_array(self.args)
 
-        if len(X) == 0 == len(Y):
-            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
-
         bvar = boolvar(shape=(len(X) + 1))
         defining = []
         defining.extend(bvar[:-1] == (X <= Y) & ((X < Y) | bvar[1:]))  # vectorized for all but the last
@@ -2508,15 +2672,20 @@ class LexLessEq(GlobalConstraint):
 class LexChainLess(GlobalConstraint):
     """
     Enforces that all rows of the matrix are lexicographically ordered.
+
+    Requires a non-empty 2D matrix (at least one row and one column).
     """
     def __init__(self, X: ListLike[ListLike[ExprLike]]):
         """
         Arguments:
             X (ListLike[ListLike[ExprLike]]): Matrix (List of lists) of expressions or constants to be compared lexicographically
+                (non-empty 2D matrix required)
         """
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
             raise ValueError(f"The matrix given in LexChainLess must be 2D, but got {Xarr.ndim} dimensions")
+        if 0 in Xarr.shape:
+            raise ValueError('LexChainLess constraint must be given a non-empty 2D matrix')
         super().__init__("lex_chain_less", tuple(Xarr.tolist()))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -2543,15 +2712,20 @@ class LexChainLess(GlobalConstraint):
 class LexChainLessEq(GlobalConstraint):
     """ 
     Enforces that all rows of the matrix are lexicographically ordered (less or equal)
+
+    Requires a non-empty 2D matrix (at least one row and one column).
     """
     def __init__(self, X: ListLike[ListLike[ExprLike]]):
         """
         Arguments:
             X (ListLike[ListLike[ExprLike]]): Matrix (List of lists) of expressions or constants to be compared lexicographically
+                (non-empty 2D matrix required)
         """
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
             raise ValueError(f"The matrix given in LexChainLessEq must be 2D, but got {Xarr.ndim} dimensions")
+        if 0 in Xarr.shape:
+            raise ValueError('LexChainLessEq constraint must be given a non-empty 2D matrix')
         super().__init__("lex_chain_lesseq", tuple(Xarr.tolist()))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
