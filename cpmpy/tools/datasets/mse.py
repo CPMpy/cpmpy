@@ -33,13 +33,12 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
     :ref:`modeling guide <modeling-datasets>`.
 
     Arguments:
-        root (str): Root directory where datasets are stored or will be downloaded to (default="."). If `dataset_dir` is provided, this argument is ignored.
+        root (str): Root directory where datasets are stored or will be downloaded to (default=".").
         year (int): Competition year of the dataset to use (default=2024).
         track (str): Track name specifying which subset of the competition instances to load (default="exact-unweighted").
         transform (callable, optional): Optional transform applied to the instance file path.
         target_transform (callable, optional): Optional transform applied to the metadata dictionary.
         download (bool): If True, downloads the dataset if it does not exist locally (default=False).
-        dataset_dir (Optional[os.PathLike]): Path to the dataset directory. If not provided, it will be inferred from the root and year/track.
     """
 
     name = "maxsateval"
@@ -53,7 +52,6 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
             year: int = 2024, track: str = "exact-unweighted",
             transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
-            dataset_dir: Optional[os.PathLike] = None,
             **kwargs: Any
         ):
         """
@@ -65,7 +63,6 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         """
 
         # Dataset-specific attributes
-        self.root = pathlib.Path(root)
         self.year = year
         self.track = track
 
@@ -75,10 +72,8 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         if not track:
             raise ValueError("Track must be specified, e.g. OPT-LIN, DEC-LIN, ...")
 
-        dataset_dir = pathlib.Path(dataset_dir) / str(year) / track if dataset_dir else self.root / self.name / str(year) / track
-
         super().__init__(
-            dataset_dir=dataset_dir, 
+            root=root, subdirs=(str(year), track),
             transform=transform, target_transform=target_transform, 
             download=download, extension=".wcnf.xz",
             **kwargs

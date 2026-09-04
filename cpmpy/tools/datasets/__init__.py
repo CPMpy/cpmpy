@@ -34,6 +34,7 @@ List of datasets
     OPBDataset
     PSPLibDataset
     SATDataset
+    ScaledSudokuDataset
     XCSP3Dataset
 """
 
@@ -49,6 +50,7 @@ from .mse import MaxSATEvalDataset
 from .opb import OPBDataset
 from .sat import SATDataset
 from .nurserostering import NurseRosteringDataset
+from .scaledsudoku import ScaledSudokuDataset
 
 
 __all__ = [
@@ -64,5 +66,6 @@ __all__ = [
     "OPBDataset",
     "SATDataset",
     "NurseRosteringDataset",
+    "ScaledSudokuDataset",
 ]
 

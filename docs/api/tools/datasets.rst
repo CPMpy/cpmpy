@@ -23,5 +23,6 @@ Available datasets:
     datasets/opb
     datasets/psplib
     datasets/sat
+    datasets/scaledsudoku
     datasets/xcsp3
 

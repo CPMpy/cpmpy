@@ -67,7 +67,6 @@ class OPBDataset(FileDataset):
                 or if the requested year/track combination is not available.
         """
 
-        self.root = pathlib.Path(root)
         self.year = year
         self.track = track
         self.competition = competition
@@ -78,10 +77,9 @@ class OPBDataset(FileDataset):
         if not track:
             raise ValueError("Track must be specified, e.g. exact-weighted, exact-unweighted, ...")
 
-        dataset_dir = self.root / self.name / str(year) / track / ('selected' if self.competition else 'normalized')
-        
         super().__init__(
-            dataset_dir=dataset_dir, 
+            root=root,
+            subdirs=(str(year), track, 'selected' if self.competition else 'normalized'),
             transform=transform, target_transform=target_transform, 
             download=download, extension=".opb.xz",
             **kwargs

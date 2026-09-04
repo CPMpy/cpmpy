@@ -12,6 +12,7 @@ The following fixtures are copied or derived from public benchmark datasets:
 | `jsplib_ft06.txt` | JSPLIB, Fisher-Thompson `ft06`/`mt06` job-shop instance | https://github.com/tamy0612/JSPLIB | JSPLIB lists MIT license and cites Muth & Thompson, *Industrial Scheduling*, 1963, among the JSPLIB references. |
 | `rcpsp_j3013_1.sm` | PSPLIB RCPSP `j30` instance | https://www.om-db.wi.tum.de/psplib/main.html | Project Scheduling Problem Library fixture. |
 | `nurserostering_instance1.txt` | Nurse rostering benchmark instances | https://schedulingbenchmarks.org/nrp/ | SchedulingBenchmarks nurse rostering fixture. |
+| `sudoku_6x6_puzzle000001.sdk.txt` | Scaled Sudoku instances, base `6x6` | https://github.com/zayenz/scaled-sudoku-instances | From Lagerkvist, ModRef 2026: https://2026.modref.org/papers/ModRef2026-07-Scaling-Sudoku.pdf |
 | `large_tseitin_n18.cnf` | Translated ProofComplexity / Tseitin instance | https://www.cril.univ-artois.fr/PB25/ | CNF translation used for larger `cnf`/`dimacs` loader coverage. |
 | `large_tseitin_n18.opb` | Pseudo-Boolean Competition, ProofComplexity / Tseitin instance | https://www.cril.univ-artois.fr/PB25/ | Relevant competition citation: D. Le Berre and A. Parrain, "The Pseudo-Boolean Evaluation 2011", JSAT 7(1), 2012. |
 | `large_ramsey_k4_n5.wcnf` | MaxSAT Evaluation 2024, exact-unweighted track | https://maxsat-evaluations.github.io/ | Decompressed copy of the original WCNF instance. |
