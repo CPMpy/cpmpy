@@ -98,6 +98,7 @@ def large_neighborhood_search(model: cp.Model,
 
     best_sol = [var.value() for var in model_vars]
     best_obj = model.objective_value()
+    assert best_obj is not None, "Not all variables are assigned, LNS requires a full solution to start from."
     sol = [var.value() for var in model_vars]
     if verbose >= 1:
         print(f"Starting LNS ({len(model_vars)} vars, solver={solver})")
@@ -140,6 +141,7 @@ def large_neighborhood_search(model: cp.Model,
 
         sol = [var.value() for var in model_vars]
         obj = model.objective_value()
+        assert obj is not None # to make mypy happy
         if model.objective_is_min:
             improved = obj < best_obj
         else:
