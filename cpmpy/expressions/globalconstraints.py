@@ -421,8 +421,8 @@ class Circuit(GlobalConstraint):
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-            Decomposition of the Circuit global constraint using auxiliary variables to reprsent the order in which we visit all the nodes.
-            Auxiliary variables are defined in the defining part of the decomposition, which is alwasy enforced top-level.
+            Decomposition of the Circuit global constraint using auxiliary variables to represent the order in which we visit all the nodes.
+            Auxiliary variables are defined in the defining part of the decomposition, which is always enforced top-level.
 
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
@@ -1751,7 +1751,7 @@ class Cumulative(GlobalConstraint):
 class CumulativeOptional(GlobalConstraint):
     """
         Generalization of the Cumulative constraint which allows for optional tasks.
-        A task is only scheduled if the corresponing is_present variable is set to True.
+        A task is only scheduled if the corresponding is_present variable is set to True.
 
         If the task is present, the constraint enforces that:
         - duration >= 0
@@ -2035,7 +2035,7 @@ class NoOverlap(GlobalConstraint):
 class NoOverlapOptional(GlobalConstraint):
     """
         Generalization of the NoOverlap constraint which allows for optional tasks.
-        A task is only scheduled if the corresponing is_present variable is set to True.
+        A task is only scheduled if the corresponding is_present variable is set to True.
 
         The constraint enforces that all present tasks are scheduled without overlapping, and for each present task, the constraint enforces that:
         - duration >= 0

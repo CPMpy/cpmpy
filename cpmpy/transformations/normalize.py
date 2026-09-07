@@ -230,7 +230,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
     elif isinstance(expr, Comparison):
         changed, (lhs, rhs) = _simplify_boolean_args(expr.args, num_context=True)
         name = expr.name
-        if is_num(lhs) and is_boolexpr(rhs):  # flip arguments of comparison to reduct nb of cases
+        if is_num(lhs) and is_boolexpr(rhs):  # flip arguments of comparison to reduce nb of cases
             if name == "<":    
                 name = ">"
             elif name == ">":  

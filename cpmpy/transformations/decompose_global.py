@@ -5,10 +5,10 @@ This transformation is necessary for all non-CP solvers, and also used to decomp
 global constraints and global functions not implemented in a CP-solver.
 
 While a solver may natively support a global constraint, it may not support it natively in a reified context.
-In this case, we will als also decompose the global constraint.
+In this case, we will also decompose the global constraint.
 
 For numerical global functions, we will only decompose them if they are not supported in non-reified context.
-Even if the solver does not explicitely support them in a subexpression,
+Even if the solver does not explicitly support them in a subexpression,
 we can rewrite them using func:`cpmpy.transformations.reification.reify_rewrite` to a non-reified version when the function is total.
 E.g., bv <-> max(a,b,c) >= 4 can be rewritten as [bv <-> IV0 >= 4, IV0 == max(a,b,c)]
 

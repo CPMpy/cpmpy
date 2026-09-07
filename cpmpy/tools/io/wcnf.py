@@ -44,7 +44,7 @@ def _get_var(i: int, vars_dict: dict[int, _BoolVarImpl]) -> _BoolVarImpl:
         cp.BoolVar: The CPMpy boolean decision variable matching to index `i`.
     """
     if i not in vars_dict:
-        vars_dict[i] = cp.boolvar(name=f"x{i}") # <- be carefull that name doesn't clash with generated variables during transformations / user variables
+        vars_dict[i] = cp.boolvar(name=f"x{i}") # <- be careful that name doesn't clash with generated variables during transformations / user variables
     return vars_dict[i]
 
 def load_wcnf(wcnf: Union[str, os.PathLike, TextIO], open:Callable=builtins.open) -> cp.Model:

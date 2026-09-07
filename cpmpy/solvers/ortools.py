@@ -383,7 +383,7 @@ class CPM_ortools(SolverInterface):
             self.user_vars.update(vs)  # save user variables
             ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vs), ws) + const
         else:
-            # save user varables
+            # save user variables
             get_variables(expr, self.user_vars)
 
             # transform objective
@@ -696,7 +696,7 @@ class CPM_ortools(SolverInterface):
 
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
-                # when using an objective over arcs, using these vars direclty is recommended
+                # when using an objective over arcs, using these vars directly is recommended
                 # (see PCTSP-path model in the future)
                 x = cpm_expr.args
                 N = len(x)

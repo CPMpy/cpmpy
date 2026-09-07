@@ -149,7 +149,7 @@ class CPM_cplex(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_cplex: Install the python package 'cpmpy[cplex]' to use this solver interface.")
         elif not self.license_ok():
-            raise ModuleNotFoundError("CPM_cplex: No license found or a problem occured during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
+            raise ModuleNotFoundError("CPM_cplex: No license found or a problem occurred during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
 
         from docplex.mp.model import Model
         self.cplex_model = Model()
