@@ -590,7 +590,7 @@ class CPM_gurobi(SolverInterface):
         grb_soft_cons = []
 
         for soft_con in soft_cons:
-            # transform each constraint seperately, can map to multiple Gurobi-level constraints
+            # transform each constraint separately, can map to multiple Gurobi-level constraints
             soft_con_tf = s.transform(soft_con)
 
             if len(soft_con_tf) == 0:

@@ -1051,7 +1051,7 @@ class Count(GlobalFunction):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to count in
-            val (ExprLike): 'Value' to count occurences of (can also be an expression)
+            val (ExprLike): 'Value' to count occurrences of (can also be an expression)
         """
         if not is_any_list(arr):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
