@@ -504,7 +504,8 @@ class NDVarArray(np.ndarray):
         """ clear, for each of the stored variables, the value obtained from the last solve call
         """
         for e in self.flat:
-            e.clear()
+            if isinstance(e, Expression):
+                e.clear()
 
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
