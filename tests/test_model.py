@@ -208,18 +208,11 @@ class TestModelDescription:
         m = cp.Model()
         with m.description("packing rules"):
             m += cp.sum(x) <= 3
-            with m.description("first item implies the next two"):
-                m += x[0].implies(x[1])
-                m += x[0].implies(x[2])
+            with pytest.raises(RuntimeError, match="Cannot nest"):
+                with m.description("first item implies the next two"):
+                    m += x[0].implies(x[1])
         assert len(m.constraints) == 1
-        outer = m.constraints[0]
-        assert outer.name == "and"
-        assert str(outer) == "packing rules"
-        assert len(outer.args) == 2
-        inner = outer.args[1]
-        assert inner.name == "and"
-        assert str(inner) == "first item implies the next two"
-        assert len(inner.args) == 2
+        assert str(m.constraints[0]) == "packing rules"
 
     def test_nested_different_models(self):
         m1, m2 = cp.Model(), cp.Model()
@@ -233,21 +226,5 @@ class TestModelDescription:
         assert a.name == "a"
         assert len(m2.constraints) == 1
         assert str(m2.constraints[0]) == "on m2"
-        assert b.name == "b"
-
-    def test_nested_inner_exception(self):
-        m = cp.Model()
-        a, b = cp.boolvar(name="a"), cp.boolvar(name="b")
-        with m.description("outer"):
-            m += a == 1
-            try:
-                with m.description("inner"):
-                    m += b == 1
-                    raise ValueError("boom")
-            except ValueError:
-                pass
-        assert len(m.constraints) == 1
-        assert str(m.constraints[0]) == "outer"
-        assert a.name == "a"
         assert b.name == "b"
 
