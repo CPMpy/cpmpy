@@ -792,7 +792,7 @@ class Operator(Expression):
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
         #  expressions the way the user wrote them)
-        if arity == 0:
+        if arity == 0 and name != 'and': # special handling for nested description groups
             arg_list = list(arg_list)  # make sure its a writable list
             i = 0 # length can change
             while i < len(arg_list):
