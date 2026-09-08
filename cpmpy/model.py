@@ -28,16 +28,16 @@
 from __future__ import annotations
 import copy
 import warnings
-from typing import Optional
+from typing import Callable, Literal, Optional
 
 from .exceptions import NotSupportedError
 from .expressions.core import Expression, NestedBoolExprLike
-from .expressions.utils import is_any_list
+from .expressions.python_builtins import all as cpm_all
+from .expressions.utils import is_any_list, flatlist
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, Callback
 
 import pickle
-
 class Model(object):
     """
     CPMpy Model object, contains the constraint and objective expressions
@@ -115,7 +115,36 @@ class Model(object):
 
         self.constraints.append(con)
         return self
-    __add__ = add  # Make __add__() (for the += operation) be the same as add() 
+
+    def __add__(self, con: NestedBoolExprLike) -> "Model":
+        return self.add(con)
+
+    def description(self, txt: str, override_print: bool = True, full_print: bool = False) -> _DescriptionContext:
+        """
+        Context manager that attaches a human-readable description to constraints added inside the block.
+
+        If a single constraint is added, the description is set on that constraint.
+        If several constraints are added, they are wrapped in a conjunction (``and``) and the description is set on that conjunction.
+
+        Arguments:
+            txt (str): description text
+            override_print (bool): whether ``str()`` of the constraint shows the description (default: True)
+            full_print (bool): if True, ``str()`` is ``"<txt> -- <repr>"`` (default: False)
+
+        Example:
+            .. code-block:: python
+
+                x = boolvar(shape=5)
+                m = Model()
+
+                with m.description("at most three items"):
+                    m += sum(x) <= 3
+
+                with m.description("first item implies the next two"):
+                    m += x[0].implies(x[1])
+                    m += x[0].implies(x[2])
+        """
+        return _DescriptionContext(self, txt, override_print, full_print) 
 
 
     def minimize(self, expr: Expression) -> None:
@@ -326,3 +355,42 @@ def _update_variable_counters(model: Model):
     # update counters for future variables
     _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
     _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
+
+
+class _DescriptionContext:
+    """Buffers constraints added to a model while a :meth:`Model.description` block is active."""
+
+    def __init__(self, model: "Model", txt: str, override_print: bool, full_print: bool):
+        self.model = model
+        self.txt = txt
+        self.override_print = override_print
+        self.full_print = full_print
+        self._buffer: list[NestedBoolExprLike] = []
+        self._prev_add: Optional[Callable[[NestedBoolExprLike], Model]] = None
+
+    def __enter__(self) -> "_DescriptionContext":
+        self._prev_add = self.model.add
+        setattr(self.model, "add", self.add)  # constraints added to the model are now buffered here
+        return self
+
+    def add(self, con: NestedBoolExprLike) -> "Model":
+        self._buffer.append(con)
+        return self.model  # so `+=` works
+
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        assert self._prev_add is not None
+        setattr(self.model, "add", self._prev_add)  # restore (may be another description context)
+
+        if exc_type is not None:
+            return False
+        cons = flatlist(self._buffer) # TODO: use toplevel_list instead?
+        if len(cons) == 0:
+            return False
+        if len(cons) == 1:
+            wrapped = cons[0]
+        else:
+            wrapped = cpm_all(cons)
+        if isinstance(wrapped, Expression):
+            wrapped.set_description(self.txt, override_print=self.override_print, full_print=self.full_print)
+        self.model.add(wrapped)
+        return False
