@@ -126,6 +126,8 @@ class Model(object):
         If a single constraint is added, the description is set on that constraint.
         If several constraints are added, they are wrapped in a conjunction (``and``) and the description is set on that conjunction.
 
+        Nested ``description()`` blocks on the same model are not supported.
+
         Arguments:
             txt (str): description text
             override_print (bool): whether ``str()`` of the constraint shows the description (default: True)
@@ -370,6 +372,8 @@ class _DescriptionContext:
 
     def __enter__(self) -> "_DescriptionContext":
         self._prev_add = self.model.add
+        if getattr(self._prev_add, "__func__", None) is not Model.add:
+            raise RuntimeError("Cannot nest model.description() context managers")
         setattr(self.model, "add", self.add)  # constraints added to the model are now buffered here
         return self
 
@@ -379,7 +383,7 @@ class _DescriptionContext:
 
     def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
         assert self._prev_add is not None
-        setattr(self.model, "add", self._prev_add)  # restore (may be another description context)
+        setattr(self.model, "add", self._prev_add)
 
         if exc_type is not None:
             return False
