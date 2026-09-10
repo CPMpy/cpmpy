@@ -174,6 +174,8 @@ def sum(iterable, **kwargs):
             return builtins.sum(iterable, **kwargs)  # does not contain expressions
 
     assert len(kwargs)==0, "sum over expressions does not support keyword arguments"
+    if len(iterable) == 1:
+        return iterable[0]
     return Operator("sum", iterable)
 
 
