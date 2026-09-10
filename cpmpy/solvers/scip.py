@@ -38,7 +38,7 @@ from ..expressions.core import Expression, BoolVal, Comparison, Operator, Nested
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
-from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst, get_nonneg_args
+from ..expressions.utils import get_bounds, is_num, is_int, is_true_cst, is_false_cst, get_nonneg_args
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -478,6 +478,9 @@ class CPM_scip(SolverInterface):
                 else:
                     start, dur, end = cpm_expr.args
                     self._add_transformed_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
+                
+                if any(lb <= 0 for lb in get_bounds(dur)[0]): # zero-duration tasks cannot overlap, not enforced by Cumulative
+                    self.add(cpm_expr.decompose())
 
             else:
                 raise NotImplementedError(
