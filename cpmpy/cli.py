@@ -130,6 +130,8 @@ def run_library_skills(argv: list[str]) -> int:
 def _load_sync_module(root: Path):
     sync_path = root / "skills" / "sync_into_package.py"
     spec = importlib.util.spec_from_file_location("cpmpy_sync_into_package", sync_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load skill sync module from {sync_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
