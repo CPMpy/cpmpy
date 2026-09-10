@@ -193,7 +193,7 @@ def main() -> int:
     if args.clean:
         sync = _load_sync_module()
         removed = sync.clean_generated_refs(REPO_ROOT / "skills")
-        sync.sync_skills(warn_missing=False)
+        sync.sync_skills()
         if removed:
             for path in removed:
                 print(f"removed {path.relative_to(REPO_ROOT)}")

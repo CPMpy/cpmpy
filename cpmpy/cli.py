@@ -44,12 +44,6 @@ To regenerate from the Sphinx docs, clone the repo and install editable:
     cpmpy skills update --regenerate
 """
 
-CONTINUE_WITHOUT_GENERATED_PROMPT = "Continue without them? [y/N] "
-NON_TTY_MISSING_REFS_HINT = (
-    "Not a TTY; aborting. Generate the files with "
-    "`cpmpy skills update --regenerate` or rerun from a terminal."
-)
-
 SKILLS_HELP_PREAMBLE = """\
 usage: cpmpy skills [-h] [update] [library-skills args ...]
 
@@ -133,63 +127,12 @@ def run_library_skills(argv: list[str]) -> int:
     return completed.returncode
 
 
-def _sync_helper_path(root: Path | None = None) -> Path | None:
-    candidates = []
-    if root is not None:
-        candidates.append(root / "skills" / "sync_into_package.py")
-    candidates.append(Path(__file__).resolve().parent.parent / "skills" / "sync_into_package.py")
-    for path in candidates:
-        if path.is_file():
-            return path
-    return None
-
-
-def _load_sync_module(root: Path | None = None):
-    sync_path = _sync_helper_path(root)
-    if sync_path is None:
-        raise FileNotFoundError("skills/sync_into_package.py")
+def _load_sync_module(root: Path):
+    sync_path = root / "skills" / "sync_into_package.py"
     spec = importlib.util.spec_from_file_location("cpmpy_sync_into_package", sync_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-def _stdin_is_tty() -> bool:
-    return sys.stdin.isatty()
-
-
-def confirm_continue_with_missing_generated_refs() -> bool:
-    """Ask whether to continue after missing generated refs. Default is no."""
-    if not _stdin_is_tty():
-        print(NON_TTY_MISSING_REFS_HINT, file=sys.stderr)
-        return False
-    try:
-        print(CONTINUE_WITHOUT_GENERATED_PROMPT, end="", file=sys.stderr, flush=True)
-        answer = input()
-    except EOFError:
-        print(file=sys.stderr)
-        return False
-    return answer.strip().lower() in {"y", "yes"}
-
-
-def warn_if_generated_refs_missing(*, skip: bool = False) -> bool:
-    """
-    On an editable/source install, warn if gitignored generated refs are absent.
-
-    Returns True if the command should proceed. When files are missing, asks
-    whether to continue (default no).
-    """
-    if skip:
-        return True
-    root = _source_root()
-    if root is None:
-        return True
-    if _sync_helper_path(root) is None:
-        return True
-    missing = _load_sync_module(root).warn_if_generated_refs_missing(root / "skills")
-    if not missing:
-        return True
-    return confirm_continue_with_missing_generated_refs()
 
 
 def regenerate_skill_references() -> int:
@@ -255,13 +198,6 @@ def command_skills(argv: list[str]) -> int:
     if argv and argv[0] in ("-h", "--help"):
         print(skills_help(), end="")
         return 0
-    help_requested = "-h" in argv or "--help" in argv
-    skip_missing_prompt = bool(
-        argv and argv[0] == "update" and "--regenerate" in argv[1:]
-    )
-    if not help_requested:
-        if not warn_if_generated_refs_missing(skip=skip_missing_prompt):
-            return 1
     if argv and argv[0] == "update":
         return command_skills_update(argv[1:])
     return run_library_skills(argv)

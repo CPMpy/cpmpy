@@ -1,5 +1,0 @@
-# Generated reference files (see generate_references.py) are derived
-# entirely from this repo's own docs/, already tracked in git — committing a
-# second copy here would just be a duplicate that can silently drift.
-# Run `python skills/generate_references.py` to (re)create them locally.
-**/references/*.generated.md
