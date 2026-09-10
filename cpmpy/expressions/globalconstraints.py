@@ -1959,6 +1959,9 @@ class NoOverlap(GlobalConstraint):
     Enforces that a set of tasks are scheduled without overlapping, and enforces:
         - duration >= 0
         - start + duration == end
+
+    Tasks with zero duration are considered to overlap, similar to MiniZinc's `disjunctive_strict` constraint.
+    If you need to enforce that tasks with zero duration are allowed to overlap, use `cp.Cumulative(start, duration, end, demand=1, capacity=1)` instead.
     """
 
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None):
@@ -2020,17 +2023,17 @@ class NoOverlap(GlobalConstraint):
             end = [s + d for s,d in zip(start, duration)]
         else:
             start, duration,end = argvals(self.args)
-            if any(a is None for a in [start, duration,end]):
+            if any(a is None for a in start + duration + end):
                 return None
         
-        tasks = sorted(zip(start, duration,end), key=lambda x: x[0])
+        tasks = sorted(zip(start, duration, end), key=lambda x: (x[0], x[1] != 0)) # break ties, sort 0-duration tasks first
 
         for i, (s,d,e) in enumerate(tasks):
             if d < 0:
                 return False
             if s + d != e:
                 return False
-            if i < len(tasks) - 1 and e < tasks[i+1][0]: # overlaps with next
+            if i < len(tasks) - 1 and e > tasks[i+1][0]: # overlaps with next
                 return False
                 
         return True
@@ -2115,13 +2118,14 @@ class NoOverlapOptional(GlobalConstraint):
             if any(a is None for a in start + duration + end + is_present):
                 return None
 
-        tasks = sorted(((s,d,e) for s,d,e,p in zip(start, duration,end, is_present) if p), key=lambda x: x[0])
+        tasks = sorted(((s,d,e) for s,d,e,p in zip(start, duration,end, is_present) if p),
+                       key=lambda x: (x[0], x[1] != 0)) # break ties, sort 0-duration tasks first
         for i, (s,d,e) in enumerate(tasks):
             if d < 0:
                 return False
             if s + d != e:
                 return False
-            if i < len(tasks) - 1 and e < tasks[i+1][0]: # overlaps with next
+            if i < len(tasks) - 1 and e > tasks[i+1][0]: # overlaps with next
                 return False
     
         return True
