@@ -105,6 +105,13 @@ class TestMUS:
                        verify_func=lambda ms: set(ms) == set(soft))
 
     @pytest.mark.parametrize("variant", ALL)
+    def single_soft_constraint(self, solver, variant):
+        x = cp.intvar(1, 2, shape=3, name="x")
+        soft = [cp.AllDifferent(x)]
+        self._test_mus(soft, hard=[], solver=solver, variant=variant,
+                       verify_func=lambda ms: len(set(ms)) == 1)
+
+    @pytest.mark.parametrize("variant", ALL)
     def test_wglobal(self, solver, variant):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
@@ -133,22 +140,11 @@ class TestMUS:
         cons = cp.AllDifferent(x)
         cons.name = "DummyAllDiff" # nonexisting name, force decompos
 
-
         soft = [cons, x[0] == x[1], x[1] == x[2]]
 
-        mus_cons = self.mus_func(soft=soft, hard=[], solver=solver)
-        assert len(set(mus_cons)) == 2
-        assert "DummyAllDiff(x[0],x[1],x[2])" in set(map(str, mus_cons))
-        mus_naive_cons = self.naive_func(soft=soft, hard=[])
-        assert len(set(mus_naive_cons)) == 2
-        assert "DummyAllDiff(x[0],x[1],x[2])" in set(map(str, mus_cons))
+        self._test_mus(soft, hard=[], solver=solver, variant=variant,
+                       verify_func=lambda ms: len(set(ms)) == 2 and "DummyAllDiff(x[0],x[1],x[2])" in set(map(str, ms)))
 
-    def single_soft_constraint(self, solver):
-        x = cp.intvar(1, 2, shape=3, name="x")
-        soft = [cp.AllDifferent(x)]
-        hard = []
-        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
-                       verify_func=lambda ms: len(set(ms)) == 1)
 
     @pytest.mark.parametrize("variant", ALL)
     def test_cse_shared_subexpr(self, solver, variant):
@@ -161,11 +157,11 @@ class TestMUS:
         soft = [
             cp.abs(x) + y <= 15,  # satisfiable, not needed for the conflict
             cp.abs(x) + y >= 11,  # the real conflict with hard
+            x == 0
         ]
-        hard = [x == 0]
 
-        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
-                       verify_func=lambda ms: set(ms) == {soft[1]})
+        self._test_mus(soft, hard=[], solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == {soft[1], soft[2]})
 
     # quickxplain-specific
     @pytest.mark.parametrize("variant", ["quickxplain", "quickxplain_naive"])
