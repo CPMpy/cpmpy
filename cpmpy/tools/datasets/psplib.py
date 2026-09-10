@@ -52,7 +52,6 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
                 or if the requested variant/family combination is not available.
         """
         
-        self.root = pathlib.Path(root)
         self.variant = variant
         self.family = family
         
@@ -66,10 +65,8 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         if family not in self.families[variant]:
             raise ValueError(f"Unknown problem family. Must be any of {','.join(self.families[variant])}")
         
-        dataset_dir = self.root / self.name / self.variant / self.family
-
         super().__init__(
-            dataset_dir=dataset_dir,
+            root=root, subdirs=(self.variant, self.family),
             transform=transform, target_transform=target_transform, 
             download=download, extension=f".{self.family_codes[self.variant]}",
             **kwargs

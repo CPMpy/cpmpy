@@ -128,6 +128,7 @@ PUBLIC_FIXTURES = [
     "jsplib_ft06.txt",
     "rcpsp_j3013_1.sm",
     "nurserostering_instance1.txt",
+    "sudoku_6x6_puzzle000001.sdk.txt",
     "large_tseitin_n18.cnf",
     "large_tseitin_n18.opb",
     "large_ramsey_k4_n5.wcnf",
@@ -634,6 +635,16 @@ LARGER_INSTANCE_CASES = [
         load_format="nurserostering",
         expected_vars=140,
         expected_constraints=334,
+    ),
+    LargerInstanceCase(
+        id="sudoku-6x6-puzzle000001",
+        filename="sudoku_6x6_puzzle000001.sdk.txt",
+        load_format="sudoku",
+        expected_vars=36,
+        # 1 given-cells equality + 1 row-AllDifferent list + 1 col-AllDifferent list
+        # + 6 block AllDifferents (see cpmpy/tools/io/sudoku.py).
+        expected_constraints=9,
+        solve_result=True,
     ),
 ]
 

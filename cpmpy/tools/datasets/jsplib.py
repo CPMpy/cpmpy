@@ -65,14 +65,11 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         Initialize the JSPLib Dataset.
         """
 
-        self.root = pathlib.Path(root)
         self._source_metadata_file = "instances.json"
         self._source_metadata: Optional[list] = None  # Loaded lazily during metadata collection
 
-        dataset_dir = self.root / self.name
-
         super().__init__(
-            dataset_dir=dataset_dir,
+            root=root,
             transform=transform, target_transform=target_transform,
             download=download, extension="",
             **kwargs
