@@ -1,21 +1,12 @@
 ---
 name: cpmpy-model
-description: Write and solve problems in CPMpy, a constraint programming and modelling library in Python, based on numpy, with direct solver access. 
-version: 0.0.1
+description: Write and solve problems in CPMpy, a constraint programming and modelling library in Python, based on numpy, with direct solver access.
 license: Apache-2.0
+compatibility: Requires Python 3.10+
 metadata:
   author: CPMpy team
   domain: constraint-programming
   library: cpmpy
-  tags:
-    - constraint-programming
-    - combinatorial-optimization
-    - constraint-modeling
-    - decision-variables
-    - global-constraints
-    - python
-    - or-tools
-    - optimization
 ---
 
 # CPMpy modeling
