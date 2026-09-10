@@ -17,5 +17,5 @@ For an overview of the available backends and their abilities: [index](https://c
 
 For a compact, complete API listing: [references/api-cheatsheet.generated.md](references/api-cheatsheet.generated.md)
 
-For the full narrative documentation (global constraints catalog, solver selection, incremental solving, I/O, debugging), see [modeling](https://cpmpy.readthedocs.io/en/latest/modeling.html).
+For the full narrative documentation (global constraints catalog, solver selection, incremental solving, I/O, debugging), see [documentation](https://cpmpy.readthedocs.io/en/latest/llm.txt).
 
