@@ -6,39 +6,54 @@ from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
 
-# annotation to run both MUS and naive varaint for the test
-run_mus_and_naive = pytest.mark.parametrize("naive", [False, True], ids=["mus", "naive"])
+ALL = [
+    "mus", "mus_naive", "mus_native",
+    "quickxplain", "quickxplain_naive",
+    "optimal_mus", "optimal_mus_naive",
+    "ocus", "ocus_naive",
+]
+
+MUS_FUNCS = dict(
+    mus = mus,
+    mus_naive = mus_naive,
+    mus_native = mus_native,
+    quickxplain = quickxplain,
+    quickxplain_naive = quickxplain_naive,
+    optimal_mus = optimal_mus,
+    optimal_mus_naive = optimal_mus_naive,
+    ocus = ocus,
+    ocus_naive = ocus_naive,
+)
 
 
-class TestMus:
-    def setup_method(self):
-        self.mus_func = mus
-        self.naive_func = mus_naive
 
-    def _supported_solver(self, solver):
+class TestMUS:
+
+    def _supported_solver(self, solver, variant):
+        if variant.endswith("_naive"):
+            return True
+        if variant == "mus_native":
+            return "mus_native" in cp.SolverLookup.lookup(solver).__dict__
+        # assumption-based algorithms
         s = cp.SolverLookup.get(solver)
-        solve_arguments = inspect.signature(s.solve).parameters
-        return solve_arguments.get("assumptions") is not None
+        return inspect.signature(s.solve).parameters.get("assumptions") is not None
 
-    def _unsupported_reason(self, solver):
+    def _unsupported_reason(self, solver, variant):
+        if variant == "mus_native":
+            return f"Solver {solver} does not support native MUS"
         return f"Solver {solver} does not support assumption-based MUS"
 
-    def _test_mus(self, cons, hard, solver, verify_func, naive=False, **kwargs):
+    def _test_mus(self, cons, hard, solver, verify_func, variant, **kwargs):
         if solver == "hexaly":
             pytest.skip("Hexaly is too slow on UNSAT problems.")
-        if naive:
-            mus_cons = self.naive_func(soft=cons, hard=hard, solver=solver, **kwargs)
-        else:
-            if not self._supported_solver(solver):
-                pytest.skip(self._unsupported_reason(solver))
-            mus_cons = self.mus_func(soft=cons, hard=hard, solver=solver, **kwargs)
+        if not self._supported_solver(solver, variant):
+            pytest.skip(self._unsupported_reason(solver, variant))
+        mus_cons = MUS_FUNCS[variant](soft=cons, hard=hard, solver=solver, **kwargs)
         assert verify_func(mus_cons)
 
-
-    # test cases
-
-    @run_mus_and_naive
-    def test_circular(self, solver, naive):
+    # shared test cases
+    @pytest.mark.parametrize("variant", ALL)
+    def test_circular(self, solver, variant):
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
         cons = [
@@ -50,11 +65,11 @@ class TestMus:
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        self._test_mus(cons, hard=[], solver=solver, naive=naive,
+        self._test_mus(cons, hard=[], solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == set(cons[:3]))
 
-    @run_mus_and_naive
-    def test_bug_191(self, solver, naive):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_bug_191(self, solver, variant):
         """
         Original Bug request: https://github.com/CPMpy/cpmpy/issues/191
         When assum is a single boolvar and candidates is a list (of length 1), it fails.
@@ -63,11 +78,11 @@ class TestMus:
         hard = [~bv]
         soft = [bv]
 
-        self._test_mus(soft, hard=hard, solver=solver, naive=naive,
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == set(soft))
 
-    @run_mus_and_naive
-    def test_bug_191_many_soft(self, solver, naive):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_bug_191_many_soft(self, solver, variant):
         """
         Checking whether bugfix 191  doesn't break anything in the MUS tool chain,
         when the number of soft constraints > 1.
@@ -80,11 +95,11 @@ class TestMus:
             y == 4
         ]
 
-        self._test_mus(soft, hard=hard, solver=solver, naive=naive,
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == set(soft))
 
-    @run_mus_and_naive
-    def test_wglobal(self, solver, naive):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_wglobal(self, solver, variant):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
 
@@ -102,20 +117,20 @@ class TestMus:
         ]
 
         # non-determinstic
-        self._test_mus(cons, hard=[], solver=solver, naive=naive,
+        self._test_mus(cons, hard=[], solver=solver, variant=variant,
                        verify_func=lambda ms: len(ms) < len(cons) and not cp.Model(ms).solve())
 
-    @run_mus_and_naive
-    def test_decomposed_global(self, solver, naive):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_decomposed_global(self, solver, variant):
         x = cp.intvar(1, 5, shape=3, name="x")
         soft = [x[0] == x[1], x[1] == x[2]]
         hard = [cp.AllDifferent(x)]
 
-        self._test_mus(soft, hard=hard, solver=solver, naive=naive,
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
                        verify_func=lambda ms: len(set(ms)) == 1)
 
-    @run_mus_and_naive
-    def test_cse_shared_subexpr(self, solver, naive):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_cse_shared_subexpr(self, solver, variant):
         """Example with CSE in the defining constraints.
 
         Reproducer from https://github.com/CPMpy/cpmpy/pull/986
@@ -128,96 +143,67 @@ class TestMus:
         ]
         hard = [x == 0]
 
-        self._test_mus(soft, hard=hard, solver=solver, naive=naive,
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == {soft[1]})
 
-
-@pytest.mark.requires_solver("exact", "gurobi", "cplex")
-class TestNativeMus(TestMus):
-    def setup_method(self):
-        self.mus_func = mus_native
-        self.naive_func = mus_naive
-
-    def _supported_solver(self, solver):
-        # True only if the concrete solver class overrides mus_native
-        return "mus_native" in cp.SolverLookup.lookup(solver).__dict__
-
-    def _unsupported_reason(self, solver):
-        return f"Solver {solver} does not support native MUS"
-
-
-class TestQuickXplain(TestMus):
-    def setup_method(self):
-        self.mus_func = quickxplain
-        self.naive_func = quickxplain_naive
-
-    @run_mus_and_naive
-    def test_prefered(self, solver, naive):
+    # quickxplain-specific
+    @pytest.mark.parametrize("variant", ["quickxplain", "quickxplain_naive"])
+    def test_prefered(self, solver, variant):
         a,b,c,d = [cp.boolvar(name=n) for n in "abcd"]
 
         mus1 = [b,d]
         mus2 = [a,b,c]
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
-        self._test_mus([a,b,c,d], hard=hard, solver=solver, naive=naive,
+        self._test_mus([a,b,c,d], hard=hard, solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == {a,b,c})
-        self._test_mus([d,c,b,a], hard=hard, solver=solver, naive=naive,
+        self._test_mus([d,c,b,a], hard=hard, solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == {b,d})
 
-
-class TestOptimalMUS(TestMus):
-
-    def setup_method(self):
-        self.mus_func = optimal_mus
-        self.naive_func = optimal_mus_naive
-
-    @run_mus_and_naive
-    def test_weighted(self, solver, naive):
+    # optimal MUS-specific
+    @pytest.mark.parametrize("variant", ["optimal_mus", "optimal_mus_naive"])
+    def test_weighted(self, solver, variant):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
         mus1 = [b, d]
         mus2 = [a, b, c]
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
-        self._test_mus([a, b, c, d], hard=hard, solver=solver, naive=naive,
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
                        weights=[1, 1, 2, 4], verify_func=lambda ms: set(ms) == {a, b, c})
-        self._test_mus([a, b, c, d], hard=hard, solver=solver, naive=naive,
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
                        weights=[2, 3, 4, 2], verify_func=lambda ms: set(ms) == {b, d})
-        self._test_mus([a, b, c, d], hard=hard, solver=solver, naive=naive,
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == {b, d})
 
-
-class TestOCUS(TestOptimalMUS):
-
-    def setup_method(self):
-        self.mus_func = ocus
-        self.naive_func = ocus_naive
-
-    @run_mus_and_naive
-    def test_constrained(self, solver, naive):
+    # OCUS-specific
+    @pytest.mark.parametrize("variant", ["ocus", "ocus_naive"])
+    def test_constrained(self, solver, variant):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
         mus1 = [b, d]
         mus2 = [a, b, c]
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
-        self._test_mus([a, b, c, d], hard=hard, solver=solver, naive=naive,
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
                        meta_constraint=~b | d, verify_func=lambda ms: set(ms) == {b, d})
-        self._test_mus([a, b, c, d], hard=hard, solver=solver, naive=naive,
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
                        meta_constraint=a & d, verify_func=lambda ms: set(ms) == {a, b, d})  # not subset-minimal
 
-    @run_mus_and_naive
-    def test_no_such_mus(self, solver, naive):
+    @pytest.mark.parametrize("variant", ["ocus", "ocus_naive"])
+    def test_no_such_mus(self, solver, variant):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
         mus1 = [b, d]
         mus2 = [a, b, c]
         hard = [~cp.all(mus1), ~cp.all(mus2)]
 
-        mus_func = self.naive_func if naive else self.mus_func
-        if not naive and not self._supported_solver(solver):
-            pytest.skip(self._unsupported_reason(solver))
-        pytest.raises(OCUSException, lambda: mus_func([a, b, c, d], hard, meta_constraint=~b, solver=solver))
+        if solver == "hexaly":
+            pytest.skip("Hexaly is too slow on UNSAT problems.")
+        if not self._supported_solver(solver, variant):
+            pytest.skip(self._unsupported_reason(solver, variant))
+        pytest.raises(OCUSException, lambda: MUS_FUNCS[variant](
+            [a, b, c, d], hard, meta_constraint=~b, solver=solver))
 
 
 class TestMARCOMUS:
