@@ -1879,17 +1879,16 @@ class CumulativeOptional(GlobalConstraint):
         else:
             start, duration, end, demand, capacity, is_present = self.args
 
-        # demand of tasks that are present doesn't exceed capacity
-        # tasks are uninterruptible, so we only need to check each starting point of each task
-        # I.e., for each task, we check if it can be started, given the tasks that are already running.
+        # Check capacity at each present task's start time (enough for non-preemptive tasks).
+        # A task is active on [start, end), so duration 0 never contributes demand —
+        # same convention as .value() and the time-based decomposition.
         for t in range(len(start)):
             st = start[t]
-            demand_at_start_of_t = []
-            for j in range(len(start)):
-                if t != j:
-                    demand_at_start_of_t.append(demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st)))
-
-            cons.append(implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity))
+            demand_at_start_of_t = [
+                demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st))
+                for j in range(len(start))
+            ]
+            cons.append(implies(is_present[t], sum(demand_at_start_of_t) <= capacity))
 
         return cons, []
 
