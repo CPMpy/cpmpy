@@ -695,13 +695,7 @@ class CPM_cpo(SolverInterface):
         if not is_optional:
             is_present = BoolVal(True) # eases handling below
 
-        lb, ub = get_bounds(dur)
         extra_cons = []
-        if lb == 0 == ub:
-            if end is None: # nothing to enforce
-                return None, []
-            return None, extra_cons + self._cpo_expr([implies(is_present, start == end)]) # no task, just enforce 0 duration
-
         # Normal setting
         if end is None: # no end provided by user
             task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur), optional=is_optional)
