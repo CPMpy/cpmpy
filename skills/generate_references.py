@@ -22,12 +22,14 @@ Usage:
     python skills/generate_references.py --check     # verify generated files are
                                                      # up to date; exit 1 if not
                                                      # (use in CI after docs change)
+    python skills/generate_references.py --clean     # delete generated files (dev)
 
 To add a new generated reference file, add an entry to SOURCES below.
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import re
 import subprocess
@@ -160,6 +162,14 @@ def build(source: str, headings: list[str] | None, output: str) -> str:
     return header + body
 
 
+def _load_sync_module():
+    path = Path(__file__).resolve().parent / "sync_into_package.py"
+    spec = importlib.util.spec_from_file_location("cpmpy_sync_into_package", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -170,7 +180,26 @@ def main() -> int:
         action="store_true",
         help="don't write files; exit 1 if any generated file is stale/missing",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="delete generated reference files and recopy skills into the package",
+    )
     args = parser.parse_args()
+
+    if args.clean and (args.build or args.check):
+        parser.error("--clean cannot be combined with --build or --check")
+
+    if args.clean:
+        sync = _load_sync_module()
+        removed = sync.clean_generated_refs(REPO_ROOT / "skills")
+        sync.sync_skills(warn_missing=False)
+        if removed:
+            for path in removed:
+                print(f"removed {path.relative_to(REPO_ROOT)}")
+        else:
+            print("no generated skill reference files to remove")
+        return 0
 
     if args.build:
         build_docs()

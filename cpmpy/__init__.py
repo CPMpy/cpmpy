@@ -15,6 +15,8 @@ The package consists of 4 modules:
 Agent Skills are authored in ``skills/`` and copied into ``cpmpy/.agents/skills/``
 at install time. Install them into a project with ``pip install 'cpmpy[skills]'``
 then ``cpmpy skills``; refresh after upgrading with ``cpmpy skills update``.
+Rebuild generated references from a source checkout with
+``cpmpy skills update --regenerate`` (requires ``cpmpy[docs]``).
 """
 # Tias Guns, 2019-2026
 

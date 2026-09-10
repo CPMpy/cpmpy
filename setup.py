@@ -77,6 +77,15 @@ format_dependencies = {
 }
 format_dependencies["io.all"] = list({pkg for group in format_dependencies.values() for pkg in group})
 
+docs_require = [
+    "sphinx>=5.3.0",
+    "sphinx_rtd_theme>=2.0.0",
+    "myst_parser",
+    "sphinx-automodapi",
+    "readthedocs-sphinx-search>=0.3.2",
+    "sphinx_llm",
+]
+
 setup(
     name='cpmpy',
     version=get_version("cpmpy/__init__.py"),
@@ -105,7 +114,7 @@ setup(
         # Other
         "test": ["pytest", "pytest-timeout"],
         "type": ["mypy", "types-tqdm"],
-        "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2", "sphinx_llm"],
+        "docs": docs_require,
         "skills": ["library-skills"],
     },
     cmdclass={
