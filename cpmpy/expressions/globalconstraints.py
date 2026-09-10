@@ -2022,14 +2022,17 @@ class NoOverlap(GlobalConstraint):
             start, duration,end = argvals(self.args)
             if any(a is None for a in [start, duration,end]):
                 return None
-       
-        if any(d < 0 for d in duration):
-            return False
-        if any(s + d != e for s,d,e in zip(start, duration,end)):
-            return False
-        for (s1,d1), (s2,d2) in all_pairs(zip(start,duration)):
-            if s1 + d1 > s2 and s2 + d2 > s1:
+        
+        tasks = sorted(zip(start, duration,end), key=lambda x: x[0])
+
+        for i, (s,d,e) in enumerate(tasks):
+            if d < 0:
                 return False
+            if s + d != e:
+                return False
+            if i < len(tasks) - 1 and e < tasks[i+1][0]: # overlaps with next
+                return False
+                
         return True
 
 class NoOverlapOptional(GlobalConstraint):
@@ -2112,13 +2115,15 @@ class NoOverlapOptional(GlobalConstraint):
             if any(a is None for a in start + duration + end + is_present):
                 return None
 
-        if any(p and d < 0 for d,p in zip(duration,is_present)):
-            return False
-        if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
-            return False
-        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,duration,is_present)):
-            if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
+        tasks = sorted(((s,d,e) for s,d,e,p in zip(start, duration,end, is_present) if p), key=lambda x: x[0])
+        for i, (s,d,e) in enumerate(tasks):
+            if d < 0:
                 return False
+            if s + d != e:
+                return False
+            if i < len(tasks) - 1 and e < tasks[i+1][0]: # overlaps with next
+                return False
+    
         return True
     
 class Precedence(GlobalConstraint):
