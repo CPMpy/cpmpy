@@ -90,7 +90,7 @@ class CPM_choco(SolverInterface):
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
                                     "lex_lesseq", "lex_less", "mdd",
                                     "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
-    supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
+    supported_reified_global_constraints = supported_global_constraints - {"no_overlap"}  # choco supports everything reified
 
     @staticmethod
     def supported():
@@ -679,10 +679,17 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
                 if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
-                    return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1))
+                    chc_cons = self._get_constraint(Cumulative(start, dur, demand=1, capacity=1))
                 else:
                     start, dur, end = cpm_expr.args
-                    return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
+                    chc_cons = self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
+                    
+                if any(lb <= 0 for lb in get_bounds(dur)[0]): # zero-duration tasks cannot overlap, not enforced by Cumulative
+                    assert "no_overlap" not in self.supported_reified_global_constraints # otherwise cannot post decomposition toplevel
+                    self.add(cpm_expr.decompose())
+
+                return chc_cons
+
             elif cpm_expr.name == "precedence":
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":
