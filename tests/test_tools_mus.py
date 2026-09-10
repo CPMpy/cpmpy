@@ -1,31 +1,75 @@
+import inspect
 import pytest
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
-@pytest.mark.requires_solver("exact")
-class TestMus:
-    def setup_method(self):
-        self.mus_func = mus
-        self.naive_func = mus_naive
 
-    def test_circular(self, solver):
+ALL = [
+    "mus", "mus_naive", "mus_native",
+    "quickxplain", "quickxplain_naive",
+    "optimal_mus", "optimal_mus_naive",
+    "ocus", "ocus_naive",
+]
+
+MUS_FUNCS = dict(
+    mus = mus,
+    mus_naive = mus_naive,
+    mus_native = mus_native,
+    quickxplain = quickxplain,
+    quickxplain_naive = quickxplain_naive,
+    optimal_mus = optimal_mus,
+    optimal_mus_naive = optimal_mus_naive,
+    ocus = ocus,
+    ocus_naive = ocus_naive,
+)
+
+
+
+class TestMUS:
+
+    def _supported_solver(self, solver, variant):
+        if variant.endswith("_naive"):
+            return True
+        if variant == "mus_native":
+            return "mus_native" in cp.SolverLookup.lookup(solver).__dict__
+        # assumption-based algorithms
+        s = cp.SolverLookup.get(solver)
+        return inspect.signature(s.solve).parameters.get("assumptions") is not None
+
+    def _unsupported_reason(self, solver, variant):
+        if variant == "mus_native":
+            return f"Solver {solver} does not support native MUS"
+        return f"Solver {solver} does not support assumption-based MUS"
+
+    def _test_mus(self, cons, hard, solver, verify_func, variant, **kwargs):
+        if solver == "hexaly":
+            pytest.skip("Hexaly is too slow on UNSAT problems.")
+        if not self._supported_solver(solver, variant):
+            pytest.skip(self._unsupported_reason(solver, variant))
+        mus_cons = MUS_FUNCS[variant](soft=cons, hard=hard, solver=solver, **kwargs)
+        assert verify_func(mus_cons)
+
+    # shared test cases
+    @pytest.mark.parametrize("variant", ALL)
+    def test_circular(self, solver, variant):
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
         cons = [
-            x[0] > x[1], 
+            x[0] > x[1],
             x[1] > x[2],
             x[2] > x[0],
-    
+
             x[3] > x[0],
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        assert set(self.mus_func(cons, hard=[], solver=solver)) == set(cons[:3])
-        assert set(self.naive_func(cons)) == set(cons[:3])
+        self._test_mus(cons, hard=[], solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == set(cons[:3]))
 
-    def test_bug_191(self, solver):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_bug_191(self, solver, variant):
         """
         Original Bug request: https://github.com/CPMpy/cpmpy/issues/191
         When assum is a single boolvar and candidates is a list (of length 1), it fails.
@@ -34,12 +78,11 @@ class TestMus:
         hard = [~bv]
         soft = [bv]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
-        assert set(mus_cons) == set(soft)
-        mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
-        assert set(mus_naive_cons) == set(soft)
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == set(soft))
 
-    def test_bug_191_many_soft(self, solver):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_bug_191_many_soft(self, solver, variant):
         """
         Checking whether bugfix 191  doesn't break anything in the MUS tool chain,
         when the number of soft constraints > 1.
@@ -52,12 +95,11 @@ class TestMus:
             y == 4
         ]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
-        assert set(mus_cons) == set(soft)
-        mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
-        assert set(mus_naive_cons) == set(soft)
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == set(soft))
 
-    def test_wglobal(self, solver):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_wglobal(self, solver, variant):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
 
@@ -66,7 +108,7 @@ class TestMus:
             x > 2,
             x < 1,
             y > 0,
-            y == 4, 
+            y == 4,
             (x + y > 0) | (y < 0),
             (y >= 0) | (x >= 0),
             (y < 0) | (x < 0),
@@ -75,26 +117,20 @@ class TestMus:
         ]
 
         # non-determinstic
-        #self.assertEqual(set(mus(cons)), set(cons[1:3]))
-        ms = self.mus_func(cons, solver=solver)
-        assert len(ms) < len(cons)
-        assert not cp.Model(ms).solve()
-        ms = self.naive_func(cons)
-        assert len(ms) < len(cons)
-        assert not cp.Model(ms).solve()
-        # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
-        
-    def test_decomposed_global(self, solver):
+        self._test_mus(cons, hard=[], solver=solver, variant=variant,
+                       verify_func=lambda ms: len(ms) < len(cons) and not cp.Model(ms).solve())
+
+    @pytest.mark.parametrize("variant", ALL)
+    def test_decomposed_global(self, solver, variant):
         x = cp.intvar(1, 5, shape=3, name="x")
         soft = [x[0] == x[1], x[1] == x[2]]
         hard = [cp.AllDifferent(x)]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
-        assert len(set(mus_cons)) == 1
-        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
-        assert len(set(mus_naive_cons)) == 1
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
+                       verify_func=lambda ms: len(set(ms)) == 1)
 
-    def test_cse_shared_subexpr(self, solver):
+    @pytest.mark.parametrize("variant", ALL)
+    def test_cse_shared_subexpr(self, solver, variant):
         """Example with CSE in the defining constraints.
 
         Reproducer from https://github.com/CPMpy/cpmpy/pull/986
@@ -107,103 +143,70 @@ class TestMus:
         ]
         hard = [x == 0]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
-        assert set(mus_cons) == {soft[1]}
-        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
-        assert set(mus_naive_cons) == {soft[1]}
+        self._test_mus(soft, hard=hard, solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == {soft[1]})
 
-@pytest.mark.requires_solver("exact", "gurobi", "cplex")
-class TestNativeMus(TestMus):
-    def setup_method(self):
-        solver = None
-        self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
-        self.naive_func = mus_naive
-
-
-
-
-@pytest.mark.requires_solver("exact")
-class TestQuickXplain(TestMus):
-    def setup_method(self):
-        self.mus_func = quickxplain
-        self.naive_func = quickxplain_naive
-
-    def test_prefered(self):
-
+    # quickxplain-specific
+    @pytest.mark.parametrize("variant", ["quickxplain", "quickxplain_naive"])
+    def test_prefered(self, solver, variant):
         a,b,c,d = [cp.boolvar(name=n) for n in "abcd"]
 
         mus1 = [b,d]
         mus2 = [a,b,c]
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
-        subset = self.mus_func([a,b,c,d],hard)
-        assert set(subset) == {a,b,c}
-        subset2 = self.mus_func([d,c,b,a], hard)
-        assert set(subset2) == {b,d}
+        self._test_mus([a,b,c,d], hard=hard, solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == {a,b,c})
+        self._test_mus([d,c,b,a], hard=hard, solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == {b,d})
 
-        subset = self.naive_func([a, b, c, d], hard)
-        assert set(subset) == {a, b, c}
-        subset2 = self.naive_func([d, c, b, a], hard)
-        assert set(subset2) == {b, d}
-
-@pytest.mark.requires_solver("exact")
-class TestOptimalMUS(TestMus):
-
-    def setup_method(self):
-        self.mus_func = optimal_mus
-        self.naive_func = optimal_mus_naive
-
-    def test_weighted(self):
+    # optimal MUS-specific
+    @pytest.mark.parametrize("variant", ["optimal_mus", "optimal_mus_naive"])
+    def test_weighted(self, solver, variant):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
         mus1 = [b, d]
         mus2 = [a, b, c]
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
-        subset = self.mus_func([a, b, c, d], hard, weights = [1,1,2,4])
-        assert set(subset) == {a, b, c}
-        subset2 = self.mus_func([a,b,c,d], hard, weights= [2,3,4,2])
-        assert set(subset2) == {b, d}
-        subset3 = self.mus_func([a,b,c,d], hard)
-        assert set(subset3) == {b,d}
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
+                       weights=[1, 1, 2, 4], verify_func=lambda ms: set(ms) == {a, b, c})
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
+                       weights=[2, 3, 4, 2], verify_func=lambda ms: set(ms) == {b, d})
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == {b, d})
 
-        subset = self.naive_func([a, b, c, d], hard, weights=[1, 1, 2, 4])
-        assert set(subset) == {a, b, c}
-        subset2 = self.naive_func([a, b, c, d], hard, weights=[2, 3, 4, 2])
-        assert set(subset2) == {b, d}
-        subset3 = self.naive_func([a, b, c, d], hard)
-        assert set(subset3) == {b, d}
-
-@pytest.mark.requires_solver("exact")
-class TestOCUS(TestOptimalMUS):
-
-    def setup_method(self):
-        self.mus_func = ocus
-        self.naive_func = ocus_naive
-
-    def test_constrained(self):
+    # OCUS-specific
+    @pytest.mark.parametrize("variant", ["ocus", "ocus_naive"])
+    def test_constrained(self, solver, variant):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
 
         mus1 = [b, d]
         mus2 = [a, b, c]
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
-        subset = self.mus_func([a, b, c, d], hard=hard, meta_constraint = ~b | d)
-        assert set(subset) == {b,d}
-        subset2 = self.mus_func([a,b,c,d], hard, meta_constraint = a & d)
-        assert set(subset2) == {a,b,d}# not subset-minimal
-        pytest.raises(OCUSException, lambda: self.mus_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
+                       meta_constraint=~b | d, verify_func=lambda ms: set(ms) == {b, d})
+        self._test_mus([a, b, c, d], hard=hard, solver=solver, variant=variant,
+                       meta_constraint=a & d, verify_func=lambda ms: set(ms) == {a, b, d})  # not subset-minimal
 
+    @pytest.mark.parametrize("variant", ["ocus", "ocus_naive"])
+    def test_no_such_mus(self, solver, variant):
+        a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
+
+        mus1 = [b, d]
+        mus2 = [a, b, c]
         hard = [~cp.all(mus1), ~cp.all(mus2)]
-        subset = self.naive_func([a, b, c, d], hard=hard, meta_constraint = ~b | d)
-        assert set(subset) == {b,d}
-        subset2 = self.naive_func([a,b,c,d], hard, meta_constraint = a & d)
-        assert set(subset2) == {a,b,d}# not subset-minimal
-        pytest.raises(OCUSException, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+
+        if solver == "hexaly":
+            pytest.skip("Hexaly is too slow on UNSAT problems.")
+        if not self._supported_solver(solver, variant):
+            pytest.skip(self._unsupported_reason(solver, variant))
+        pytest.raises(OCUSException, lambda: MUS_FUNCS[variant](
+            [a, b, c, d], hard, meta_constraint=~b, solver=solver))
 
 
-@pytest.mark.requires_solver("exact")
-class TestMARCOMUS(TestMus):
+class TestMARCOMUS:
 
     def test_php(self):
         x = cp.boolvar(shape=(5,3), name="x")
