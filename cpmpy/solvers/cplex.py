@@ -482,8 +482,7 @@ class CPM_cplex(SolverInterface):
                         cplexlhs = self._make_numexpr(lhs)
                         return self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                     else:
-                        raise NotImplementedError(
-                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
+                        raise NotImplementedError("Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
             else:
                 raise NotImplementedError(
                 "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
