@@ -1,0 +1,16 @@
+<!--
+================================================================================
+File written by CPMpy
+    Format: 'xcsp3'
+    CPMpy Version: 0.10.0
+================================================================================
+-->
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <var id="x"> 0..2 </var>
+    <var id="y"> 0..2 </var>
+  </variables>
+  <constraints>
+    <intension> lt(x,y) </intension>
+  </constraints>
+</instance>

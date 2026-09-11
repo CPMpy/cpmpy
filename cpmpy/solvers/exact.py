@@ -53,8 +53,10 @@ from typing import Optional, List, Iterable
 
 from packaging.version import Version
 
+from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
@@ -65,7 +67,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int
 from ..exceptions import NotSupportedError
 
 import numpy as np
@@ -161,8 +163,11 @@ class CPM_exact(SolverInterface):
         """
         return self.xct_solver
 
-    def _fillVars(self):
-        if not self.xct_solver.hasSolution():
+    def _fillVars(self, has_solution=None):
+        if has_solution is None:
+            has_solution = self.xct_solver.hasSolution()
+
+        if not has_solution:
             self.objective_value_ = None
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -258,15 +263,16 @@ class CPM_exact(SolverInterface):
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
         
-        self._fillVars()
+        # True/False depending on self.cpm_status
+        ret = self._solve_return(self.cpm_status)
+        self._fillVars(has_solution=ret)
         if self.has_objective():
             if self.objective_is_min_:
                 self.objective_value_ = obj_val
             else: # maximize, so actually negative value
                 self.objective_value_ = -obj_val
         
-        # True/False depending on self.cpm_status
-        return self._solve_return(self.cpm_status)
+        return ret
 
     def _update_time(self, timelim, start, end):
         """
@@ -312,7 +318,7 @@ class CPM_exact(SolverInterface):
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
             if my_status == "UNSAT": # found unsatisfiability
                 total_end = time.time()
-                self._fillVars() # erases the solution
+                self._fillVars(has_solution=False) # erases the solution
                 # update exit status
                 self.cpm_status = SolverStatus(self.name)
                 self.cpm_status.runtime = total_end - total_start
@@ -346,14 +352,14 @@ class CPM_exact(SolverInterface):
 
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
             if my_status == "UNSAT": # found unsatisfiability (no more solutions to be found)
-                self._fillVars() # erases the solution
+                self._fillVars(has_solution=False) # erases the solution
                 break
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
-                    self._fillVars()
+                    self._fillVars(has_solution=True)
                     self.print_display(display)
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
@@ -393,33 +399,34 @@ class CPM_exact(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # special case, negative-bool-view. Should be eliminated in linearize
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+                self.xct_solver.addVariable(name)
+            else:
+                lb, ub = cpm_var.get_bounds()
+                if self.encoding is None:
+                    encoding = "order" if ub-lb < 8 else "log"  # heuristic bound
+                else:
+                    encoding = self.encoding  # can also force it
+                self.xct_solver.addVariable(name, lb, ub, encoding)
+            self._varmap[name] = name
+            return name
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view. Should be eliminated in linearize
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
-
-        # return it if it already exists
-        if cpm_var in self._varmap:
-            return self._varmap[cpm_var]
-
-        # create if it does not exist
-        revar = str(cpm_var)
-        if isinstance(cpm_var, _BoolVarImpl):
-            self.xct_solver.addVariable(revar)
-        elif isinstance(cpm_var, _IntVarImpl):
-            lb, ub = cpm_var.get_bounds()
-            if self.encoding is None:
-                encoding = "order" if ub-lb < 8 else "log" # heuristic bound
-            else:
-                encoding = self.encoding # can also force it
-            self.xct_solver.addVariable(revar, lb, ub, encoding)
-        else:
-            raise NotImplementedError("Not a known var {}".format(cpm_var))
-        self._varmap[cpm_var] = revar
-        return revar
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize):
@@ -439,6 +446,7 @@ class CPM_exact(SolverInterface):
 
         # transform objective
         obj, safe_cons = safen_objective(expr)
+        obj = push_down_negation_objective(obj)
         obj, decomp_cons = decompose_linear_objective(obj,
                                                       supported=self.supported_global_constraints,
                                                       supported_reified=self.supported_reified_global_constraints,
@@ -493,7 +501,7 @@ class CPM_exact(SolverInterface):
 
         return xcfvars, self.fix(xrhs)
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
         Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -502,14 +510,16 @@ class CPM_exact(SolverInterface):
 
         See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        Arguments:
+            cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: list of Expression
+        Returns:
+            list[Expression]: transformed constraints
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"}) # linearize and decompose expects safe exprs
+        cpm_cons = no_partial_functions(cpm_cons)
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified = self.supported_reified_global_constraints,
@@ -540,7 +550,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr):  # helper function (Multiplication is GlobalFunction name 'mul')
         return isinstance(cpm_expr, Multiplication)
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_exact":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -553,22 +563,23 @@ class CPM_exact(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr_orig: CPMpy expression, or list thereof
-        :type cpm_expr_orig: Expression or list of Expression
+        Arguments:
+            cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+        Returns:
+            self
         """
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
+        for con in self.transform(cpm_expr):
             # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
-            if isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
-                if cpm_expr.name == "==":
+            if isinstance(con, Comparison):
+                lhs, rhs = con.args
+                if con.name == "==":
                     # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
                     if lhs.name == "mul":
                         if is_num(rhs): # make dummy var
@@ -583,26 +594,26 @@ class CPM_exact(SolverInterface):
                         xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                         self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
 
-                elif cpm_expr.name == "<=":
+                elif con.name == "<=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                     self._add_xct_constr(xct_cfvars, False, 0, True, xct_rhs)
 
-                elif cpm_expr.name == ">=":
+                elif con.name == ">=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                     self._add_xct_constr(xct_cfvars, True, xct_rhs, False, 0)
 
                 else:
-                    raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+                    raise NotImplementedError(con)  # if you reach this... please report on github
 
-            elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+            elif isinstance(con, Operator) and con.name == "->":
                 # Indicator constraints
                 # Take form bvar -> sum(x,y,z) >= rvar
-                cond, sub_expr = cpm_expr.args
-                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+                cond, sub_expr = con.args
+                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {con} must have BoolVar as lhs"
                 assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
 
                 if sub_expr.name not in ["==", ">=", "<="]:
-                    raise NotImplementedError("Constraint not supported by Exact '{}' {}".format(lhs.name, cpm_expr))
+                    raise NotImplementedError("Constraint not supported by Exact '{}' {}".format(lhs.name, con))
 
                 lhs, rhs = sub_expr.args
                 xct_cfvars, xct_rhs = self._make_numexpr(lhs,rhs)
@@ -620,16 +631,16 @@ class CPM_exact(SolverInterface):
                     self._add_xct_reif_right(cond, bool_val, [(-x,y) for x,y in xct_cfvars], -xct_rhs)
 
             # True or False
-            elif isinstance(cpm_expr, BoolVal):
-                self._add_xct_constr([], True, 0 if cpm_expr.args[0] else 1, False, 0)
+            elif isinstance(con, BoolVal):
+                self._add_xct_constr([], True, 0 if con.args[0] else 1, False, 0)
 
             # a direct constraint, pass to solver
-            elif isinstance(cpm_expr, DirectConstraint):
-                cpm_expr.callSolver(self, self.xct_solver)
+            elif isinstance(con, DirectConstraint):
+                con.callSolver(self, self.xct_solver)
                 return self
 
             else:
-                raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+                raise NotImplementedError(con)  # if you reach this... please report on github
             
         return self
     __add__ = add  # avoid redirect in superclass

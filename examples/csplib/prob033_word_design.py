@@ -43,12 +43,7 @@ def word_design(n=2):
             model += sum(x_r != y_c) >= 4
 
     # break symmetry
-    for r in range(n - 1):
-        b = boolvar(n + 1)
-        model += b[0] == 1
-        model += b == ((words[r] <= words[r + 1]) &
-                       ((words[r] < words[r + 1]) | b[1:] == 1))
-        model += b[-1] == 0
+    model += LexChainLess(words)  # lexicographic ordering of words
 
     return model, (words,)
 
