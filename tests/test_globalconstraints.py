@@ -1134,6 +1134,24 @@ class TestGlobal:
         # also test decomposition
         assert not cp.Model(cons.decompose()).solve()# capacity was not taken into account and this failed
 
+    def test_cumulative_zero_duration(self):
+        # Zero-duration tasks occupy no resource
+        from cpmpy.expressions.utils import argval
+
+        s = cp.intvar(0, 0, name="s")
+        d = cp.intvar(0, 0, name="d")
+        cons = cp.Cumulative([s], [d], demand=[2], capacity=1)
+
+        assert cp.Model([s == 0, d == 0]).solve()
+        assert cons.value() is True
+
+        task, _ = cons.decompose(how="task")
+        time, _ = cons.decompose(how="time")
+        assert all(argval(q) for q in task)
+        assert all(argval(q) for q in time)
+        assert cp.Model(cons.decompose(how="task")).solve()
+        assert cp.Model(cons.decompose(how="time")).solve()
+
     def test_cumulative_nested_expressions(self):
         import numpy as np
 
