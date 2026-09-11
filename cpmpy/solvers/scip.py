@@ -109,7 +109,6 @@ class CPM_scip(SolverInterface):
         self.objective_ = None
         self.scip_model.setParam("iis/silent", True)  # suppress native IIS statistics/logs
         self.scip_model.hideOutput()
-        self.objective_value_ = None
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
