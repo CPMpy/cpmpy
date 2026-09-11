@@ -1543,6 +1543,43 @@ class TestGlobal:
 
         cp.Model(~cons).solveAll(display=check_val)
 
+    def test_no_overlap_zero_duration(self, solver):
+        
+        start = cp.intvar(0,5, shape=3, name=tuple("ABC"))
+        start_val = [1,0,5] # task A starts midway through task B, but has 0 duration
+        dur = [0,5,3]
+
+        cons = cp.NoOverlap(start=start, duration=dur)
+
+        assert cp.Model(cons, start == start_val).solve(solver=solver) is False # 0-duration tasks should overlap
+        assert cp.Model(~cons, start == start_val).solve(solver=solver) is True
+        assert cons.value() is False
+
+
+        # start at the same time is fine
+        start_val = [0,0,5]
+        assert cp.Model(cons, start == start_val).solve(solver=solver) is True
+
+    def test_no_overlap_optional_zero_duration(self, solver):
+        start = cp.intvar(0,5, shape=3, name=tuple("ABC"))
+        start_val = [1,0,5] # task A starts midway through task B, but has 0 duration
+        dur = [0,5,3]
+
+        cons = cp.NoOverlapOptional(start=start, duration=dur, is_present=[True, True, True])
+        assert cp.Model(cons, start == start_val).solve(solver=solver) is False # 0-duration tasks should overlap
+        assert cp.Model(~cons, start == start_val).solve(solver=solver) is True
+        assert cons.value() is False
+
+        # absent zero-duration task or overlapping task: no conflict
+        cons = cp.NoOverlapOptional(start=start, duration=dur, is_present=[False, True, True])
+        assert cp.Model(cons, start == start_val).solve(solver=solver) is True
+        assert cons.value() is True
+
+        cons = cp.NoOverlapOptional(start=start, duration=dur, is_present=[True, False, True])
+        assert cp.Model(cons, start == start_val).solve(solver=solver) is True
+        assert cons.value() is True
+
+
 class TestBounds:
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)

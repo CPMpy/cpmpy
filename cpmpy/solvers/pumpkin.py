@@ -582,10 +582,16 @@ class CPM_pumpkin(SolverInterface):
             elif cpm_expr.name == "no_overlap":
                 if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
-                    return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1), tag=tag)
+                    pum_cons = self._get_constraint(Cumulative(start, dur, demand=1, capacity=1), tag=tag)
                 else:
                     start, dur, end = cpm_expr.args
-                    return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
+                    pum_cons = self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
+                
+                if any(lb <= 0 for lb in get_bounds(dur)[0]): # zero-duration tasks cannot overlap, not enforced by Cumulative
+                    assert f"no_overlap" not in self.supported_reified_global_constraints # otherwise cannot post decomposition toplevel
+                    self.add(cpm_expr.decompose())
+            
+                return pum_cons
 
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args

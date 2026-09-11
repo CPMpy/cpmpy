@@ -768,7 +768,7 @@ class CPM_minizinc(SolverInterface):
                 start, dur, end = expr.args
                 extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
             
-            global_str = "disjunctive({},{})"
+            global_str = "disjunctive_strict({},{})"
             # ensure duration is non-negative
             dur, dur_cons = get_nonneg_args(dur)
             extra_cons += dur_cons
