@@ -1,6 +1,28 @@
 from setuptools import find_packages, setup
+from setuptools.command.build_py import build_py as _build_py
 import codecs
+import importlib.util
 import os.path
+
+def _load_sync_skills():
+    """
+    Load skills/sync_into_package.py without importing the cpmpy package.
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "skills", "sync_into_package.py")
+    spec = importlib.util.spec_from_file_location("cpmpy_sync_skills", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.sync_skills
+
+
+class build_py(_build_py):
+    """
+    Copy authored skills/ into cpmpy/.agents/skills/ before packaging.
+    """
+
+    def run(self):
+        _load_sync_skills()()
+        super().run()
 
 def read(rel_path):
     here = os.path.abspath(os.path.dirname(__file__))
@@ -55,6 +77,15 @@ format_dependencies = {
 }
 format_dependencies["io.all"] = list({pkg for group in format_dependencies.values() for pkg in group})
 
+docs_require = [
+    "sphinx>=5.3.0",
+    "sphinx_rtd_theme>=2.0.0",
+    "myst_parser",
+    "sphinx-automodapi",
+    "readthedocs-sphinx-search>=0.3.2",
+    "sphinx_llm",
+]
+
 setup(
     name='cpmpy',
     version=get_version("cpmpy/__init__.py"),
@@ -83,7 +114,11 @@ setup(
         # Other
         "test": ["pytest", "pytest-timeout"],
         "type": ["mypy", "types-tqdm"],
-        "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
+        "docs": docs_require,
+        "skills": ["library-skills"],
+    },
+    cmdclass={
+        "build_py": build_py,
     },
     entry_points={
         'console_scripts': [
