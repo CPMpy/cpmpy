@@ -271,4 +271,49 @@ class TestCSE:
                          '(x) + (y)': 'IV3'} # flat expr
         assert {str(key): str(val) for key, val in self.csemap.flat_map.items()} == csemap_should
 
+    def test_expr_eq_var_flatten(self):
+
+        x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
+        a,b = cp.boolvar(shape=2, name=tuple("ab"))
+
+        constraints = []
+        aux_var = cp.intvar(0,10, name="aux") # mimic as if the user made the variable themselves
+        constraints += [aux_var == x + y]
+        # but then promplty forgot about it
+        constraints += [z * (x + y) <= 10] # lhs is not flat
+        csemap = CSEMap()
+        flat_cons = flatten_constraint(constraints, csemap=csemap)
+        assert len(flat_cons) == 2
+        assert str(flat_cons[0]) == "((x) + (y)) == (aux)"
+        assert str(flat_cons[1]) == "(z) * (aux) <= 10"
+        assert len(csemap) == 1
+        assert str(csemap.flat_map[x + y]) == "aux"
+
+        # check for Boolean
+        constraints = []
+        aux_var = cp.boolvar(name="aux") # mimic as if the user made the variable themselves
+        constraints += [aux_var == a | b]
+        # but then promplty forgot about it
+        constraints += [x * (a | b) <= 10] # lhs is not flat
+        csemap = CSEMap()
+        flat_cons = flatten_constraint(constraints, csemap=csemap)
+        assert len(flat_cons) == 2
+        assert str(flat_cons[0]) == "((a) or (b)) == (aux)"
+        assert str(flat_cons[1]) == "(x) * (aux) <= 10"
+        assert len(csemap) == 1
+        assert str(csemap.flat_map[a | b]) == "aux"
+
+        # check mixed types
+        constraints = []
+        aux_var = cp.intvar(0,10, name="aux") # mimic as if the user made the variable themselves
+        constraints += [aux_var == a | b] # rhs should be promoted to integer
+        # but then promplty forgot about it
+        constraints += [x * (a | b) <= 10] # lhs is not flat
+        csemap = CSEMap()
+        flat_cons = flatten_constraint(constraints, csemap=csemap)
+        assert len(flat_cons) == 3
+        assert str(flat_cons[0]) == "(BV0) == (aux)"
+        assert str(flat_cons[1]) == "((a) or (b)) == (BV0)"
+        assert str(flat_cons[2]) == "(x) * (BV0) <= 10"
+
     ### other transformations only use csemap as argument to flatten_constraint internally, not sure how to easily test them
