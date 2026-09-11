@@ -161,7 +161,7 @@ class CPM_pysdd(SolverInterface):
             has_sol = not self.pysdd_root.is_false()
 
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = 0.0
+        self.cpm_status.solve_time = 0.0
 
         # translate exit status
         if has_sol:
