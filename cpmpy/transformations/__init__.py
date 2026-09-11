@@ -39,6 +39,7 @@ the following ordering corresponds to the waterfall:
     comparison
     linearize
     to_cnf
+    to_gcnf
 """
 
 __all__ = []
