@@ -51,6 +51,9 @@
             def decompose(self):
                 return (self.args[0] + self.args[1]), []  # the decomposition
 
+            def compute_value(self):
+                return argval(self.args[0]) + argval(self.args[1])
+
     Objective-only :class:`FloatSum`
     -------------------------------
 
@@ -103,6 +106,7 @@ class GlobalFunction(Expression):
 
     Like all expressions it has a `.name` and `.args` property.
     It overwrites the :meth:`is_bool() <cpmpy.expressions.core.Expression.is_bool>` method to return False, as global functions are numeric.
+    Subclasses implement :meth:`compute_value` (called by :meth:`~cpmpy.expressions.core.Expression.value`).
     """
 
     def is_bool(self) -> bool:
@@ -112,15 +116,17 @@ class GlobalFunction(Expression):
         """
         return False
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
-        Returns whether the global function can be evaluated under the current variable assignment.
+        Evaluate the function under the current assignment (called by :meth:`~cpmpy.expressions.core.Expression.value`).
+
+        Subclasses must implement this method. Do not override ``value()``.
 
         Returns:
             Optional[int]: The numeric value when all variables within its scope are assigned;
             None if any variable within its scope is unassigned.
         """
-        raise NotImplementedError(f"`value` is not implemented for {self}")
+        raise NotImplementedError(f"`compute_value` is not implemented for {self}")
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -213,7 +219,7 @@ class Minimum(GlobalFunction):
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
@@ -275,7 +281,7 @@ class Maximum(GlobalFunction):
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The maximum value of the arguments, or None if any argument is not assigned
@@ -328,7 +334,7 @@ class Abs(GlobalFunction):
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The absolute value of the argument, or None if the argument is not assigned
@@ -447,7 +453,7 @@ class Multiplication(GlobalFunction):
             return Multiplication(-self.args[0], self.args[1])
         return super().__neg__()
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         x, y = self.args
         val_y = y.value()
         if val_y is None:
@@ -581,7 +587,7 @@ class Division(GlobalFunction):
         _div = intvar(*self.get_bounds())
         return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
 
-    def value(self):
+    def compute_value(self):
         """
         Returns:
             int: The integer division of the arguments, or None if the arguments are not assigned
@@ -593,9 +599,7 @@ class Division(GlobalFunction):
         try:
             return int(x / y)  # integer division, rounding towards zero
         except ZeroDivisionError:
-            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational "
-                                            "semantics.")
+            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
 
     def get_bounds(self):
         """
@@ -677,7 +681,7 @@ class Modulo(GlobalFunction):
             x * _mod >= 0        # remainder is negative iff x is negative
         ]
 
-    def value(self):
+    def compute_value(self):
         """
         Returns:
             int: The modulo of the arguments, or None if the arguments are not assigned
@@ -689,9 +693,7 @@ class Modulo(GlobalFunction):
         try:  # modulo defined with integer division
             return x - (y * int(x / y))
         except ZeroDivisionError:
-            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational "
-                                            "semantics.")
+            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
 
     def get_bounds(self):
         """
@@ -760,7 +762,7 @@ class Power(GlobalFunction):
             _pow *= base
         return _pow,[]
 
-    def value(self):
+    def compute_value(self):
         """
         Returns:
             int: The power of the arguments, or None if the arguments are not assigned
@@ -831,7 +833,7 @@ class Element(GlobalFunction):
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2].")
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The value of the array element at the given index, or None if the index is not assigned or the array element is not assigned
@@ -844,8 +846,7 @@ class Element(GlobalFunction):
             return None
 
         if vidx < 0 or vidx >= len(arr):
-            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}"
-                                            + "\n Use argval(expr) to get the value of expr with relational semantics.")
+            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}")
         return argval(arr[vidx])  # can be None
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -949,7 +950,7 @@ class NDElement(GlobalFunction):
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The value of the array element at the given indices, or None if any index is not assigned or the array element is not assigned
@@ -962,10 +963,7 @@ class NDElement(GlobalFunction):
             return None
         for v, dim in zip(vidxs, arr.shape):
             if v < 0 or v >= dim:
-                raise IncompleteFunctionError(
-                    f"Index {v} out of range for dimension size {dim} while calculating value for expression {self}"
-                    + "\n Use argval(expr) to get the value of expr with relational semantics."
-                )
+                raise IncompleteFunctionError(f"Index {v} out of range for dimension size {dim} while calculating value for expression {self}")
         return argval(arr[tuple(vidxs)])
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -1071,7 +1069,7 @@ class Count(GlobalFunction):
         arr, val = self.args
         return cp.sum((a == val) for a in arr), []
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The number of occurrences of val in arr, or None if val or any element in arr is not assigned
@@ -1133,7 +1131,7 @@ class Among(GlobalFunction):
         arr, vals = self.args
         return cp.sum(Count(arr, val) for val in vals), []
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The number of variables in arr that take a value present in vals, or None if any element in arr is not assigned
@@ -1195,7 +1193,7 @@ class NValue(GlobalFunction):
 
         return cp.sum(cp.any(a == v for a in self.args) for v in range(lb, ub+1)), []
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The number of distinct values in the array, or None if any element in arr is not assigned
@@ -1256,7 +1254,7 @@ class NValueExcept(GlobalFunction):
 
         return cp.sum([cp.any(a == v for a in arr) for v in range(lb, ub+1) if v != n]), []
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The number of distinct values in the array, excluding value n, or None if any element in arr is not assigned

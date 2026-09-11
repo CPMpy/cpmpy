@@ -61,7 +61,9 @@ If you want a **sparse domain**, containing only a few values, you can either de
 
 Decision variables have a **unique name**. You can set it yourself, otherwise a unique name will automatically be assigned. If you print decision variables (`print(b)` or `print(x)`), it will display the name. Did we already say the name <u>must be unique</u>? Many solvers use the name as unique identifier, and it is near-impossible to debug with non-uniquely named decision variables.
 
-A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. Variables are not tied to a solver, so you can use the same variable across multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. Before solving, this value will be `None`. After solving it has either taken a boolean or integer value, or it is still None. For example when the solver didn't find any solution or when the decision variable was never used in the model, i.e. a "stale" decision variable which never appeared in a constraint or the objective function.
+A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. The same `.value()` call works on any CPMpy expression (a constraint, a sum, `arr[idx]`, …): it evaluates the expression under the current assignment, or returns `None` if some variable is still unassigned. See [Partial functions and value()](#partial-functions-and-value) for undefined values of partial functions.
+
+Variables are not tied to a solver, so you can use the same variable across multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. Before solving, this value will be `None`. After solving it has either taken a boolean or integer value, or it is still None. For example when the solver didn't find any solution or when the decision variable was never used in the model, i.e. a "stale" decision variable which never appeared in a constraint or the objective function.
 
 Finally, by providing a **shape** you automatically create a **numpy n-dimensional array** of decision variables. These variables automatically get their index appended to their name (the name is provided on the array-level) as to ensure its uniqueness:
 
@@ -434,8 +436,25 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 # arr: [0 1 2 3], idx: 2, val: 2
 ```
 
-         
+### Partial functions and value()
 
+Integer division `x // y`, modulo `x % y`, and `Element` (`arr[idx]`) are partial: they are undefined for some inputs (divisor `0`, or an index outside the array). After solving, you can still ask for the value of a constraint that nests such a function:
+
+- On a Boolean expression, `.value()` follows *relational semantics*: if a nested partial function is undefined, the Boolean expression evaluates to `False`. So `(x // y >= 3).value()` is `False` when `y` is `0`, rather than raising.
+- On the undefined numeric expression, `.value()` raises `IncompleteFunctionError`. So `(x // y).value()` with `y.value() = 0` returns an error as the result is undefined. 
+
+This matches how CPMpy (and the solver, after [safening](./api/transformations/safening.rst)) treat undefinedness in reified or nested constraints: the nearest Boolean parent becomes false, the unsafe argument is not forced in-bounds.
+
+```python
+import cpmpy as cp
+
+x, y = cp.intvar(0, 5, shape=2, name=("x","y"))
+b = cp.boolvar(name="b")
+cons = x // y >= 3
+cp.Model(cons, y == 0).solve() # b :: False allows for solution where y == 0
+print(cons.value())          # False
+# print((x // y).value())    # IncompleteFunctionError
+```
 
 ## Objective functions
 

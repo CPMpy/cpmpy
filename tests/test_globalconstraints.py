@@ -1543,6 +1543,54 @@ class TestGlobal:
 
         cp.Model(~cons).solveAll(display=check_val)
 
+
+class TestIncompleteFunctions:
+
+    def test_numeric_value_raises(self):
+        a, b = cp.intvar(1, 2, shape=2)
+        a._value, b._value = 1, 1
+        with pytest.raises(IncompleteFunctionError):
+            (42 // (a - b)).value()
+
+        arr = cp.cpm_array([1, 2, 3])
+        i = cp.intvar(0, 5)
+        i._value = 5
+        with pytest.raises(IncompleteFunctionError):
+            arr[i].value()
+
+    def test_numeric_sum_with_partial_raises(self):
+        x = cp.intvar(0, 5)
+        a, b = cp.intvar(1, 2, shape=2)
+        x._value = 1
+        a._value, b._value = 1, 1
+        with pytest.raises(IncompleteFunctionError):
+            (x + (42 // (a - b))).value()
+
+    def test_boolean_partial_as_first_child(self):
+        a, b = cp.intvar(1, 2, shape=2)
+        a._value, b._value = 1, 1
+        assert ((42 // (a - b)) >= 3).value() is False
+
+        arr = cp.cpm_array([1, 2, 3])
+        i = cp.intvar(0, 5)
+        p = cp.boolvar()
+        i._value, p._value = 5, False
+        assert (arr[i] == 1).implies(p).value() is True  # (undefined == 1) is False, False -> p is True
+
+    def test_boolean_deeply_nested_partial(self):
+        x = cp.intvar(0, 5)
+        a, b = cp.intvar(1, 2, shape=2)
+        x._value = 1
+        a._value, b._value = 1, 1
+        assert ((x + (42 // (a - b))) >= 3).value() is False
+
+        arr = cp.cpm_array([1, 2, 3])
+        p = cp.boolvar()
+        p._value = False
+        assert (arr[10 // (a - b)] == 1).implies(p).value() is True
+
+    
+
 class TestBounds:
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)
@@ -1677,33 +1725,6 @@ class TestBounds:
         assert ub ==9
         assert not cp.Model(expr < lb).solve()
         assert not cp.Model(expr > ub).solve()
-
-    def test_incomplete_func(self):
-        # element constraint
-        arr = cp.cpm_array([1,2,3])
-        i = cp.intvar(0,5,name="i")
-        p = cp.boolvar()
-
-        cons = (arr[i] == 1).implies(p)
-        m = cp.Model([cons, i == 5])
-        assert m.solve()
-        assert cons.value()
-
-        # div constraint
-        a,b = cp.intvar(1,2,shape=2)
-        cons = (42 // (a - b)) >= 3
-        m = cp.Model([p.implies(cons), a == b])
-        if cp.SolverLookup.lookup("z3").supported():
-            assert m.solve(solver="z3")# ortools does not support divisor spanning 0 work here
-            pytest.raises(IncompleteFunctionError, cons.value)
-            assert not argval(cons)
-
-        # mayhem
-        cons = (arr[10 // (a - b)] == 1).implies(p)
-        m = cp.Model([cons, a == b])
-        if cp.SolverLookup.lookup("z3").supported():
-            assert m.solve(solver="z3")
-            assert cons.value()
 
     def test_bounds_count(self):
         x = cp.intvar(-8, 8)

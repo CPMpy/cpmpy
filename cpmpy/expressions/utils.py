@@ -36,7 +36,6 @@ import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
 from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final
-from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
@@ -138,13 +137,7 @@ def argval(a):
         We check with hasattr instead of isinstance to avoid circular dependency
     """
     if hasattr(a, "value"):
-        try:
-            val = a.value()
-        except IncompleteFunctionError as e:
-            if isinstance(a, cp.expressions.core.Expression) and a.is_bool():
-                return False
-            else:
-                raise e
+        val = a.value()
     else:
         val = a
 

@@ -65,14 +65,20 @@
             def decompose(self):
                 return [self.args[0] != self.args[1]] # your decomposition
 
+            def compute_value(self):                
+                return argval(self.args[0]) != argval(self.args[1])
+
     ..
 
     You can also implement a `.negate()` method if the global constraint has a better way to negate it than negating the decomposition.
     The expression returned by `.negate()` should be equivalent to the negation of the global constraint, and is not allowed to introduce explicit `not` operators.
     Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
 
+    Implement ``compute_value()`` to evaluate the constraint under the current assignment.
+    :meth:`~cpmpy.expressions.core.Expression.value` wraps ``compute_value()`` and applies relational semantics for Boolean expressions.
+
     If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
-    then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
+    then set `is_bool=False` in the super() constructor and implement ``compute_value()`` accordingly.
 
 
     Alternative decompositions
@@ -159,6 +165,7 @@ class GlobalConstraint(Expression):
 
         Like all expressions it has a ``.name`` and ``.args`` property.
         Overwrites the ``.is_bool()`` method as all global constraints are Boolean.
+        Subclasses implement :meth:`compute_value` (called by :meth:`~cpmpy.expressions.core.Expression.value`).
     """
 
     def is_bool(self) -> bool:
@@ -170,15 +177,17 @@ class GlobalConstraint(Expression):
         """
         return True
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
-        Returns whether the global constraint is satisfied under the current variable assignment.
+        Evaluate the constraint under the current assignment (called by :meth:`~cpmpy.expressions.core.Expression.value`).
+
+        Subclasses must implement this method. Do not override ``value()``.
 
         Returns:
             Optional[bool]: True or False when all variables within its scope are assigned;
             None if any variable within its scope is unassigned.
         """
-        raise NotImplementedError(f"`value` is not implemented for {self}")
+        raise NotImplementedError(f"`compute_value` is not implemented for {self}")
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -258,7 +267,7 @@ class AllDifferent(GlobalConstraint):
         lb, ub = min(lbs), max(ubs)
         return [cp.sum((arg_i == val) for arg_i in self.args) <= 1 for val in range(lb, ub + 1)], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -306,7 +315,7 @@ class AllDifferentExceptN(GlobalConstraint):
             cons.append(cond.implies(cp.any([x == a for a in n]))) # equivalent to (x in n) | (y in n) | (x != y)
         return cons, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -351,7 +360,7 @@ class AllEqual(GlobalConstraint):
         # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
         return [x == y for x, y in zip(self.args[:-1], self.args[1:])], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -394,7 +403,7 @@ class AllEqualExceptN(GlobalConstraint):
             constraints.append(cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n))
         return constraints, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -475,7 +484,7 @@ class Circuit(GlobalConstraint):
 
         return constraining, defining
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -536,7 +545,7 @@ class Inverse(GlobalConstraint):
         
         return constraining, toplevel
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -686,7 +695,7 @@ class Table(GlobalConstraint):
 
         return [MDD(arr, transitions, start=ROOT)], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -769,7 +778,7 @@ class ShortTable(GlobalConstraint):
             defining.append(row_selected[i].implies(subexpr))  # implication-only decomposition
         return [cp.sum(row_selected) == 1], defining
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -835,7 +844,7 @@ class NegativeTable(GlobalConstraint):
         arr, tab = self.args
         return [cp.all([cp.any([ai != ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -1048,7 +1057,7 @@ class Regular(GlobalConstraint):
         return constraining, defining
 
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -1309,7 +1318,7 @@ class MDD(GlobalConstraint):
             return value_cons + cons, []
 
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -1356,7 +1365,7 @@ class IfThenElse(GlobalConstraint):
                             f"{condition, if_true, if_false}")
         super().__init__("ite", (condition, if_true, if_false))
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -1441,7 +1450,7 @@ class InDomain(GlobalConstraint):
         arr_set = frozenset(arr)
         return [cp.any([expr == val for val in arr_set])], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -1528,7 +1537,7 @@ class Xor(GlobalConstraint):
 
         return [prev], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         arrvals = argvals(self.args)
         if any(a is None for a in arrvals):
             return None
@@ -1715,7 +1724,7 @@ class Cumulative(GlobalConstraint):
 
         return cons, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -1920,7 +1929,7 @@ class CumulativeOptional(GlobalConstraint):
 
         return cons, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2008,7 +2017,7 @@ class NoOverlap(GlobalConstraint):
             cons.append((e1 <= s2) | (e2 <= s1))
         return cons, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2096,7 +2105,7 @@ class NoOverlapOptional(GlobalConstraint):
             cons += [implies(p1 & p2, (e1 <= s2) | (e2 <= s1))]
         return cons, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2168,7 +2177,7 @@ class Precedence(GlobalConstraint):
                 constraints.append(lhs.implies(cp.any(args[:j] == s)))
         return constraints, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2231,7 +2240,7 @@ class GlobalCardinalityCount(GlobalConstraint):
             
         return constraints, []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2273,7 +2282,7 @@ class Increasing(GlobalConstraint):
         args = self.args
         return [args[i] <= args[i+1] for i in range(len(args)-1)], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2306,7 +2315,7 @@ class Decreasing(GlobalConstraint):
         args = self.args
         return [args[i] >= args[i+1] for i in range(len(args)-1)], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2339,7 +2348,7 @@ class IncreasingStrict(GlobalConstraint):
         args = self.args
         return [args[i] < args[i+1] for i in range(len(args)-1)], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2373,7 +2382,7 @@ class DecreasingStrict(GlobalConstraint):
         args = self.args
         return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2436,7 +2445,7 @@ class LexLess(GlobalConstraint):
 
         return constraining, defining
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2494,7 +2503,7 @@ class LexLessEq(GlobalConstraint):
 
         return constraining, defining
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2529,7 +2538,7 @@ class LexChainLess(GlobalConstraint):
         X = self.args
         return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
@@ -2560,7 +2569,7 @@ class LexChainLessEq(GlobalConstraint):
         X = self.args
         return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned

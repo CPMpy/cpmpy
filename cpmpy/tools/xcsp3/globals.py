@@ -80,7 +80,7 @@ class AllDifferentLists(GlobalConstraint):
             constraints.append(cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2)))
         return constraints, []
 
-    def value(self):
+    def compute_value(self):
         lst_vals = [tuple(argvals(a)) for a in self.args]
         return len(set(lst_vals)) == len(self.args)
 class AllDifferentListsExceptN(GlobalConstraint):
@@ -111,7 +111,7 @@ class AllDifferentListsExceptN(GlobalConstraint):
             constraints.append(cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(Table(lst1, self.args[1])))
         return constraints, []
 
-    def value(self):
+    def compute_value(self):
         lst_vals = [tuple(argvals(a)) for a in self.args[0]]
         except_vals = [tuple(argvals(a)) for a in self.args[1]]
         return len(set(lst_vals) - set(except_vals)) == len([x for x in lst_vals if x not in except_vals])
@@ -191,7 +191,7 @@ class SubCircuit(GlobalConstraint):
 
         return constraining, defining
 
-    def value(self):
+    def compute_value(self):
 
         succ = [argval(a) for a in self.args]
         n = len(succ)
@@ -286,7 +286,7 @@ class SubCircuitWithStart(GlobalConstraint):
 
         return constraining, defining
 
-    def value(self):
+    def compute_value(self):
         start_index = self.args[-1]
         succ = [argval(a) for a in self.args[:-1]] # Successor variables
 
@@ -324,7 +324,7 @@ class SafeOnlyInverse(GlobalConstraint):
         rev = cpm_array(rev)
         return [cp.all(rev[x] == i for i, x in enumerate(fwd))], []
 
-    def value(self):
+    def compute_value(self):
         fwd = argvals(self.args[0])
         rev = argvals(self.args[1])
         # args are fine, now evaluate actual inverse cons
@@ -351,7 +351,7 @@ class InverseOne(GlobalConstraint):
         arr = cpm_array(arr)
         return [all(arr[x] == i for i, x in enumerate(arr))], []
 
-    def value(self):
+    def compute_value(self):
         valsx = argvals(self.args[0])
         try:
             return all(valsx[x] == i for i, x in enumerate(valsx))
@@ -378,7 +378,7 @@ class Channel(GlobalConstraint):
         arr, v = self.args
         return [(arr[i] == 1) == (v == i) for i in range(len(arr))] + [v >= 0, v < len(arr)], []
 
-    def value(self):
+    def compute_value(self):
         arr, v = self.args
         return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
@@ -415,7 +415,7 @@ class NegativeShortTable(GlobalConstraint):
         arr, tab = self.args
         return [cpm_all(cpm_any([ai != ri for ai, ri in zip(arr, row) if ri != "*"]) for row in tab)], []
 
-    def value(self):
+    def compute_value(self):
         arr, tab = self.args
         arrval = np.asarray(argvals(arr))
         if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
@@ -463,7 +463,7 @@ class NotInDomain(GlobalConstraint):
         return [all([(expr != a) for a in arr])], defining
 
 
-    def value(self):
+    def compute_value(self):
         return argval(self.args[0]) not in argvals(self.args[1])
 
     def __repr__(self):
@@ -489,7 +489,7 @@ class NoOverlap2d(GlobalConstraint):
             cons.append(cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
                                  end_y[i] <= start_y[j], end_y[j] <= start_y[i]]))
         return cons,[]
-    def value(self):
+    def compute_value(self):
         start_x, dur_x, end_x,  start_y, dur_y, end_y = argvals(self.args)
         n = len(start_x)
         if any(s + d != e for s, d, e in zip(start_x, dur_x, end_x)):
@@ -524,7 +524,7 @@ class IfThenElseNum(GlobalFunction):
         b,x,y = self.args
         lbs,ubs = get_bounds([x,y])
         return min(lbs), max(ubs)
-    def value(self):
+    def compute_value(self):
         b,x,y = self.args
         if argval(b):
             return argval(x)
@@ -623,7 +623,7 @@ class DynamicCumulative(GlobalConstraint):
 
         return cons, []
 
-    def value(self):
+    def compute_value(self):
         arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
                    else argval(arg) for arg in self.args]
 
@@ -724,7 +724,7 @@ class OrtSubcircuitWithStart(DirectConstraint):
 
         return Native_solver.AddCircuit(ort_arcs)
 
-    def value(self):
+    def compute_value(self):
         from cpmpy.expressions.utils import argval
         arguments, start_index = self.args
         N = len(arguments)
