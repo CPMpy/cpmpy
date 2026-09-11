@@ -537,30 +537,23 @@ class CPM_scip(SolverInterface):
         """
         Compute a MUS using SCIP's native IIS (Irreducible Infeasible Subsystem) algorithm.
 
-        SCIP minimizes over native constraints, while CPMpy expects a MUS over user-level
-        constraints. If a CPMpy soft constraint transforms to multiple SCIP constraints, we
-        represent it by one activation constraint `a >= 1` and post `a -> transformed_constraint`
-        as hard constraints. The returned IIS can then be mapped back through the single
-        activation constraint.
+        SCIP's IIS is over native constraints. CPMpy soft constraints that post as a single
+        SCIP constraint are added as-is and mapped back to the original CPMpy constraint. 
+        Hard constraints and soft constraints that transform to multiple SCIP constraints
+        are not supported and raise a ValueError.
         """
         soft_cons = toplevel_list(soft, merge_and=False)
         hard_cons = toplevel_list(hard, merge_and=False)
 
-        s = cls()
-        native_soft_names = []
-        captured_hard_cons = []
-
-        def post_transformed(cpm_con):
-            posted = []
-            for tf_con in s.transform(cpm_con):
-                posted.extend(s._flatten_scip_cons(
-                    s._add_transformed_constraint(tf_con)
-                ))
-            return posted
-
-        
         if len(hard_cons) > 0:
             raise ValueError("SCIP: MUS extraction with hard constraints is not supported")
+
+        s = cls()
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
+        s._csemap = None
+        native_soft_names = []
 
         for soft_con in soft_cons:
             soft_con_tf = s.transform(soft_con)
@@ -578,30 +571,27 @@ class CPM_scip(SolverInterface):
             else:
                 raise ValueError("SCIP: MUS extraction with multiple transformed constraints is not supported")
 
+        # `generateIIS()` solves the model if needed. Unlike Gurobi, a feasible
+        # model does not raise: the returned IIS is then not infeasible.
         try:
-            # `generateIIS()` solves the model if needed and raises if the model is feasible.
-            try:
-                iis = s.native_model.generateIIS()
-            except Exception as e:
-                # Keep the user-facing contract consistent with other native MUS extractors.
-                status = s.native_model.getStatus()
-                if status not in ("infeasible", "inforunbd"):
-                    raise AssertionError("MUS: model must be UNSAT") from e
-                raise
+            iis = s.native_model.generateIIS()
+        except Exception as e:
+            status = s.native_model.getStatus()
+            if status not in ("infeasible", "inforunbd"):
+                raise AssertionError("MUS: model must be UNSAT") from e
+            raise
 
-            subscip = iis.getSubscip()
-            iis_names = {con.name for con in subscip.getConss()}
+        if not iis.isSubscipInfeasible():
+            raise AssertionError("MUS: model must be UNSAT")
 
-            candidate = [
-                soft_con
-                for soft_con, scip_names in zip(soft_cons, native_soft_names)
-                if any(name in iis_names for name in scip_names)
-            ]
+        subscip = iis.getSubscip()
+        iis_names = {con.name for con in subscip.getConss()}
 
-            return candidate
-        finally:
-            for scip_con in captured_hard_cons:
-                s.native_model.releaseCons(scip_con)
+        return [
+            soft_con
+            for soft_con, scip_names in zip(soft_cons, native_soft_names)
+            if any(name in iis_names for name in scip_names)
+        ]
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         warnings.warn("Solution enumeration is not implemented in PySCIPOpt, defaulting to CPMpy's naive implementation")

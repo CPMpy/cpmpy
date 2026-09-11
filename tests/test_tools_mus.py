@@ -3,6 +3,7 @@ import pytest
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
+from cpmpy.solvers.scip import CPM_scip
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
 
@@ -46,6 +47,8 @@ class TestMUS:
     def _test_mus(self, cons, hard, solver, verify_func, variant, **kwargs):
         if solver == "hexaly":
             pytest.skip("Hexaly is too slow on UNSAT problems.")
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support hard constraints or multi-constraint transforms")
         if not self._supported_solver(solver, variant):
             pytest.skip(self._unsupported_reason(solver, variant))
         mus_cons = MUS_FUNCS[variant](soft=cons, hard=hard, solver=solver, **kwargs)
@@ -277,3 +280,57 @@ class TestMCS:
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
         assert len(mcs(cons)) == 1
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+class TestSCIPNativeMUS:
+    """SCIP native IIS: one CPMpy constraint to one SCIP constraint, no hard constraints."""
+
+    def test_integer_circular(self):
+        x = cp.intvar(0, 3, shape=3, name="x")
+        cons = [x[0] > x[1], x[1] > x[2], x[2] > x[0]]
+        mus = mus_native(cons, solver="scip")
+        assert set(mus) == set(cons)
+
+    def test_integer_drops_redundant(self):
+        x = cp.intvar(0, 5, name="x")
+        y = cp.intvar(0, 5, name="y")
+        cons = [
+            x >= 4,
+            y >= 4,
+            x + y <= 6,
+            x <= 5,  # implied by the domain, not needed for unsat
+        ]
+        mus = mus_native(cons, solver="scip")
+        assert set(mus) == set(cons[:3])
+
+    def test_binary_conflict(self):
+        x, y, z = cp.boolvar(name="x"), cp.boolvar(name="y"), cp.boolvar(name="z")
+        cons = [
+            x + y >= 2,
+            ~x,
+            ~y,
+            z,  # independent of the conflict
+        ]
+        mus = mus_native(cons, solver="scip")
+        assert z not in mus
+        assert set(mus).issubset(set(cons[:3]))
+        assert not cp.Model(mus).solve()
+        for i in range(len(mus)):
+            assert cp.Model(mus[:i] + mus[i + 1:]).solve()
+
+    def test_hard_raises(self):
+        x = cp.boolvar(name="x")
+        with pytest.raises(ValueError, match="hard constraints"):
+            mus_native([x], hard=[~x], solver="scip")
+
+    def test_multiple_transformed_raises(self):
+        x = cp.intvar(1, 2, shape=3, name="x")
+        with pytest.raises(ValueError, match="multiple transformed"):
+            mus_native([cp.AllDifferent(x)], solver="scip")
+
+    def test_sat_raises(self):
+        x = cp.boolvar(name="x")
+        with pytest.raises(AssertionError, match="UNSAT"):
+            mus_native([x], solver="scip")
+
