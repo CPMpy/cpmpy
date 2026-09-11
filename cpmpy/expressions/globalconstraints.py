@@ -2144,15 +2144,15 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
         super().__init__("precedence", (list(vars), list(precedence)))
 
-    """def decompose(self) -> tuple[list[Expression], list[Expression]]:
-
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
         Decomposition based on:
         Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
         Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
 
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
-
+        """
 
         args, precedence = self.args
         args = cpm_array(args)
@@ -2166,7 +2166,7 @@ class Precedence(GlobalConstraint):
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
                 constraints.append(lhs.implies(cp.any(args[:j] == s)))
-        return constraints, []"""
+        return constraints, []
 
 
     def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
@@ -2193,7 +2193,7 @@ class Precedence(GlobalConstraint):
             defining.append(a[i,0].implies(args[i] == precedence[0]))
 
         for i in range(1, len(args)):
-            for j in range(0, i + 1):
+            for j in range(0, max(i+1, len(precedence))):
                 defining.append(e[i - 1, j] + a[i - 1, j - 1] == e[i, j] + a[i, j])
                 defining.append(e[i, j].implies(cp.all(args[i] != p for p in precedence[j:])))
                 defining.append(a[i, j].implies(args[i] == precedence[j]))
