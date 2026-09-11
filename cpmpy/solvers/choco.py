@@ -85,7 +85,7 @@ class CPM_choco(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                    "table", 'negative_table', "short_table", "regular", "InDomain",
+                                    "table", 'negative_table', "short_table", "regular", "indomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
                                     "lex_lesseq", "lex_less", "mdd",
@@ -650,7 +650,7 @@ class CPM_choco(SolverInterface):
                 _HandleWrapper.__init__(chc_mdd, chc_handle)
                 return self.chc_model.mddc(self._to_vars(array), chc_mdd)
 
-            elif cpm_expr.name == 'InDomain':
+            elif cpm_expr.name == 'indomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)

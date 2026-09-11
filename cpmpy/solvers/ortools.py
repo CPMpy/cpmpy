@@ -766,12 +766,13 @@ class CPM_ortools(SolverInterface):
                     else:
                         tasks.append(self.ort_model.NewOptionalFixedSizeIntervalVar(ort_s, ort_d, ort_p, f"interval_{cpm_s}-{cpm_d}-{is_present[i]}"))
                 else: # variable sized interval, need to make the end variable ourself
-                    cpm_e, end_cons = get_or_make_var(cpm_s + cpm_d, csemap=self.csemap)
+                    cpm_e, end_cons = get_or_make_var(cpm_s + cpm_d, csemap=self._csemap)
                     cons.extend(end_cons)
+                    ort_e = self.solver_var(cpm_e)
                     if ort_p is None:
-                        tasks.append(self.ort_model.NewIntervalVar(ort_s, ort_d, cpm_e, f"interval_{cpm_s}-{cpm_d}-{cpm_e}"))
+                        tasks.append(self.ort_model.NewIntervalVar(ort_s, ort_d, ort_e, f"interval_{cpm_s}-{cpm_d}-{cpm_e}"))
                     else:
-                        tasks.append(self.ort_model.NewOptionalIntervalVar(ort_s, ort_d, cpm_e, ort_p, f"interval_{cpm_s}-{cpm_d}-{cpm_e}-{is_present[i]}"))
+                        tasks.append(self.ort_model.NewOptionalIntervalVar(ort_s, ort_d, ort_e, ort_p, f"interval_{cpm_s}-{cpm_d}-{cpm_e}-{is_present[i]}"))
             
             elif ort_p is None: # mandatory interval
                 tasks.append(self.ort_model.NewIntervalVar(ort_s, ort_d, self.solver_var(end[i]), f"interval_{cpm_s}-{cpm_d}-{end[i]}"))

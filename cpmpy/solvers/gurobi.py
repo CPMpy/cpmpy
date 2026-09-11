@@ -580,6 +580,10 @@ class CPM_gurobi(SolverInterface):
 
         # instantiate Gurobi solver
         s = cls()
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
+        s._csemap = None
 
         # collect the Gurobi constraint objects
         grb_hard_cons = []
