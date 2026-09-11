@@ -87,13 +87,13 @@ class CallbacksCPMPy(Callbacks):
         "le": (2, lambda x, y: x <= y),
         "ge": (2, lambda x, y: x >= y),
         "gt": (2, lambda x, y: x > y),
-        "ne": (2, lambda x, y: x != y),
+        # arity 0: XCSP3 allows n-ary eq/ne (all-equal / not-all-equal)
+        "ne": (0, lambda x: x[0] != x[1] if len(x) == 2 else ~cp.AllEqual(x)),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
         'in': (2, lambda x, y: cp.InDomain(x, y)),  # could be mixed context here!
         'notin': (2, lambda x, y: xglobals.NotInDomain(x, y)),  # could be mixed context here!
         'set': (0, lambda x: list(set(x))),
-        # TODO 'notin' is the only other set operator (negative indomain)
         # Logic
         "not": (1, lambda x: ~x),
         "and": (0, lambda x: cp.all(x)),
@@ -265,21 +265,21 @@ class CallbacksCPMPy(Callbacks):
             cpm_vars = self.vars_from_node(scope)
             exttuples = [tuple([strwildcard(x) for x in tup]) for tup in tuples]
             if positive:
-                self.cpm_model += xglobals.RowSelectingShortTable(cpm_vars, exttuples)
+                self.cpm_model += cp.ShortTable(cpm_vars, exttuples)
             else:
                 self.cpm_model += xglobals.NegativeShortTable(cpm_vars, exttuples)
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
-                self.cpm_model += xglobals.NonReifiedTable(cpm_vars, tuples)
+                self.cpm_model += cp.Table(cpm_vars, tuples)
             else:
-                self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
+                self.cpm_model += ~cp.Table(cpm_vars, tuples)
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        self.cpm_model += xglobals.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
+        self.cpm_model += cp.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        self.cpm_model += xglobals.MDD(self.get_cpm_vars(scope), transitions)
+        self.cpm_model += cp.MDD(self.get_cpm_vars(scope), transitions)
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         cpm_exprs = self.get_cpm_exprs(scope)
@@ -470,7 +470,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += (cp.Count(cpm_vars, value) == self.get_cpm_var(k))
 
     def ctr_among(self, lst: list[Variable], values: list[int], k: int | Variable):
-        self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
+        self.cpm_model += cp.Among(self.get_cpm_vars(lst), self.unroll(values)) == self.get_cpm_var(k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
         if excepting is None:
@@ -499,8 +499,8 @@ class CallbacksCPMPy(Callbacks):
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable],
                         occurs: list[int] | list[Variable] | list[range], closed: bool):
         self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
-                                                    self.get_cpm_exprs(values),
-                                                    self.get_cpm_exprs(occurs),
+                                                    self.unroll(values),
+                                                    self.get_cpm_occurs_exprs(occurs),
                                                     closed=closed)
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
@@ -712,7 +712,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, balance, arcs, capacities, weights, condition)
 
     def ctr_instantiation(self, lst: list[Variable], values: list[int]):
-        self.cpm_model += xglobals.NonReifiedTable(self.get_cpm_vars(lst), [values])
+        self.cpm_model += cp.Table(self.get_cpm_vars(lst), [values])
 
     def ctr_clause(self, pos: list[Variable], neg: list[Variable]):  # not in XCSP3-core
         self._unimplemented(pos, neg)
@@ -806,7 +806,7 @@ class CallbacksCPMPy(Callbacks):
         return cpm_exprs
 
     def get_cpm_var(self, x):
-        if isinstance(x, XVar):
+        if isinstance(x, XVar) or x in self.cpm_variables:
             return self.cpm_variables[x]
         else:
             return x  # constants
@@ -821,20 +821,32 @@ class CallbacksCPMPy(Callbacks):
         else:
             return self.vars_from_node(lst)
 
+    def get_cpm_occurs_exprs(self, occurs):
+        """Cardinality occurs list: constants and/or intvars for interval bounds."""
+        cpm_occurs = []
+        for occur in occurs:
+            if isinstance(occur, range):
+                cpm_occurs.append(cp.intvar(occur.start, occur.stop - 1))
+            elif isinstance(occur, XVar):
+                cpm_occurs.append(self.get_cpm_var(occur))
+            else:
+                cpm_occurs.append(self.intentionfromtree(occur))
+        return cpm_occurs
+
     def get_cpm_exprs(self, lst):
+        # Guard against empty input;
+        # use len() == 0 instead of `not lst` to also support numpy arrays
+        if len(lst) == 0:
+            return []
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            # assert len(lst) == 1, f"Expected range here, but got list with multiple elements, what's the semantics???{lst}"
-
             if len(lst) == 1:
-                return list(lst[0])  # this should work without converting to str first
-            else:
-                return [cp.intvar(l.start, l.stop - 1) for l in lst]
-
-            # return list(eval(str(lst[0])))
-        else:
-            return self.exprs_from_node(lst)
+                return list(lst[0])
+            return self.get_cpm_occurs_exprs(lst)
+        if any(isinstance(x, range) for x in lst):
+            return self.get_cpm_occurs_exprs(lst)
+        return self.exprs_from_node(lst)
 
     def end_instance(self):
         pass

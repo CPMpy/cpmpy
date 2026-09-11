@@ -14,7 +14,7 @@ The package consists of 4 modules:
 """
 # Tias Guns, 2019-2026
 
-__version__ = "0.10.0"
+__version__ = "1.0.0"
 
 
 from .expressions import __all__ as _expressions_all

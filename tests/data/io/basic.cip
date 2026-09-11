@@ -1,0 +1,17 @@
+# ----------------------------------------------------------------------------------------------------
+# File written by CPMpy
+#     Format: 'cip'
+#     CPMpy Version: 0.10.0
+# ----------------------------------------------------------------------------------------------------
+STATISTICS
+  Problem name     : CPMpy Model
+  Variables        : 2 (0 binary, 2 integer, 0 implicit integer, 0 continuous)
+  Constraints      : 0 initial, 1 maximal
+OBJECTIVE
+  Sense            : maximize
+VARIABLES
+  [integer] <y>: obj=2, original bounds=[0,10]
+  [integer] <x>: obj=1, original bounds=[0,10]
+CONSTRAINTS
+  [linear] <c1>: <x>[I] +<y>[I] == 5;
+END

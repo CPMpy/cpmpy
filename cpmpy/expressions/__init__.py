@@ -20,7 +20,6 @@ List of submodules
 # we only import methods/classes that are used for modelling
 # others need to be imported by the developer explicitely
 from .variables import boolvar, intvar, cpm_array
-from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
 from .globalconstraints import (
     AllDifferent,
     AllDifferentExcept0,
@@ -50,6 +49,7 @@ from .globalconstraints import (
     NoOverlap,
     NoOverlapOptional,
     NegativeTable,
+    MDD,
     Regular,
 )
 from .globalfunctions import (
@@ -61,10 +61,12 @@ from .globalfunctions import (
     Modulo,
     Power,
     Element,
+    NDElement,
     Count,
     Among,
     NValue,
     NValueExcept,
+    FloatSum,
 )
 from .core import BoolVal
 from .python_builtins import all, any, max, min, sum, abs
@@ -74,10 +76,6 @@ __all__ = [
     "boolvar",
     "intvar",
     "cpm_array",
-# Variables (old, to be deprecated)
-    "BoolVar",
-    "IntVar",
-    "cparray",
 # Global functions
     "Minimum",
     "Maximum",
@@ -87,10 +85,13 @@ __all__ = [
     "Modulo",
     "Power",
     "Element",
+    "NDElement",
     "Count",
     "Among",
     "NValue",
     "NValueExcept",
+# Objective-only (not an Expression)
+    "FloatSum",
 # Global constraints
     "AllDifferent",
     "AllDifferentExcept0",
@@ -116,6 +117,7 @@ __all__ = [
     "LexChainLessEq",
     "LexLess",
     "LexLessEq",
+    "MDD",
     "NegativeTable",
     "NoOverlap",
     "NoOverlapOptional",
