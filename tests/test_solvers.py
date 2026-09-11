@@ -510,6 +510,37 @@ class TestSolvers:
         assert s.z3_solver.lower(s.obj_handle) == s.z3_solver.upper(s.obj_handle)
         assert x[n - 1].value() == obj_bound
 
+    @pytest.mark.requires_solver("cvc5")
+    def test_cvc5(self):
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 9, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        s = cp.SolverLookup.get("cvc5", m)
+        assert not s.solve(assumptions=bv)
+
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("cvc5", m)
+        assert s.solve()
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("cvc5", m)
+        assert s.solve()
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("cvc5", m)
+        assert s.solve()
+
+        x = cp.intvar(0, 1)
+        m = cp.Model((x >= 0.1) & (x != 1))
+        s = cp.SolverLookup.get("cvc5", m)
+        assert not s.solve() # TODO: same bug as z3?
+
+
     def test_pow(self):
         iv1 = cp.intvar(2,9)
         for i in [0,1,2]:
@@ -973,7 +1004,8 @@ class TestSupportedSolvers:
 
     def test_incremental_assumptions(self, solver):
         x, y, z = cp.boolvar(shape=3, name=["x","y","z"])
-        s = cp.SolverLookup.get(solver)
+        init_kwargs = {"unsat_cores": True} if solver == "cvc5" else {}
+        s = cp.SolverLookup.get(solver, **init_kwargs)
         if "assumptions" not in inspect.signature((s.solve)).parameters:
             return # solver does not support solving under assumptions
         
@@ -1275,6 +1307,8 @@ class TestSupportedSolvers:
             pytest.skip(reason="veripb not on path")
         if basename == "pysat" and which("drat-trim") is None:
             pytest.skip(reason="drat-trim not on path")
+        if basename == "cvc5" and which("carcara") is None:
+            pytest.skip(reason="carcara not on path")
         
         a,b,c,d = cp.intvar(1,3,shape=4)
         m = cp.Model(a != b, a != c, a != d, b != c, b != d, c != d)
