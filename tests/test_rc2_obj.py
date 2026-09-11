@@ -1,3 +1,4 @@
+import importlib
 import unittest
 import pytest
 import cpmpy as cp
@@ -5,8 +6,11 @@ from cpmpy.solvers.rc2 import CPM_rc2
 
 # Check if RC2 is available
 rc2_available = CPM_rc2.supported()
+# Check if PyPBlib is available
+pblib_available = importlib.util.find_spec("pypblib") is not None
 
 @pytest.mark.skipif(not rc2_available, reason="RC2 solver not available")
+@pytest.mark.skipif(not pblib_available, reason="PyPBlib not available")
 class TestRC2Transform(unittest.TestCase):
     """
     Test cases for RC2 solver objective transformation functionality
