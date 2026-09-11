@@ -18,7 +18,7 @@ List of submodules
 """
 
 # we only import methods/classes that are used for modelling
-# others need to be imported by the developer explicitely
+# others need to be imported by the developer explicitly
 from .variables import boolvar, intvar, cpm_array
 from .globalconstraints import (
     AllDifferent,

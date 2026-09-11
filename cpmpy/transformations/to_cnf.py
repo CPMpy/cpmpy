@@ -22,7 +22,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     Arguments:
         constraints:    list[Expression] or Operator
         csemap:         `dict()` used for CSE
-        ivarmap:        `dict()` used to map integer variables to their encoding (usefull for finding the values of the now-encoded integer variables)
+        ivarmap:        `dict()` used to map integer variables to their encoding (useful for finding the values of the now-encoded integer variables)
         encoding:       the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     Returns:
         Equivalent CPMpy constraints in CNF, and the updated `ivarmap`
