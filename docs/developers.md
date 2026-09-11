@@ -4,6 +4,7 @@ CPMpy is an open source project and we are happy for you to read and change the 
 
 This page introduces how to get started on developing on CPMpy itself, with a focus on sharing these changes back with us for inclusion.
 
+Change AGENTS.md accordingly when developer guidelines and practices change.
 
 ## Setting up your development environment
 
