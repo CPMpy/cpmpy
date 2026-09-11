@@ -218,8 +218,6 @@ class TestMUS:
 
     @pytest.mark.parametrize("variant", ["mus_native"])
     def test_sat_raises(self, solver, variant):
-        if solver == "hexaly":
-            pytest.skip("Hexaly is too slow on UNSAT problems.")
         if not self._supported_solver(solver, variant):
             pytest.skip(self._unsupported_reason(solver, variant))
         x = cp.boolvar(name="x")
@@ -238,13 +236,14 @@ class TestMUS:
 
     @pytest.mark.parametrize("variant", ["mus_native"])
     def test_multiple_transformed_raises(self, solver, variant):
-        if solver != "scip":
+        if solver == "scip":
+            if not self._supported_solver(solver, variant):
+                pytest.skip(self._unsupported_reason(solver, variant))
+            x = cp.intvar(1, 2, shape=3, name="x")
+            with pytest.raises(ValueError, match="multiple transformed"):
+                MUS_FUNCS[variant](soft=[cp.AllDifferent(x)], solver=solver)
+        else:
             pytest.skip(f"{solver} native MUS supports grouped constraints")
-        if not self._supported_solver(solver, variant):
-            pytest.skip(self._unsupported_reason(solver, variant))
-        x = cp.intvar(1, 2, shape=3, name="x")
-        with pytest.raises(ValueError, match="multiple transformed"):
-            MUS_FUNCS[variant](soft=[cp.AllDifferent(x)], solver=solver)
 
     # quickxplain-specific
     @pytest.mark.parametrize("variant", ["quickxplain", "quickxplain_naive"])

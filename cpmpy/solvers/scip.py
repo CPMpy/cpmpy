@@ -583,6 +583,8 @@ class CPM_scip(SolverInterface):
 
         if not iis.isSubscipInfeasible():
             raise AssertionError("MUS: model must be UNSAT")
+        if not iis.isSubscipIrreducible():
+            raise AssertionError("MUS: SCIP IIS is not irreducible")
 
         subscip = iis.getSubscip()
         iis_names = {con.name for con in subscip.getConss()}
