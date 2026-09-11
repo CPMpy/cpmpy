@@ -106,6 +106,7 @@ class CPM_scip(SolverInterface):
 
         self.scip_model = scip.Model()
         self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
+        self.objective_ = None
         self.scip_model.setParam("iis/silent", True)  # suppress native IIS statistics/logs
         self.scip_model.hideOutput()
         self.objective_value_ = None
