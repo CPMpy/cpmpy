@@ -2131,18 +2131,29 @@ class Precedence(GlobalConstraint):
         - X = [1,2,1,3] satisfies the precedence [1,2,3].
         - X = [4,1,2,1,3] also satisfies the precedence, as values not appearing in P can appear in any order.
         - X = [2,1,3] does not satisfy the precedence, as 1 does not appear before 2.
+
+    The values in P must be pairwise distinct. A repeated value would require an
+    occurrence of that value to strictly precede itself, which makes the value
+    unusable rather than expressing a precedence, so it is rejected instead.
     """
     def __init__(self, vars: ListLike[ExprLike], precedence: ListLike[int|np.integer]):
         """
         Arguments:
             vars (ListLike[ExprLike]): List of expressions or constants representing the variables
-            precedence (ListLike[int | np.integer]): List of integer precedence values
+            precedence (ListLike[int | np.integer]): List of distinct integer precedence values
+
+        Raises:
+            TypeError: If `vars` is not a list, or `precedence` is not a list of constants
+            ValueError: If `precedence` contains duplicate values
         """
         if not is_any_list(vars):
             raise TypeError("Precedence expects a list of variables as first argument, but got", vars)
         if not is_any_list(precedence) or not all(is_num(p) for p in precedence):
             raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
-        super().__init__("precedence", (list(vars), list(precedence)))
+        precedence = list(precedence)
+        if len(set(precedence)) != len(precedence):
+            raise ValueError(f"Precedence expects distinct values as second argument, but got {precedence}")
+        super().__init__("precedence", (list(vars), precedence))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -2169,39 +2180,36 @@ class Precedence(GlobalConstraint):
         return constraints, []
 
 
-    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
 
         args, precedence = self.args
-        args = cpm_array(args)
-        defining = []
-        constraining = []
+        if len(precedence) == 0:
+            return [cp.BoolVal(True)], []
 
+        args = cpm_array(args)
         a = cp.boolvar(shape=(len(args), len(args)))
         e = cp.boolvar(shape=(len(args), len(args)))
+        b = cp.boolvar(shape=(len(args), len(precedence)))
+        defining = [b[i, m] == (args[i] == precedence[m]) for i in range(len(args)) for m in range(len(precedence))]
 
-        constraining.append(e[0,0] + a[0,0] == 1)
-        defining.append(e[0,0] == (cp.all(args[0] != p for p in precedence)))
-        defining.append(a[0,0] == (args[0] == precedence[0]))
+        constraining = [e[0,0] + a[0,0] == 1]
+        defining.append(e[0,0] + cp.sum(b[0, :]) == 1)
+        defining.append(a[0,0] == b[0,0])
+
+        for i in range(1, len(args)):
+            for j in range(0, min(i+1, len(precedence))):
+                if j == 0:
+                    defining.append(e[i-1, 0] == e[i, 0] + a[i, 0])
+                else:
+                    defining.append(e[i-1, j] + a[i-1, j-1] == e[i, j] + a[i, j])
+                defining.append(e[i, j] + cp.sum(b[i, j:]) <= 1)
+                defining.append(a[i, j] <= b[i,j])
 
         for i in range(0, len(args)):
-            for j in range(i+1, len(args)):
-                defining.append(~e[i,j] & ~a[i,j])
-
-        for i in range(1, len(args)):
-            defining.append(e[i-1, 0] == e[i, 0] + a[i, 0])
-            defining.append(e[i,0].implies(cp.all(args[i] != p for p in precedence)))
-            defining.append(a[i,0].implies(args[i] == precedence[0]))
-
-        for i in range(1, len(args)):
-            for j in range(0, max(i+1, len(precedence))):
-                defining.append(e[i - 1, j] + a[i - 1, j - 1] == e[i, j] + a[i, j])
-                defining.append(e[i, j].implies(cp.all(args[i] != p for p in precedence[j:])))
-                defining.append(a[i, j].implies(args[i] == precedence[j]))
+            for j in range(min(i+1, len(precedence)), len(args)):
+                defining.append(e[i,j] + a[i,j] == 0)
 
         return constraining, defining
-
-
-
 
 
     def value(self) -> Optional[bool]:
@@ -2472,6 +2480,31 @@ class LexLess(GlobalConstraint):
 
         return constraining, defining
 
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
+        X, Y = cpm_array(self.args)
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
+        if len(X) == 1 == len(Y):
+            return [X[0] < Y[0]], []
+
+        e = cp.boolvar(shape=len(X))
+        a = cp.boolvar(shape=len(X))
+
+        constraining = []
+        defining = []
+
+        constraining.append(e[0] + a[0] == 1)
+        defining.append(e[0] == (X[0] == Y[0]))
+        defining.append(a[0] == (X[0] < Y[0]))
+        for i in range(1, len(X)):
+            defining.append(e[i-1] == a[i] + e[i])
+            defining.append(e[i].implies(X[i] == Y[i]))
+            defining.append(a[i].implies(X[i] < Y[i]))
+        constraining.append(~e[len(X)-1])
+
+        return constraining, defining
+
+
     def value(self) -> Optional[bool]:
         """
         Returns:
@@ -2527,6 +2560,29 @@ class LexLessEq(GlobalConstraint):
         defining.extend(bvar[:-1] == (X <= Y) & ((X < Y) | bvar[1:]))  # vectorized for all but the last
         defining.append(bvar[-1] == (X[-1] <= Y[-1]))
         constraining = [bvar[0]]
+
+        return constraining, defining
+
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
+        X, Y = cpm_array(self.args)
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
+        if len(X) == 1 == len(Y):
+            return [X[0] <= Y[0]], []
+
+        e = cp.boolvar(shape=len(X))
+        a = cp.boolvar(shape=len(X))
+
+        constraining = []
+        defining = []
+
+        constraining.append(e[0] + a[0] == 1)
+        defining.append(e[0] == (X[0] == Y[0]))
+        defining.append(a[0] == (X[0] < Y[0]))
+        for i in range(1, len(X)):
+            defining.append(e[i-1] == a[i] + e[i])
+            defining.append(e[i].implies(X[i] == Y[i]))
+            defining.append(a[i].implies(X[i] < Y[i]))
 
         return constraining, defining
 

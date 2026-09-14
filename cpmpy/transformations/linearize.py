@@ -642,7 +642,6 @@ def get_linear_decompositions():
         table=lambda expr: expr.decompose_linear(), 
         short_table=lambda expr: expr.decompose(),
         indomain=lambda expr: expr.decompose_linear(),
-        precedence=lambda expr: expr.decompose_linear(),
         regular=lambda expr: expr.decompose_linear(),
     )
 
@@ -657,6 +656,8 @@ def get_linear_positive_decompositions():
     return dict(
         regular=lambda expr: expr.decompose_linear_positive(),
         circuit=lambda expr: expr.decompose_linear_positive(),
+        lex_less=lambda expr: expr.decompose_linear_positive(),
+        precedence=lambda expr: expr.decompose_linear_positive(),
     )
 
 
