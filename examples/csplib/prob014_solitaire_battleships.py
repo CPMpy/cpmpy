@@ -195,13 +195,5 @@ if __name__ == "__main__":
             for r in range(args.rows):
                 print(" ".join(symbols[grid[r, c].value()] for c in range(args.cols)))
         pretty_print(grid)
-        # get all solutions by restricting the grid to be different from previous solutions
-        for _s in range(10):  # limit to 10 solutions
-            model += cp.sum(grid != grid.value()) > 0  # at least one cell must differ
-            if model.solve():
-                pretty_print(grid)
-            else:
-                print("No more solutions.")
-                break
     else:
         raise ValueError("Model is unsatisfiable")
