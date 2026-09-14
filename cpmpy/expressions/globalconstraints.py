@@ -2193,20 +2193,19 @@ class Precedence(GlobalConstraint):
         defining = [b[i, m] == (args[i] == precedence[m]) for i in range(len(args)) for m in range(len(precedence))]
 
         constraining = [e[0,0] + a[0,0] == 1]
-        defining.append(e[0,0] + cp.sum(b[0, :]) == 1)
-        defining.append(a[0,0] == b[0,0])
 
-        for i in range(1, len(args)):
-            for j in range(0, min(i+1, len(precedence))):
-                if j == 0:
-                    defining.append(e[i-1, 0] == e[i, 0] + a[i, 0])
-                else:
-                    defining.append(e[i-1, j] + a[i-1, j-1] == e[i, j] + a[i, j])
+        for i in range(0, len(args)):
+            max_j = min(i + 1, len(precedence))
+            for j in range(0, max_j):
+                if i > 0:
+                    if j == 0:
+                        defining.append(e[i-1, 0] == e[i, 0] + a[i, 0])
+                    else:
+                        defining.append(e[i-1, j] + a[i-1, j-1] == e[i, j] + a[i, j])
                 defining.append(e[i, j] + cp.sum(b[i, j:]) <= 1)
                 defining.append(a[i, j] <= b[i,j])
 
-        for i in range(0, len(args)):
-            for j in range(min(i+1, len(precedence)), len(args)):
+            for j in range(max_j, len(args)):
                 defining.append(e[i,j] + a[i,j] == 0)
 
         return constraining, defining
@@ -2494,10 +2493,9 @@ class LexLess(GlobalConstraint):
         defining = []
 
         constraining.append(e[0] + a[0] == 1)
-        defining.append(e[0] == (X[0] == Y[0]))
-        defining.append(a[0] == (X[0] < Y[0]))
-        for i in range(1, len(X)):
-            defining.append(e[i-1] == a[i] + e[i])
+        for i in range(0, len(X)):
+            if i > 0:
+                defining.append(e[i-1] == a[i] + e[i])
             defining.append(e[i].implies(X[i] == Y[i]))
             defining.append(a[i].implies(X[i] < Y[i]))
         constraining.append(~e[len(X)-1])
@@ -2577,10 +2575,9 @@ class LexLessEq(GlobalConstraint):
         defining = []
 
         constraining.append(e[0] + a[0] == 1)
-        defining.append(e[0] == (X[0] == Y[0]))
-        defining.append(a[0] == (X[0] < Y[0]))
-        for i in range(1, len(X)):
-            defining.append(e[i-1] == a[i] + e[i])
+        for i in range(0, len(X)):
+            if i > 0:
+                defining.append(e[i-1] == a[i] + e[i])
             defining.append(e[i].implies(X[i] == Y[i]))
             defining.append(a[i].implies(X[i] < Y[i]))
 
