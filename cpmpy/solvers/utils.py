@@ -108,21 +108,24 @@ class SolverLookup():
                 print(f"{basename}: Not supported (missing Python package, binary or license).")
 
     @classmethod
-    def supported(cls):
+    def supported(cls, subsolvers=True):
         """
-            Return the list of names of all solvers (and subsolvers) supported on this system.
+            Return the list of names of all solvers (and optionally subsolvers) supported on this system.
 
             If a solver name is returned, it means that the solver's `.supported()` function returns True
             and it is hence ready for immediate use
             (e.g. any separate binaries are also installed if necessary, and licenses are active if needed).
 
             Typical use case is to use these names in `SolverLookup.get(name)`.
+
+            :param subsolvers: if True (default), also include installed subsolvers as
+                ``<base_solver>:<subsolver>`` entries in the list; otherwise only the <base_solver> is added.
         """
         names = []
         for (basename, CPM_slv) in cls.base_solvers():
             if CPM_slv.supported():
                 names.append(basename)
-                if hasattr(CPM_slv, "solvernames"):
+                if subsolvers and hasattr(CPM_slv, "solvernames"):
                     subnames = CPM_slv.solvernames(installed=True)
                     for subn in subnames:
                         names.append(basename+":"+subn)
@@ -130,6 +133,11 @@ class SolverLookup():
 
     @classmethod
     def solvernames(cls):
+        """
+        .. deprecated:: 1.0.0
+            Please use :meth:`supported` instead.
+        """
+        warnings.warn("Deprecated, use supported() instead", DeprecationWarning)
         # The older (more indirectly named) way to get the list of names of *supported* solvers.
         # Will be deprecated at some point.
         return cls.supported()
@@ -241,19 +249,3 @@ class SolverLookup():
                 # For main solvers, show version if available
                 version = version if version else "Not found" if installed else "-"
                 print(f"{basename:<25} {'Yes' if installed else 'No':<10} {version:<15}")
-
-
-# using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
-# Order matters! first is default, then tries second, etc...
-builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, CPM_choco]
-def get_supported_solvers():
-    """
-        Returns a list of solvers supported on this machine.
-       
-        .. deprecated:: 0.9.4
-            Please use :class:`SolverLookup` object instead.
-
-        :return: a list of SolverInterface sub-classes :list[SolverInterface]:
-    """
-    warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
-    return [sv for sv in builtin_solvers if sv.supported()]

@@ -32,6 +32,7 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install ".[test, ${{ inputs.solver }}]"
           pip install pytest-xdist
+          pip install pytest-rerunfailures
 
       - name: Install solver dependencies
         if: ${{ inputs.install_commands != '' }}

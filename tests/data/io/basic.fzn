@@ -1,0 +1,19 @@
+% ----------------------------------------------------------------------------------------------------
+% File written by CPMpy
+%     Format: 'fzn'
+%     CPMpy Version: 0.10.0
+% ----------------------------------------------------------------------------------------------------
+% SCIP STATISTICS
+% Problem name     : CPMpy Model
+% Variables        : 2 (0 binary, 2 integer, 0 implicit integer, 0 continuous)
+% Constraints      : 1
+
+%%%%%% Problem variables %%%%%%
+var 0..10: y;
+var 0..10: x;
+
+%%%%%% Problem constraints %%%%%%
+constraint int_lin_eq([1, 1], [x, y], 5);
+
+%%%%%% Objective function %%%%%%
+solve maximize int_float_lin([2.0, 1.0], [], [y, x], []);

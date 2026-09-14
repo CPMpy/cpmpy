@@ -1,7 +1,7 @@
-Dataset (:mod:`cpmpy.tools.xcsp3.dataset`)
-=====================================================
+Dataset
+=======
 
-.. automodule:: cpmpy.tools.xcsp3.dataset
-    :members:
-    :undoc-members:
-    :inherited-members:
+The XCSP3 tools can work directly with benchmark instances from the XCSP3
+competitions. The :doc:`XCSP3Dataset </api/tools/datasets/xcsp3>` class
+provides a PyTorch-style interface for downloading a competition year and
+track, iterating over the instance files, and accessing per-instance metadata.

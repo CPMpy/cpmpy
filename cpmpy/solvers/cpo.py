@@ -44,10 +44,12 @@
 
 from typing import Optional
 import warnings
+import time
+
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -156,14 +158,18 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the CP Optimizer solver
 
             Arguments:
-                time_limit (float, optional):   maximum solve time in seconds 
-                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `CpoSolutionCounter`. If you want to count all solutions, 
-                                                                                                        don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
+                time_limit (float, optional):   maximum solve time in seconds
+                solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` or ``docplex.cp.solver.cpo_callback.CpoCallback`` object, or a list thereof
+                                                takes precedence over ``display`` when both are set.
+                display:                        generic solution callback for use during optimization.
+                                                either a list of CPMpy expressions, OR a callback function which
+                                                gets called after the variable-value mapping of the intermediate solution.
+                                                default/None: nothing is displayed
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -199,14 +205,31 @@ class CPM_cpo(SolverInterface):
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
-        
+
         # create solver object
         self.cpo_solver = docp.solver.solver.CpoSolver(
             self.cpo_model,
-            TimeLimit=time_limit, 
-            **kwargs, 
-            listeners=[solution_callback] if solution_callback is not None else None
+            TimeLimit=time_limit,
+            **kwargs,
         )
+
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+            if not isinstance(callback, list):
+                callback = [callback]
+        elif display is not None:
+            callback = [CpoSolutionPrinter(self, display)]
+
+        if callback is not None:
+            for cb in callback:
+                if isinstance(cb, CpoSolverListener):
+                    self.cpo_solver.add_listener(cb)
+                    # By default `solve()` only notifies listeners once with the final/best result.
+                    # Enable search_next mode so listeners are warned about every intermediate solution.
+                    self.cpo_solver.set_solve_with_search_next(True)
+                if isinstance(cb, CpoCallback):
+                    self.cpo_solver.add_callback(cb)
 
         self.cpo_result = self.cpo_solver.solve()
 
@@ -400,7 +423,7 @@ class CPM_cpo(SolverInterface):
         return self.cpo_model.get_objective() is not None
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -409,14 +432,15 @@ class CPM_cpo(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -424,7 +448,7 @@ class CPM_cpo(SolverInterface):
         # no flattening required
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_cpo":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -437,10 +461,11 @@ class CPM_cpo(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
 
         # add new user vars to the set
@@ -694,13 +719,65 @@ class CPM_cpo(SolverInterface):
                 extra_cons += [dom.presence_of(task) == self._cpo_expr(is_present, boolexpr=True)]
             return task, extra_cons
 
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using CP Optimizer's native conflict refiner.
+
+        CP Optimizer refines conflicts over native constraints. A CPMpy soft
+        constraint may expand to several native ones. In that case we post them
+        as one ``logical_and``, which the refiner treats as a single member.
+        CP Optimizer does not actually support hard constraints so the parameter can not be used.
+
+        For more information see the actual documentation of CPO: 
+        https://www.ibm.com/docs/en/cofz/12.10.0?topic=concepts-conflict-refiner-in-cp-optimizer
+        """
+        soft_cons = toplevel_list(soft, merge_and=False)
+        s = cls()
+        dom = s.get_docp().modeler
+
+        # Check that there are no hard constraints
+        if len(hard) != 0:
+            raise ValueError("CP Optimizer does not support hard constraints for MUS extraction. " \
+            "Please only use soft constraints or a different solver.")
+
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
+        s._csemap = None
+
+        native_to_soft_idx = {}
+        for i, soft_con in enumerate(soft_cons):
+            native_soft = []
+            for cpm_con in s.transform(soft_con):
+                cpo_expr = s._cpo_expr(cpm_con, boolexpr=True)
+                # Globals such as Cumulative may return a list of native exprs.
+                native_soft.extend(cpo_expr if is_any_list(cpo_expr) else [cpo_expr])
+
+            # Keep multi-native softs atomic: the refiner does not split &&.
+            soft_native = native_soft[0] if len(native_soft) == 1 else dom.logical_and(native_soft)
+            s.cpo_model.add(soft_native)
+            native_to_soft_idx[soft_native] = i
+
+        refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
+        assert refine_res.is_conflict(), "MUS: model must be UNSAT"
+
+        core = []
+        cpo_core = refine_res.get_member_constraints()
+
+        for cpo_con in cpo_core:
+            soft_idx = native_to_soft_idx[cpo_con]
+            core.append(soft_cons[soft_idx])
+
+        return core
+
 
 # solvers are optional, so this file should be interpretable
 # even if cpo is not installed...
 try:
+    from docplex.cp.solver.cpo_callback import CpoCallback, EVENT_SOLUTION
     from docplex.cp.solver.solver_listener import CpoSolverListener
-    import time
-
+    from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
     class CpoSolutionCounter(CpoSolverListener):
         """
         Native CP Optimizer callback for solution counting.
@@ -718,7 +795,7 @@ try:
 
         Arguments:
             verbose (bool, default: False): whether to print info on every solution found 
-    """
+        """
 
         def __init__(self, verbose=False):
             super().__init__()
@@ -727,15 +804,18 @@ try:
             if self.__verbose:
                 self.__start_time = time.time()
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def result_found(self, solver: CpoSolver, sres: CpoSolveResult):
+            """Keep track of solution count, invoked for each solution"""
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
+
             if self.__verbose:
                 current_time = time.time()
                 obj = sres.get_objective_value()
                 print('Solution %i, time = %0.2f s, objective = %i' %
                       (self.__solution_count, current_time - self.__start_time, obj))
             self.__solution_count += 1
-
+        
         def solution_count(self):
             """Returns the number of solutions found."""
             return self.__solution_count
@@ -773,7 +853,7 @@ try:
                             default/None: nothing displayed
                 solution_limit (default = None): stop after this many solutions 
         """
-        def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+        def __init__(self, solver: CPM_cpo, display:Optional[Callback]=None, solution_limit:Optional[int]=None, verbose:bool=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
             # we only need the cpmpy->solver varmap from the solver
@@ -786,9 +866,13 @@ try:
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
                 self._cpm_vars = solver.user_vars
+            self._cpm_solver = solver
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def result_found(self, solver:CpoSolver, sres:CpoSolveResult):
+            
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
+
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
@@ -800,13 +884,7 @@ try:
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif is_any_list(self._display):
-                    # explicit list of expressions to display
-                    print(argvals(self._display))
-                else: # callable
-                    self._display()
+                self._cpm_solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:
