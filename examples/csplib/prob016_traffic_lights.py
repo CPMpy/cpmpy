@@ -10,7 +10,14 @@ have different states (e.g., red, green). The problem parameters describe
 constraints on which combinations of light states are safe.
 
 Vehicle light states: 0=red, 1=red-yellow, 2=green, 3=yellow
-Pedestrian light states: 0=red, 1=green
+Pedestrian light states: 0=red, 2=green
+
+Junction arms, numbered clockwise (each has vehicle and pedestrian lights):
+             V1/P1
+               |
+    V4/P4 -----+----- V2/P2
+               |
+             V3/P3
 
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_016_traffic_lights/csplib_016_traffic_lights.cpmpy.py)
 """
@@ -18,16 +25,19 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 import cpmpy as cp
 
 
+RED, RED_YELLOW, GREEN, YELLOW = range(4)
+
+
 def traffic_lights():
-    vehicle_lights = cp.intvar(0, 3, shape=4, name=tuple(f"V{i}" for i in range(1, 5)))
-    pedestrian_lights = cp.intvar(0, 1, shape=4, name=tuple(f"P{i}" for i in range(1, 5)))
+    vehicle_lights = cp.intvar(RED, YELLOW, shape=4, name=tuple(f"V{i}" for i in range(1, 5)))
+    pedestrian_lights = cp.intvar(RED, GREEN, shape=4, name=tuple(f"P{i}" for i in range(1, 5)))
 
     # Allowed combinations for (V_i, P_i, V_{i+1}, P_{i+1})
     allowed_tuples = [
-        [0, 0, 2, 1],
-        [1, 0, 3, 0],
-        [2, 1, 0, 0],
-        [3, 0, 1, 0],
+        [RED, RED, GREEN, GREEN],
+        [RED_YELLOW, RED, YELLOW, RED],
+        [GREEN, GREEN, RED, RED],
+        [YELLOW, RED, RED_YELLOW, RED],
     ]
 
     model = cp.Model()
@@ -55,14 +65,14 @@ if __name__ == "__main__":
 
     if model.solve():
         vehicle_state_names = {
-            0: "red",
-            1: "red-yellow",
-            2: "green",
-            3: "yellow",
+            RED: "red",
+            RED_YELLOW: "red-yellow",
+            GREEN: "green",
+            YELLOW: "yellow",
         }
         pedestrian_state_names = {
-            0: "red",
-            1: "green",
+            RED: "red",
+            GREEN: "green",
         }
 
         print(

@@ -88,8 +88,6 @@ if __name__ == "__main__":
 
     model, (sequence,) = water_bucket(max_steps=max_steps)
 
-    # print(model)
-
     if model.solve():
         cost = model.objective_value()
         sequence = sequence.value()

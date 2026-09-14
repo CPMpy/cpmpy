@@ -17,9 +17,7 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 import cpmpy as cp
 
 
-def sonet(r=4, n=10, demand=None, capacity_nodes=None):
-    if demand is None:
-        demand = [[0, 1, 1, 0, 0, 0, 1, 1, 0, 0],
+DEFAULT_DEMAND = [[0, 1, 1, 0, 0, 0, 1, 1, 0, 0],
                   [1, 0, 1, 1, 0, 0, 0, 0, 0, 0],
                   [1, 1, 0, 1, 0, 0, 0, 0, 0, 0],
                   [0, 1, 1, 0, 1, 0, 0, 0, 0, 0],
@@ -29,8 +27,14 @@ def sonet(r=4, n=10, demand=None, capacity_nodes=None):
                   [1, 0, 0, 0, 0, 1, 1, 0, 1, 0],
                   [0, 0, 0, 0, 0, 0, 1, 1, 0, 1],
                   [0, 0, 0, 0, 1, 0, 0, 0, 1, 0]]
-    if capacity_nodes is None:
-        capacity_nodes = [3, 4, 5, 6]
+
+DEFAULT_CAPACITY_NODES = [3, 4, 5, 6]
+
+
+def sonet(r=4, n=10, demand=DEFAULT_DEMAND, capacity_nodes=DEFAULT_CAPACITY_NODES):
+    assert len(demand) == n
+    assert all(len(row) == n for row in demand)
+    assert len(capacity_nodes) == r
 
     model = cp.Model()
 

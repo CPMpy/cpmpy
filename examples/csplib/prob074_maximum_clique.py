@@ -15,13 +15,16 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 import cpmpy as cp
 
 
-def maximum_clique(n=5, adj=None):
-    if adj is None:
-        adj = [[0, 1, 0, 1, 0],
+DEFAULT_ADJ = [[0, 1, 0, 1, 0],
                [1, 0, 1, 0, 0],
                [0, 1, 0, 1, 1],
                [1, 0, 1, 0, 1],
                [0, 0, 1, 1, 0]]
+
+
+def maximum_clique(n=5, adj=DEFAULT_ADJ):
+    assert len(adj) == n
+    assert all(len(row) == n for row in adj)
 
     c = cp.boolvar(shape=n, name="c")
 

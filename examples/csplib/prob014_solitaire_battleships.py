@@ -22,7 +22,7 @@ import cpmpy as cp
 # Cell types in the grid. Each cell is either water or part of a ship.
 # Ship cells indicate their position within the vessel.
 WATER = 0    # water
-CIRCLE = 1   # submarine, a 1-cell ship
+SUBMARINE = 1   # submarine, a 1-cell ship
 LEFT = 2     # leftmost cell of a horizontal ship
 RIGHT = 3    # rightmost cell of a horizontal ship
 TOP = 4      # topmost cell of a vertical ship
@@ -32,8 +32,8 @@ MIDDLE = 6   # interior cell of a ship longer than 2
 
 DEFAULT_ROWSUM = (0, 2, 3, 1, 2, 4, 2, 1, 2, 3)
 DEFAULT_COLSUM = (1, 3, 3, 1, 5, 1, 2, 4, 0, 0)
-DEFAULT_FLEET_COUNTS = ((4, 1), (3, 2), (2, 3), (1, 4))
-DEFAULT_HINTS = ((7, 1, CIRCLE),)
+DEFAULT_FLEET_COUNTS = {4: 1, 3: 2, 2: 3, SUBMARINE: 4}
+DEFAULT_HINTS = ((7, 1, SUBMARINE),)
 
 
 def solitaire_battleships(
@@ -49,8 +49,6 @@ def solitaire_battleships(
     assert cols > 0, "colsum must contain at least one column"
     assert all(0 <= v <= cols for v in rowsum), "Each row sum must be between 0 and the number of columns"
     assert all(0 <= v <= rows for v in colsum), "Each column sum must be between 0 and the number of rows"
-
-    fleet_counts = dict(fleet_counts)
 
     assert all(size > 0 and count >= 0 for size, count in fleet_counts.items())
     assert sum(rowsum) == sum(colsum), "Row sums and column sums must have the same total"
@@ -71,9 +69,9 @@ def solitaire_battleships(
 
     # Row and column sums
     for i in range(rows):
-        model += cp.sum(grid[i, :] > WATER) == rowsum[i]
+        model += cp.sum(grid[i, :] != WATER) == rowsum[i]
     for j in range(cols):
-        model += cp.sum(grid[:, j] > WATER) == colsum[j]
+        model += cp.sum(grid[:, j] != WATER) == colsum[j]
 
     # Adjacency and connectivity
     for r in range(rows):
@@ -88,7 +86,7 @@ def solitaire_battleships(
                 diag_is_water.append(grid[r + 1, c - 1] == WATER)
             if r < rows - 1 and c < cols - 1:
                 diag_is_water.append(grid[r + 1, c + 1] == WATER)
-            model += (grid[r, c] > WATER).implies(cp.all(diag_is_water))
+            model += (grid[r, c] != WATER).implies(cp.all(diag_is_water))
 
             ortho_is_water = []
             if r > 0:
@@ -100,8 +98,9 @@ def solitaire_battleships(
             if c < cols - 1:
                 ortho_is_water.append(grid[r, c + 1] == WATER)
 
-            # A CIRCLE must be entirely surrounded by water
-            model += (grid[r, c] == CIRCLE).implies(cp.all(ortho_is_water))
+            # Define ship layouts through the allowed neighbors of each cell type.
+            # A SUBMARINE must be entirely surrounded by water
+            model += (grid[r, c] == SUBMARINE).implies(cp.all(ortho_is_water))
 
             # LEFT piece
             model += (grid[r, c] == LEFT).implies(
@@ -147,7 +146,7 @@ def solitaire_battleships(
             model += (grid[r, c] == MIDDLE).implies(is_hor_middle | is_ver_middle)
 
     # Fleet composition
-    model += cp.sum(grid == CIRCLE) == fleet_counts[1]
+    model += cp.sum(grid == SUBMARINE) == fleet_counts[SUBMARINE]
 
     num_horizontal_ships = cp.sum(grid == LEFT)
     num_vertical_ships = cp.sum(grid == TOP)
@@ -159,6 +158,18 @@ def solitaire_battleships(
 
     expected_middles = cp.sum((size - 2) * count for size, count in fleet_counts.items() if size > 2)
     model += cp.sum(grid == MIDDLE) == expected_middles
+
+    # Count complete ships of each length, in both orientations.
+    for size, count in fleet_counts.items():
+        if size == 1:
+            continue
+        horizontal = [LEFT] + [MIDDLE] * (size - 2) + [RIGHT]
+        vertical = [TOP] + [MIDDLE] * (size - 2) + [BOTTOM]
+        ships = [cp.all(grid[r, c:c + size] == horizontal)
+                 for r in range(rows) for c in range(cols - size + 1)]
+        ships += [cp.all(grid[r:r + size, c] == vertical)
+                  for r in range(rows - size + 1) for c in range(cols)]
+        model += cp.sum(ships) == count
 
     return model, (grid,)
 
@@ -178,7 +189,7 @@ if __name__ == "__main__":
         def pretty_print(grid):
             print("\n--- Solution Board ---")
             symbols = {
-                WATER: '~', CIRCLE: 'O', LEFT: '<',
+                WATER: '~', SUBMARINE: 'O', LEFT: '<',
                 RIGHT: '>', TOP: '^', BOTTOM: 'v', MIDDLE: '#'
             }
             for r in range(args.rows):

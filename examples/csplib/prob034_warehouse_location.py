@@ -41,22 +41,9 @@ def warehouse_location(
     capacity=DEFAULT_CAPACITY,
     cost_matrix=DEFAULT_COST_MATRIX,
 ):
-    """Build a warehouse location model.
-
-    Args:
-        n_suppliers: Number of candidate warehouse locations.
-        n_stores: Number of stores to supply.
-        building_cost: Fixed cost for opening a warehouse.
-        capacity: Capacity of each warehouse, length n_suppliers.
-        cost_matrix: Supply cost matrix of shape n_stores x n_suppliers.
-
-    Returns:
-        (model, vars) where vars contains supplier assignments and open warehouses.
-    """
     assert len(capacity) == n_suppliers
     assert len(cost_matrix) == n_stores
     assert all(len(row) == n_suppliers for row in cost_matrix)
-    assert sum(capacity) >= n_stores
 
     model = cp.Model()
 

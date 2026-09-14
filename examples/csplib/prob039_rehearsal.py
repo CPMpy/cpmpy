@@ -17,15 +17,19 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 import cpmpy as cp
 
 
-def rehearsal(num_pieces=9, num_players=5, duration=None, rehearsal_matrix=None):
-    if duration is None:
-        duration = [2, 4, 1, 3, 3, 2, 5, 7, 6]
-    if rehearsal_matrix is None:
-        rehearsal_matrix = [[1, 1, 0, 1, 0, 1, 1, 0, 1],
+DEFAULT_DURATION = [2, 4, 1, 3, 3, 2, 5, 7, 6]
+
+DEFAULT_REHEARSAL_MATRIX = [[1, 1, 0, 1, 0, 1, 1, 0, 1],
                             [1, 1, 0, 1, 1, 1, 0, 1, 0],
                             [1, 1, 0, 0, 0, 0, 1, 1, 0],
                             [1, 0, 0, 0, 1, 1, 0, 0, 1],
                             [0, 0, 1, 0, 1, 1, 1, 1, 0]]
+
+
+def rehearsal(num_pieces=9, num_players=5, duration=DEFAULT_DURATION, rehearsal_matrix=DEFAULT_REHEARSAL_MATRIX):
+    assert len(duration) == num_pieces
+    assert len(rehearsal_matrix) == num_players
+    assert all(len(row) == num_pieces for row in rehearsal_matrix)
 
     duration = cp.cpm_array(duration)
     rehearsal = cp.cpm_array(rehearsal_matrix)
@@ -41,14 +45,18 @@ def rehearsal(num_pieces=9, num_players=5, duration=None, rehearsal_matrix=None)
 
     model += cp.AllDifferent(rehearsal_order)
 
+    # Whether player p plays the piece in slot i.
+    is_playing = cp.cpm_array([
+        [rehearsal[p, rehearsal_order[i]] == 1 for i in range(num_pieces)]
+        for p in range(num_players)
+    ])
+
     # Link arrival and departure times to the rehearsal schedule.
     # A player must be present for all pieces they play in.
     for p in range(num_players):
         for i in range(num_pieces):
-            # is_playing is an expression that is true if player p plays in the piece at slot i.
-            is_playing = (rehearsal[p, rehearsal_order[i]] == 1)
             # If a player is playing, they must be present (between their arrival and departure slot).
-            model += is_playing.implies((arrival[p] <= i) & (i <= departure[p]))
+            model += is_playing[p, i].implies((arrival[p] <= i) & (i <= departure[p]))
 
     # Objective: Minimize total waiting time
     # Waiting time for a player in a slot is the duration of the piece in that slot
@@ -57,7 +65,7 @@ def rehearsal(num_pieces=9, num_players=5, duration=None, rehearsal_matrix=None)
     for p in range(num_players):
         for i in range(num_pieces):
             is_present = (arrival[p] <= i) & (i <= departure[p])
-            is_not_playing = (rehearsal[p, rehearsal_order[i]] == 0)
+            is_not_playing = ~is_playing[p, i]
             is_waiting = is_present & is_not_playing
             # Add the duration of the piece if the player is waiting.
             waiting_times.append(duration[rehearsal_order[i]] * is_waiting)

@@ -7,7 +7,7 @@ https://www.csplib.org/Problems/prob057/
 Killer sudoku (also killer su doku, sumdoku, sum doku, addoku, or
 samunamupure) is a puzzle that combines elements of sudoku and kakuro.
 Despite the name, the simpler killer sudokus can be easier to solve
-than regular sudokus, depending on the solver's skill at mental arithmetic;
+than regular sudokus, depending on the human solver's skill at mental arithmetic;
 the hardest ones, however, can take hours to crack.
 
 The objective is to fill the grid with numbers from 1 to 9 in a way that
@@ -26,9 +26,8 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 import cpmpy as cp
 
 
-def killer_sudoku(n=9, problem=None):
-    if problem is None:
-        problem = [[3, [[1, 1], [1, 2]]], [15, [[1, 3], [1, 4], [1, 5]]],
+# Each cage is [target_sum, [[row, column], ...]], using 1-based coordinates.
+DEFAULT_PROBLEM = [[3, [[1, 1], [1, 2]]], [15, [[1, 3], [1, 4], [1, 5]]],
                    [22, [[1, 6], [2, 5], [2, 6], [3, 5]]], [4, [[1, 7], [2, 7]]],
                    [16, [[1, 8], [2, 8]]], [15, [[1, 9], [2, 9], [3, 9], [4, 9]]],
                    [25, [[2, 1], [2, 2], [3, 1], [3, 2]]], [17, [[2, 3], [2, 4]]],
@@ -44,6 +43,13 @@ def killer_sudoku(n=9, problem=None):
                    [16, [[8, 3], [9, 3]]], [15, [[8, 6], [8, 7]]],
                    [13, [[9, 5], [9, 6], [9, 7]]], [17, [[9, 8], [9, 9]]]]
 
+
+def killer_sudoku(n=9, problem=DEFAULT_PROBLEM):
+    bsize = int(n**0.5)
+    assert bsize * bsize == n, "n must be a perfect square"
+    assert all(1 <= row <= n and 1 <= col <= n
+               for _, segment in problem for row, col in segment)
+
     x = cp.intvar(1, n, shape=(n, n), name="x")
 
     model = cp.Model()
@@ -51,10 +57,9 @@ def killer_sudoku(n=9, problem=None):
     model += [cp.AllDifferent(row) for row in x]
     model += [cp.AllDifferent(col) for col in x.T]
 
-    for i in range(2):
-        for j in range(2):
-            cell = [x[r, c] for r in range(i * 3, i * 3 + 3) for c in range(j * 3, j * 3 + 3)]
-            model += [cp.AllDifferent(cell)]
+    for i in range(0, n, bsize):
+        for j in range(0, n, bsize):
+            model += cp.AllDifferent(x[i:i+bsize, j:j+bsize])
 
     for (res, segment) in problem:
         cage = [x[i[0] - 1, i[1] - 1] for i in segment]

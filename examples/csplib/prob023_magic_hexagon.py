@@ -50,42 +50,42 @@ def magic_hexagon(n=3):
         (model, vars) where vars is a flat list of decision variables.
     """
     num_cells = 3 * n * n - 3 * n + 1
-    magic_sum = num_cells * (num_cells + 1) // (2 * (2 * n - 1))
 
-    coords = _hex_coords(n)
-    assert len(coords) == num_cells
-
-    LD = cp.intvar(1, num_cells, shape=num_cells, name="LD")
+    cells = cp.intvar(1, num_cells, shape=(num_cells,), name="cells")
 
     # Build lookup: coordinate -> variable
-    var_at = {c: v for c, v in zip(coords, LD)}
+    var_at = {c: v for c, v in zip(_hex_coords(n), cells)}
 
     model = cp.Model()
-    model += cp.AllDifferent(LD)
+    model += cp.AllDifferent(cells)
+
+    line_sums = []
 
     # Horizontal rows: group by r coordinate
     for r in range(-(n - 1), n):
         row = [var_at[(q, r)] for q in range(-(n - 1), n) if (q, r) in var_at]
-        model += cp.sum(row) == magic_sum
+        line_sums.append(cp.sum(row))
 
     # Diagonals (top-left to bottom-right): group by (q + r) coordinate
     for s in range(-(n - 1) * 2, (n - 1) * 2 + 1):
         diag = [var_at[(q, r)] for q in range(-(n - 1), n) for r in range(-(n - 1), n) if (q, r) in var_at and q + r == s]
         if diag:
-            model += cp.sum(diag) == magic_sum
+            line_sums.append(cp.sum(diag))
 
     # Diagonals (top-right to bottom-left): group by q coordinate
     for q in range(-(n - 1), n):
         diag = [var_at[(q, r)] for r in range(-(n - 1), n) if (q, r) in var_at]
         if diag:
-            model += cp.sum(diag) == magic_sum
+            line_sums.append(cp.sum(diag))
 
-    return model, (LD,)
+    model += cp.AllEqual(line_sums)
+
+    return model, (cells,)
 
 
-def print_hexagon(LD, n):
+def print_hexagon(cells, n):
     coords = _hex_coords(n)
-    vals = LD.value()
+    vals = cells.value()
     current_r = None
     for (q, r), v in zip(coords, vals):
         if r != current_r:
@@ -106,9 +106,9 @@ if __name__ == "__main__":
     parser.add_argument("-n", type=int, default=3, help="Edge length of the hexagon (default: 3)")
     args = parser.parse_args()
 
-    model, (LD,) = magic_hexagon(n=args.n)
+    model, (cells,) = magic_hexagon(n=args.n)
 
     if model.solve():
-        print_hexagon(LD, n=args.n)
+        print_hexagon(cells, n=args.n)
     else:
         raise ValueError("Model is unsatisfiable")

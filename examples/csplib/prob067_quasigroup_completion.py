@@ -16,13 +16,16 @@ import cpmpy as cp
 import numpy as np
 
 
-def quasigroup_completion(N=5, start=None):
-    if start is None:
-        start = [[1, 0, 0, 0, 0],
+DEFAULT_START = [[1, 0, 0, 0, 0],
                  [0, 2, 0, 0, 0],
                  [0, 0, 3, 0, 0],
                  [0, 0, 0, 4, 0],
                  [0, 0, 0, 0, 5]]
+
+
+def quasigroup_completion(n=5, start=DEFAULT_START):
+    start_np = np.array(start)
+    assert start_np.shape == (n, n)
 
     puzzle = cp.intvar(1, n, shape=(n, n), name="puzzle")
 
@@ -30,12 +33,7 @@ def quasigroup_completion(N=5, start=None):
 
     # Constraints
     # 1. Pre-fill the grid with the starting values.
-    # We iterate through the start matrix and add a constraint for each non-zero cell.
-    start_np = np.array(start)
-    for i in range(N):
-        for j in range(N):
-            if start_np[i, j] != 0:
-                model += puzzle[i, j] == start_np[i, j]
+    model += puzzle[start_np != 0] == start_np[start_np != 0]
 
     model += [cp.AllDifferent(row) for row in puzzle]
     model += [cp.AllDifferent(col) for col in puzzle.T]

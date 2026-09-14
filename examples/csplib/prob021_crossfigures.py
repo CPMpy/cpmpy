@@ -74,6 +74,9 @@ import cpmpy as cp
 import numpy as np
 
 
+BASE = 10
+
+
 def is_prime(n):
     """Check if n is a prime number."""
     if n < 2: return False
@@ -86,26 +89,26 @@ def is_prime(n):
     return True
 
 
-def to_num(a, n, base):
-    """Constrain digit list a to represent number n in the given base."""
+def to_num(a, n):
+    """Constrain digit list a to represent number n in base BASE."""
     tlen = len(a)
-    return n == cp.sum([(base ** (tlen - i - 1)) * a[i] for i in range(tlen)])
+    return n == cp.sum([(BASE ** (tlen - i - 1)) * a[i] for i in range(tlen)])
 
 
-def across(Matrix, Across, Len, Row, Col):
+def across(matrix, across_clue, length, row, col):
     """Link an across clue variable to its digit cells in the grid."""
-    Row -= 1
-    Col -= 1
-    digits = [Matrix[Row, Col + i] for i in range(Len)]
-    return [to_num(digits, Across, 10)]
+    row -= 1
+    col -= 1
+    digits = [matrix[row, col + i] for i in range(length)]
+    return [to_num(digits, across_clue)]
 
 
-def down(Matrix, Down, Len, Row, Col):
+def down(matrix, down_clue, length, row, col):
     """Link a down clue variable to its digit cells in the grid."""
-    Row -= 1
-    Col -= 1
-    digits = [Matrix[Row + i, Col] for i in range(Len)]
-    return [to_num(digits, Down, 10)]
+    row -= 1
+    col -= 1
+    digits = [matrix[row + i, col] for i in range(length)]
+    return [to_num(digits, down_clue)]
 
 
 def crossfigures():
