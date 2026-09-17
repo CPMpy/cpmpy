@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## optalcp.py
+## optal.py
 ##
 """
     Interface to OptalCP's Python API.
 
     OptalCP is a scheduling-oriented constraint programming solver with a native Python API.
 
-    Always use :func:`cp.SolverLookup.get("optalcp") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+    Always use :func:`cp.SolverLookup.get("optal") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============
     Installation
@@ -34,11 +34,13 @@
     .. autosummary::
        :nosignatures:
 
-        CPM_optalcp
+        CPM_optal
 """
 
 from typing import Optional
 import warnings
+
+import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
@@ -47,7 +49,7 @@ from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_np_int, is_np_bool, is_any_list, eval_comparison, get_bounds, get_nonneg_args, implies
+from ..expressions.utils import is_num, is_any_list, eval_comparison, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -119,7 +121,7 @@ def _extract_guarded_demands(demand):
     return is_present, stripped_demand
 
 
-class CPM_optalcp(SolverInterface):
+class CPM_optal(SolverInterface):
     """
     Interface to OptalCP's Python API.
 
@@ -134,6 +136,7 @@ class CPM_optalcp(SolverInterface):
     supported_global_constraints = frozenset({
         "cumulative", "cumulative_optional", "no_overlap", "no_overlap_optional",
         "min", "max", "abs", "mul", "div",
+        "lex_less", "lex_lesseq",
     })
     supported_reified_global_constraints = frozenset()
 
@@ -148,10 +151,10 @@ class CPM_optalcp(SolverInterface):
         
     @staticmethod
     def license_ok():
-        if not CPM_optalcp.installed():
+        if not CPM_optal.installed():
             warnings.warn(
                 "License check failed, python package 'optalcp' is not installed! "
-                "Please check 'CPM_optalcp.installed()' before attempting to check license."
+                "Please check 'CPM_optal.installed()' before attempting to check license."
             )
             return False
         try:
@@ -170,7 +173,7 @@ class CPM_optalcp(SolverInterface):
 
     @staticmethod
     def supported():
-        return CPM_optalcp.installed() and CPM_optalcp.license_ok()
+        return CPM_optal.installed() and CPM_optal.license_ok()
 
     @staticmethod
     def version() -> Optional[str]:
@@ -194,11 +197,11 @@ class CPM_optalcp(SolverInterface):
         """
         if not self.installed():
             raise ModuleNotFoundError(
-                "CPM_optalcp: Install the 'optalcp' Python package and an OptalCP binary to use this solver interface."
+                "CPM_optal: Install the 'optalcp' Python package and an OptalCP binary to use this solver interface."
             )
         
         if not self.license_ok():
-            raise ModuleNotFoundError("CPM_optalcp: In CPMpy we only support non-preview versions of OptalCP." \
+            raise ModuleNotFoundError("CPM_optal: In CPMpy we only support non-preview versions of OptalCP." \
             "You can request an academic/full version: https://dev.vilim.eu/docs/Quick%20Start/editions")
 
         import optalcp
@@ -206,7 +209,7 @@ class CPM_optalcp(SolverInterface):
         assert subsolver is None
         self.opt_model = optalcp.Model()
         self._objective_is_min = None
-        super().__init__(name="optalcp", cpm_model=cpm_model)
+        super().__init__(name="optal", cpm_model=cpm_model)
 
     @property
     def native_model(self):
@@ -233,7 +236,7 @@ class CPM_optalcp(SolverInterface):
             printLog                        This parameter controls the verbosity. It is a boolean. The default value is False.
             absoluteGapTolerance            This parameter sets an absolute tolerance on the objective value for optimization models. The value is a positive float. Default value is 0.
             relativeGapTolerance            This parameter sets a relative tolerance on the objective value for optimization models. The value is a positive float. Default value is 0.0001. This parameter works together with Parameters.relativeGapTolerance as an OR condition: the search stops when either the absolute gap or the relative gap is within tolerance.
-            seachType                       This parameter controls the type of search the solver uses. Possible values are:
+            searchType                      This parameter controls the type of search the solver uses. Possible values are:
                                             - 'Auto': Automatically determined (Default)
                                             - 'LNS': Large Neighbourhood Search
                                             - 'FDS': Failure-Directed Search 
@@ -316,13 +319,9 @@ class CPM_optalcp(SolverInterface):
             Returns:
                 int: Number of solutions found.
         """
-        try:
-            return super().solveAll(display=display, time_limit=time_limit,
-                                    solution_limit=solution_limit, call_from_model=call_from_model, **kwargs)
-        except Exception as exc:
-            raise exc
+        return super().solveAll(display=display, time_limit=time_limit,
+                                solution_limit=solution_limit, call_from_model=call_from_model, **kwargs)
 
-    
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
@@ -453,11 +452,10 @@ class CPM_optalcp(SolverInterface):
 
         if isinstance(cpm_con, BoolVal):
             return cpm_con.args[0]
-        
-        if is_np_int(cpm_con):
+
+        if isinstance(cpm_con, np.integer):
             return int(cpm_con)
-        
-        if is_np_bool(cpm_con):
+        if isinstance(cpm_con, np.bool_):
             return bool(cpm_con)
 
         if is_num(cpm_con):
@@ -533,6 +531,12 @@ class CPM_optalcp(SolverInterface):
                 if len(task_list) > 1:
                     cons.append(self.opt_model.no_overlap(task_list))
                 return cons
+            if cpm_con.name == "lex_less":
+                lhs, rhs = self._opt_expr(cpm_con.args)
+                return self.opt_model.lex_lt(lhs, rhs)
+            if cpm_con.name == "lex_lesseq":
+                lhs, rhs = self._opt_expr(cpm_con.args)
+                return self.opt_model.lex_le(lhs, rhs)
             if isinstance(cpm_con, DirectConstraint):
                 return cpm_con.callSolver(self, self.opt_model)
             raise NotImplementedError(f"Global constraint {cpm_con} not supported by OptalCP backend")
@@ -685,7 +689,7 @@ class CPM_optalcp(SolverInterface):
                 cons:       list of OptalCP constraints linking the interval variable to
                             the CPMpy start/duration/end/presence variables
         """
-        assert get_bounds(dur)[0] >= 0, "optalcp does not support intervals with negative duration, use `utils.get_nonneg_args` first"
+        assert get_bounds(dur)[0] >= 0, "optal does not support intervals with negative duration, use `utils.get_nonneg_args` first"
 
         is_optional = is_present is not None
         if not is_optional:

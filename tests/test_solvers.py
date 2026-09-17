@@ -23,6 +23,7 @@ from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
 from cpmpy.solvers.highs import CPM_highs
+from cpmpy.solvers.optal import CPM_optal
 from cpmpy import SolverLookup
 
 from test_constraints import numexprs
@@ -796,6 +797,46 @@ class TestSolvers:
 
         m = cp.Model([x + y == 2, wsum == 9])
         assert m.solve(solver="minizinc")
+
+    @pytest.mark.skipif(not CPM_optal.supported(),
+                        reason="optal not installed")
+    def test_optal(self):
+        # Two fully overlapping optional tasks, capacity 1.
+        # Optal posts these as native optional interval variables.
+        start = cp.intvar(0, 0, shape=2)
+        present = cp.boolvar(shape=2)
+        cons = cp.CumulativeOptional(start, [2, 2], demand=1, capacity=1, is_present=present)
+
+        s = CPM_optal()
+        interval_kwargs = []
+        original = s.native_model.interval_var
+
+        def interval_var_spy(*args, **kwargs):
+            interval_kwargs.append(dict(kwargs))
+            return original(*args, **kwargs)
+
+        s.native_model.interval_var = interval_var_spy
+        s += cons
+        assert any(kw.get("optional") is True for kw in interval_kwargs)
+        assert s.solve()
+        assert sum(present.value()) <= 1
+
+        # Guarded demand `presence * height` is rewritten to optional intervals.
+        start = cp.intvar(0, 0, shape=2)
+        present = cp.boolvar(shape=2)
+        s = CPM_optal()
+        interval_kwargs = []
+        original = s.native_model.interval_var
+
+        def interval_var_spy(*args, **kwargs):
+            interval_kwargs.append(dict(kwargs))
+            return original(*args, **kwargs)
+
+        s.native_model.interval_var = interval_var_spy
+        s += cp.Cumulative(start, [2, 2], demand=present, capacity=1)
+        assert any(kw.get("optional") is True for kw in interval_kwargs)
+        assert s.solve()
+        assert sum(present.value()) <= 1
 
     @pytest.mark.requires_solver("pumpkin")
     def test_pumpkin_indomain_expression(self, solver):
