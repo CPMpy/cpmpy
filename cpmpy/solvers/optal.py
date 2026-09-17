@@ -98,11 +98,9 @@ class CPM_optal(SolverInterface):
             bv = mdl.bool_var(name="dummy")
             mdl.enforce(bv)
             result = mdl.solve({"printLog": False})
-            if result.nb_solutions == 0:
-                return False
-            # Without a valid (non-preview) license, OptalCP returns masked/garbage values.
-            # A bool var enforced to True must be 1 if the license is valid.
-            return result.solution.get_value(bv) == 1
+            # Preview masks every variable as absent (`None`). Academic/Full
+            # return real values, so a forced bool is present. See Solution.is_present.
+            return result.solution is not None and result.solution.is_present(bv)
         except Exception:
             return False
 
