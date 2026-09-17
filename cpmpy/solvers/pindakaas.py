@@ -39,15 +39,15 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Iterable, Optional, List, Any
+from typing import Iterable, Optional, List, Any, Set
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison
+from ..expressions.core import Expression, BoolVal, Comparison, NestedBoolExprLike
 from ..expressions.utils import eval_comparison, is_int
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
-from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool
+from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool, replace_int_user_vars
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear
 from ..transformations.normalize import simplify_boolean, toplevel_list
 from ..transformations.negation import push_down_negation
@@ -123,19 +123,32 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
-    def _int2bool_user_vars(self):
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+    def _int2bool_user_vars(self) -> Set[_BoolVarImpl]:
+        """
+        Encode all integer user variables to Booleans and register them with the solver.
 
-        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
-        for x in self.user_vars:
-            if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
+        Ensures every user variable is known to the solver back-end: integer variables
+        are encoded via `int2bool` (their encoding constraints are posted and their
+        encoding Booleans registered), while Boolean variables are registered directly.
+
+        :return: a new set containing only the Boolean user variables (integer user
+            variables replaced by their encoding Booleans), so that e.g. `solveAll`
+            behaves consistently.
+        """
+
+        # ensure all vars are known to solver
+        for cpm_var in self.user_vars:
+            if isinstance(cpm_var, _NumVarImpl) and not cpm_var.is_bool():
+                if cpm_var.name not in self.ivarmap:
+                    _, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                    for cpm_expr in self.transform(cons):
+                        self._post_constraint(cpm_expr)
+                for bv in self.ivarmap[cpm_var.name].vars().flatten():
+                    self.solver_var(bv)
             else:
-                # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-        return user_vars
+                self.solver_var(cpm_var)
+        # the user vars should have all and only Booleans (e.g. to ensure solveAll behaves consistently)
+        return replace_int_user_vars(self.user_vars, self.ivarmap)
 
     def solve(self, time_limit: Optional[float] = None, assumptions: Optional[Iterable[_BoolVarImpl]] = None):
         """
@@ -224,27 +237,16 @@ class CPM_pindakaas(SolverInterface):
             or returns a constant if the variable is a constant
         """
         if isinstance(cpm_var, _NumVarImpl):
-
+            if not cpm_var.is_bool():
+                raise TypeError(f"CPM_pindakaas.solver_var only supports Boolean variables, not {cpm_var}")
             name = cpm_var.name
             revar = self._varmap.get(name)
             if revar is not None:
                 return revar
-
-            if cpm_var.is_bool():
-                if isinstance(cpm_var, NegBoolView):  # negative literal
-                    # get inner variable and return its negated solver var
-                    revar = ~self.solver_var(cpm_var._bv)
-                else:
-                    revar = self.pdk_solver.new_var()
-            
+            if isinstance(cpm_var, NegBoolView):  # negative literal
+                revar = ~self.solver_var(cpm_var._bv)
             else:
-                if name not in self.ivarmap:
-                    enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                    self.add(cons)
-                else:
-                    enc = self.ivarmap[name]
-                revar = self.solver_vars(enc.vars())
-            
+                revar = self.pdk_solver.new_var()
             self._varmap[name] = revar
             return revar
 
@@ -253,9 +255,23 @@ class CPM_pindakaas(SolverInterface):
 
         raise TypeError(f"Unexpected type: {cpm_var}")
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                list[Expression]: transformed constraints
+        """
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element", "nd_element"})
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(
             cpm_cons,
@@ -272,19 +288,37 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pindakaas":
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                self
+        """
         import pindakaas as pdk
 
         if self.unsatisfiable:
             return self
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         try:
-            for cpm_expr in self.transform(cpm_expr_orig):
-                self._post_constraint(cpm_expr)
+            for con in self.transform(cpm_expr):
+                self._post_constraint(con)
         except pdk.Unsatisfiable:
             self.unsatisfiable = True
 

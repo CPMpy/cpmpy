@@ -49,7 +49,7 @@ import time
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -73,8 +73,9 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "mod", "pow", "element"})
-    supported_reified_global_constraints = frozenset()
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "pow", "element", "nvalue", "nvalue_except",  # no mod, CPMpy rounds towards zero
+                                                   "alldifferent", "xor"}) 
+    supported_reified_global_constraints = frozenset({"alldifferent", "xor"})
 
 
     @staticmethod
@@ -347,7 +348,7 @@ class CPM_hexaly(SolverInterface):
 
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -356,10 +357,11 @@ class CPM_hexaly(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -370,7 +372,7 @@ class CPM_hexaly(SolverInterface):
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hexaly":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -383,17 +385,18 @@ class CPM_hexaly(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            hex_expr = self._hex_expr(cpm_expr)
+        for con in self.transform(cpm_expr):
+            hex_expr = self._hex_expr(con)
             self.hex_model.add_constraint(hex_expr)
 
         return self
@@ -444,12 +447,25 @@ class CPM_hexaly(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
             if cpm_expr.name == "alldifferent":
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
-                return self.hex_model.distinct(hex_arr)
+                return self.hex_model.count(self.hex_model.distinct(hex_arr)) == len(cpm_expr.args)
+            if cpm_expr.name == "xor":
+                return self.hex_model.xor(self._hex_expr(cpm_expr.args))
             raise ValueError(f"Global constraint {cpm_expr} is not supported by hexaly")
 
         elif isinstance(cpm_expr, GlobalFunction):
-            if cpm_expr.name == "nvalues":
-                return self.hex_model.distinct(self._hex_expr(cpm_expr.args))
+            if cpm_expr.name == "nvalue":
+                hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
+                return self.hex_model.count(self.hex_model.distinct(hex_arr))
+            if cpm_expr.name == "nvalue_except":
+                arr, n = cpm_expr.args
+                arr = flatlist(arr)
+                n = argval(n)
+                hex_arr = self.hex_model.array(self._hex_expr(arr))
+                nv = self.hex_model.count(self.hex_model.distinct(hex_arr))
+                if len(arr) == 0:
+                    return nv
+                appears = self.hex_model.or_(*(self._hex_expr(a == n) for a in arr))
+                return nv - self.hex_model.iif(appears, 1, 0)
             if cpm_expr.name == "element":
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args[0]))
                 idx = self._hex_expr(cpm_expr.args[1])
@@ -470,9 +486,6 @@ class CPM_hexaly(SolverInterface):
                        self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
                        self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
                        self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
-            if cpm_expr.name == "mod":
-                a, b = self._hex_expr(cpm_expr.args)
-                return a % b
             if cpm_expr.name == "pow":
                 a, b = self._hex_expr(cpm_expr.args)
                 return a ** b

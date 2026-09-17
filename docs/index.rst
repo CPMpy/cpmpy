@@ -11,6 +11,12 @@ CPMpy is ideal for solving combinatorial problems like assignment problems or co
 
    modeling
    summary
+   upgrading_to_v1
+
+.. note::
+   CPMpy v1.0.0 contains a number of breaking changes. If you are upgrading from an
+   earlier version, see :doc:`upgrading_to_v1` and the
+   `full changelog on GitHub <https://github.com/CPMpy/cpmpy/blob/master/changelog.md#100>`_.
 
 .. _supported-solvers:
 

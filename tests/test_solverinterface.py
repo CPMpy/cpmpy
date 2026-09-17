@@ -190,7 +190,8 @@ def test_maximize(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solver_var(solver):
     """Test basic solver_var functionality with different variable types"""
-    solver_class = SolverLookup.lookup(solver)
+    solver_name = solver
+    solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     
     # Test with boolean variable
@@ -222,8 +223,8 @@ def test_solver_var(solver):
 
     # Test with integer variable
 
-    # Skip pysdd as it doesn't support sum
-    if solver == "pysdd":
+    # SAT solvers encode integers to Booleans via int2bool, not via solver_var
+    if solver_name in ("pysat", "pindakaas", "rc2", "pysdd"):
         return
 
     # Test with integer variable
@@ -338,30 +339,24 @@ def test_runtime_tracking(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solveall_basic(solver):
     """Test solveAll functionality if supported"""
-    solver_class = SolverLookup.lookup(solver)
-    solver = solver_class()
-    
-    bvar = cp.boolvar(shape=2)
-    x, y = bvar
     
     # Create a problem with multiple solutions
-    solver += [x | y]  # 3 solutions: (T,T), (T,F), (F,T)
-    
+    x,y = cp.boolvar(shape=2)    
+    model = cp.Model(x | y)
+
     try:
         # Test solveAll with solution limit
         solution_count = 0
         def count_solution():
             nonlocal solution_count
             solution_count += 1
-            
-        if solver == "pysdd":
-            # pysdd doesn't support solution_limit
-            total = solver.solveAll(display=count_solution)
-        elif solver == "hexaly":
-            # set time limit, hexaly cannot prove UNSAT at last call
-            total = solver.solveAll(display=count_solution, solution_limit=10, time_limit=5)
+        
+        if solver == "pysdd": # pysdd doesn't support solution_limit
+            total = model.solveAll(solver=solver,display=count_solution)
+        elif solver == "hexaly":  # set time limit, hexaly cannot prove UNSAT at last call
+            total = model.solveAll(display=count_solution, solution_limit=10, time_limit=3)
         else:
-            total = solver.solveAll(display=count_solution, solution_limit=10)
+            total = model.solveAll(display=count_solution, solution_limit=10)
         
         assert total == 3  # Should find all 3 solutions
         assert solution_count == 3

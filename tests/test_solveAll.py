@@ -100,7 +100,11 @@ class TestSolveAll:
         x = cp.boolvar(shape=3, name="x")
         m = cp.Model(cp.sum(x) == 1)
 
-        n_sols = m.solveAll(solver=solver, display=x[0], solution_limit=3)  # should print 3 sols
+        kwargs = dict(display=x[0], solution_limit=3)
+        if solver == "hexaly":
+            kwargs["time_limit"] = 5
+
+        n_sols = m.solveAll(solver=solver, **kwargs)  # should print 3 sols
         assert n_sols == 3
         out = capsys.readouterr().out
         assert {"True", "False"} == set([s for s in out.split("\n") if len(s)])
@@ -109,7 +113,11 @@ class TestSolveAll:
         x = cp.boolvar(shape=3,name="x")
         m = cp.Model(cp.sum(x) == 1)
 
-        m.solveAll(solver=solver, display=x, solution_limit=3) # should print 3 sols
+        kwargs = dict(display=x, solution_limit=3)
+        if solver == "hexaly":
+            kwargs["time_limit"] = 5
+
+        m.solveAll(solver=solver, **kwargs)  # should print 3 sols
         out = capsys.readouterr().out
         assert {"[True, False, False]", "[False, True, False]", "[False, False, True]"} == set([s for s in out.split("\n") if len(s)])
 
@@ -117,7 +125,11 @@ class TestSolveAll:
         x = cp.boolvar(shape=3, name="x")
         m = cp.Model(cp.sum(x) == 1)
 
-        m.solveAll(solver=solver, display=list(x), solution_limit=3)  # should print 3 sols
+        kwargs = dict(display=list(x), solution_limit=3)
+        if solver == "hexaly":
+            kwargs["time_limit"] = 5
+
+        m.solveAll(solver=solver, **kwargs)  # should print 3 sols
         out = capsys.readouterr().out
         assert {"[True, False, False]", "[False, True, False]", "[False, False, True]"} ==  set([s for s in out.split("\n") if len(s)])
 

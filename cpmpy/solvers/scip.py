@@ -34,11 +34,11 @@ from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
-from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
-from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
+from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst, get_nonneg_args
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -68,10 +68,12 @@ class CPM_scip(SolverInterface):
     # Globals we keep and how they are translated in add():
     # - "xor": addConsXor();
     # - "abs": addCons(abs(x) <= k);
-    # - "mul": addCons(mul == rhs).
+    # - "mul": addCons(mul == rhs);
+    # - "cumulative": addConsCumulative() when dur/demand/cap are fixed integers;
+    # - "no_overlap": addConsCumulative() with demand=1, capacity=1.
     # No native "div": PySCIPOpt uses real division, which does not match CPMpy integer division
     # (round toward zero); same rationale as Gurobi — decompose via Division.decompose().
-    supported_global_constraints = frozenset({"xor", "abs", "mul"})
+    supported_global_constraints = frozenset({"xor", "abs", "mul", "cumulative", "no_overlap"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -305,9 +307,23 @@ class CPM_scip(SolverInterface):
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                list[Expression]: transformed constraints
+        """
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"})
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
@@ -320,7 +336,25 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_scip":
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                self
+        """
         get_variables(cpm_expr, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))
@@ -403,6 +437,48 @@ class CPM_scip(SolverInterface):
 
                 # post constraint (note: `addConsXor` is tested to work for empty lists)
                 self.scip_model.addConsXor(scip_args, rhsvar)
+
+            elif cpm_expr.name == "cumulative":
+                if len(cpm_expr.args) == 4:
+                    start, dur, demand, cap = cpm_expr.args
+                    end = None
+                else:
+                    start, dur, end, demand, cap = cpm_expr.args
+
+                if not hasattr(self.scip_model, "addConsCumulative"):
+                    for c in self.transform(cpm_expr.decompose()[0]):
+                        self._add_transformed_constraint(c)
+                    return
+
+                dur, dur_cons = get_nonneg_args(dur)
+                demand, demand_cons = get_nonneg_args(demand)
+                for c in self.transform(dur_cons + demand_cons):
+                    self._add_transformed_constraint(c)
+
+                if end is not None:
+                    for c in self.transform([s + d == e for s, d, e in zip(start, dur, end)]):
+                        self._add_transformed_constraint(c)
+
+                if not (all(is_num(d) for d in dur) and all(is_num(h) for h in demand) and is_num(cap)):
+                    for c in self.transform(cpm_expr.decompose()[0]):
+                        self._add_transformed_constraint(c)
+                    return
+
+                self.scip_model.addConsCumulative(
+                    self.solver_vars(start),
+                    [int(d) for d in dur],
+                    [int(h) for h in demand],
+                    int(cap),
+                )
+
+            elif cpm_expr.name == "no_overlap":
+                if len(cpm_expr.args) == 2:
+                    start, dur = cpm_expr.args
+                    self._add_transformed_constraint(Cumulative(start, dur, demand=1, capacity=1))
+                else:
+                    start, dur, end = cpm_expr.args
+                    self._add_transformed_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
+
             else:
                 raise NotImplementedError(
                     f"SCIP does not translate global constraint '{cpm_expr.name}' natively; "

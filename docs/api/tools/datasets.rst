@@ -16,5 +16,13 @@ Available datasets:
 .. toctree::
     :maxdepth: 1
 
+    datasets/jsplib
+    datasets/miplib
+    datasets/mse
+    datasets/nurserostering
+    datasets/opb
+    datasets/psplib
+    datasets/sat
+    datasets/scaledsudoku
     datasets/xcsp3
 

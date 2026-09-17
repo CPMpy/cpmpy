@@ -114,11 +114,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
             if cpm_expr.name == "and" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
+                newlist.append(Operator("sum", cpm_expr.args) >= len(cpm_expr.args))
 
             # disjunction
             elif cpm_expr.name == "or" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= 1)
+                newlist.append(Operator("sum", cpm_expr.args) >= 1)
 
             # reification
             elif cpm_expr.name == "->":
@@ -215,11 +215,14 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
             lhs, rhs = cpm_expr.args
 
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
-                # very special case, avoid writing as sum of 1 argument
+                # very special case, avoid writing as sum of 1 argument; write as disjunction of 1 arg instead
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
-                if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
-                    continue # skip or([BoolVal(True)])
+                if isinstance(new_expr[0], BoolVal):
+                    if new_expr[0].value() is True:
+                        continue # skip or([BoolVal(True)])
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap)  # don't wrap in or(BoolVal(False))
+                    continue
                 newlist.append(Operator("or", new_expr))
                 continue
 
@@ -234,7 +237,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     continue
                 elif not t_lb and not t_ub:
                     newlist += linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap) # post the linear version of False
-                    break
+                    continue
 
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
@@ -485,7 +488,7 @@ def canonical_comparison(lst_of_expr: ListLike[Expression]) -> list[Expression]:
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
-                    lhs = lhs + lhs2
+                    lhs = Operator("sum", [lhs, lhs2])
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
 
@@ -632,13 +635,14 @@ def get_linear_decompositions():
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
+    # dispatch dynamically so subclasses with their own decompose_linear are respected
     return dict(
-        alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
-        table=Table.decompose_linear,
-        short_table=ShortTable.decompose,
-        InDomain=InDomain.decompose_linear,
-        regular=Regular.decompose_linear,
+        alldifferent=lambda expr: expr.decompose_linear(),
+        element=lambda expr: expr.decompose_linear(), 
+        table=lambda expr: expr.decompose_linear(), 
+        short_table=lambda expr: expr.decompose(),
+        indomain=lambda expr: expr.decompose_linear(),
+        regular=lambda expr: expr.decompose_linear(),
     )
 
 def get_linear_positive_decompositions():
@@ -648,9 +652,10 @@ def get_linear_positive_decompositions():
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
+    # dispatch dynamically so subclasses with their own decompose_linear_positive are respected
     return dict(
-        regular=Regular.decompose_linear_positive,
-        circuit=Circuit.decompose_linear_positive,
+        regular=lambda expr: expr.decompose_linear_positive(),
+        circuit=lambda expr: expr.decompose_linear_positive(),
     )
 
 

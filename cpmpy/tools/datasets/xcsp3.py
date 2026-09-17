@@ -10,7 +10,7 @@ import lzma
 import zipfile
 import pathlib
 import io
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Callable
 
 from cpmpy.tools.datasets.core import FileDataset
 
@@ -22,6 +22,10 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
     
     - Origin: https://xcsp.org/instances/
     - Reference: Audemard, G., Boussemart, F., Lecoutre, C., Piette, C., Tabary, S. XCSP3: An Integrated Format for Benchmarking Combinatorial Constrained Problems. arXiv:2009.00514, 2020.
+
+    To load an instance into a CPMpy model, use :func:`~cpmpy.tools.io.xcsp3.load_xcsp3`.
+    For examples of using a loader as a dataset ``transform``, see the
+    :ref:`modeling guide <modeling-datasets>`.
 
     Arguments:
         root (str): Root directory containing the XCSP3 instances (if 'download', instances will be downloaded to this location)
@@ -47,36 +51,33 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
         Initialize the XCSP3 Dataset.
         """
 
-        self.root = pathlib.Path(root)
         self.year = year
         self.track = track
 
-        dataset_dir = self.root / self.name / str(year) / track
-        
         if not str(year).startswith('20'):
             raise ValueError("Year must start with '20'")
         if not track:
             raise ValueError("Track must be specified, e.g. COP, CSP, MiniCOP, ...")
         
         super().__init__(
-            dataset_dir=dataset_dir,
+            root=root, subdirs=(str(year), track),
             transform=transform, target_transform=target_transform, 
             download=download, extension=".xml.lzma",
             **kwargs
         )
 
-    def categories(self) -> Dict[str, Any]:
+    def categories(self) -> dict[str, Any]:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict[str, Any]:
         """
         Extract instance type (CSP/COP) from XCSP3 XML root element.
         """
         import re
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 # Read only the first few lines to find the root element
@@ -157,6 +158,7 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
 
 
 if __name__ == "__main__":
-    dataset = XCSP3Dataset(year=2024, track="MiniCOP", download=True)
+    dataset = XCSP3Dataset(year=2024, track="COP", download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])
+    print("Instance 'AircraftAssemblyLine-3-628-000-0_c24':", dataset["AircraftAssemblyLine-3-628-000-0_c24"])

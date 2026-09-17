@@ -25,9 +25,6 @@ def get_variables_model(model):
     return vars_ + [x for x in get_variables(model.objective_) if not x in seen]
 
 
-def vars_expr(expr):
-    warnings.warn("Deprecated, use get_variables() instead, will be removed in stable version", DeprecationWarning)
-    return get_variables(expr)
 def get_variables(expr, collect=None):
     """
         Get variables of an expression
@@ -93,12 +90,3 @@ def print_variables(expr_or_model):
     print("Variables:")
     for var in vars_:
         print(f"    {var}: {var.lb}..{var.ub}")
-
-
-# https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
-def _uniquify(seq):
-    warnings.warn("Deprecated, copy inline if used, will be removed in stable version", DeprecationWarning)
-    seen = set()
-    seen_add = seen.add
-    return [x for x in seq if not (x in seen or seen_add(x))]
-

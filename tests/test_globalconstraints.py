@@ -293,6 +293,7 @@ class TestGlobal:
 
         # Test InDomain with constant list
         vals = [1, 5, 8, -4]
+        assert cp.InDomain(iv, vals).name == "indomain"
         model = cp.Model([cp.InDomain(iv, vals)])
         assert model.solve()
         assert iv.value() in vals
@@ -661,14 +662,37 @@ class TestGlobal:
         true_model = cp.Model(cp.Regular(x, transitions, start, ends))
         false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
 
-        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))))
-        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))))
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10) # all assignments = 8
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))), **kwargs)
+        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))), **kwargs)
 
         assert num_true == len(solutions)
         assert true_sols == set(solutions)
 
         assert num_true + num_false == 2**3
         assert len(true_sols & false_sols) == 0# no solutions can be in both
+
+    def test_regular_positive_reif(self):
+        b = cp.boolvar()
+        x = cp.intvar(0, 1, shape=2)
+
+        # 3-state automaton that accepts only the string [0, 0].
+        reg = cp.Regular(x, transitions=[('a', 0, 'b'), ('b', 0, 'c')], start='a', accepting=['c'])
+
+        m = cp.Model([x[0] == 1, b.implies(reg)])
+
+        # x[0] = 1 has no transition from 'a' -> automaton rejects -> reg is False.
+        # b is False, so "b -> reg" MUST be satisfiable.
+        sat = m.solve()
+
+        assert sat, "BUG: half-reified Regular is unsound for rejected strings"
+
 
     def test_mdd(self):
         x = cp.intvar(0, 3, shape=3)
@@ -693,6 +717,30 @@ class TestGlobal:
         assert sols_redu == set(solutions)
 
         assert num_orig == num_redu
+
+    def test_mdd_variable_reuse(self):
+        x = cp.intvar(0, 3, shape=3, name="x")
+        # MDD accepting exactly [1,1,1]
+        mdd = cp.MDD(x, transitions=[('A', 1, 'B'),
+                                  ('B', 1, 'C'),
+                                  ('C', 1, 'D'), ])
+
+        # x=[0,0,0] is NOT a path in the MDD => MDD(x) is False => ~MDD(x) must be True.
+        m_neg = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, ~mdd])
+        assert m_neg.solve()
+
+        # Full reification: b == MDD(x), force b False with the rejected assignment.
+        b = cp.boolvar(name="b")
+        m_reif = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b == mdd, ~b])
+        assert m_reif.solve()
+
+        # Sanity: a genuinely accepted assignment still works positively.
+        m_toplevel = cp.Model([x[0] == 1, x[1] == 1, x[2] == 1, mdd])
+        assert m_toplevel.solve()
+
+        # Sanity: a non-accepted assignment still works when the mdd is positively reified, with no other constraints on b.
+        m_pos = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b.implies(mdd)])
+        assert m_pos.solve()
 
 
     def test_minimum(self):
@@ -882,25 +930,23 @@ class TestGlobal:
         }
         assert set(map(str, decomposed)) == expected
 
-        # should raise a warning if we don't safen first
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose()
-            expected = {
-                # actual decomposition
-                '(x == 0) -> (IV2 == 0)',
-                '(x == 1) -> (IV2 == 1)',
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
+        # decomposition should safen
+        val, decomp = elem.decompose()
+        expected = {
+            # actual decomposition
+            '(x == 0) -> (IV2 == 0)',
+            '(x == 1) -> (IV2 == 1)',
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
 
         # also for linear decomp
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose_linear()
-            expected = {
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
-            assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+        val, decomp = elem.decompose_linear()
+        expected = {
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
+        assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
 
     def test_multid_element_index_dom_mismatched(self):
         """
@@ -1212,6 +1258,25 @@ class TestGlobal:
         assert not cp.Model(expr).solve()
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
+
+    def test_cumulative_var_duration_no_end(self):
+        # regression: OR-Tools interval construction used self.csemap (missing) when
+        # duration is variable and end is not provided
+        start = cp.intvar(0, 10, shape=3, name="start")
+        duration = cp.intvar(1, 5, shape=3, name="dur")
+        demand = [1, 2, 1]
+        capacity = 3
+        cons = cp.Cumulative(start=start, duration=duration, demand=demand, capacity=capacity)
+        assert cp.Model(cons).solve(solver="ortools")
+        assert cons.value()
+
+    def test_no_overlap_var_duration_no_end(self):
+        # same OR-Tools path as Cumulative for variable-sized intervals without end
+        start = cp.intvar(0, 10, shape=3, name="start")
+        duration = cp.intvar(1, 4, shape=3, name="dur")
+        cons = cp.NoOverlap(start, duration)
+        assert cp.Model(cons).solve(solver="ortools")
+        assert cons.value()
 
     def test_optional_cumulative(self):
         start = cp.intvar(0, 10, shape=4, name="start")
@@ -1736,6 +1801,8 @@ class TestTypeChecks:
             assert not constr.value()
 
         assert total == len(all_sols) + len(not_all_sols)
+
+
 
 
     def test_increasing(self):

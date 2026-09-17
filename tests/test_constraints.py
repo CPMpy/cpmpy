@@ -117,7 +117,7 @@ def comp_constraints(solver):
 def bool_exprs(solver):
     """
         Generate all boolean expressions:
-        - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var, ...]), or([Var, ...])    (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
         - Global constraints
     """
@@ -128,13 +128,15 @@ def bool_exprs(solver):
 
     for name, arity in names:
         if arity != 0:
-            operator_args = BOOL_ARGS[:arity]
+            arg_counts = [arity]
         else:
-            operator_args = BOOL_ARGS
+            arg_counts = [1, len(BOOL_ARGS)] # singleton and full
 
-        yield Operator(name, operator_args)
-        # Negated boolean values
-        yield Operator(name, [~ arg for arg in operator_args])
+        for n in arg_counts:
+            operator_args = BOOL_ARGS[:n]
+            yield Operator(name, operator_args)
+            # Negated boolean values
+            yield Operator(name, [~ arg for arg in operator_args])
 
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
@@ -198,6 +200,7 @@ def global_constraints(solver):
             if solver != "pumpkin": # only supports with fixed durations
                 yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
                 yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+                yield cp.Cumulative(start=s, duration=cp.intvar(1, 5, shape=3), demand=demand, capacity=cap)
             continue
 
         elif name == "CumulativeOptional":
@@ -208,6 +211,8 @@ def global_constraints(solver):
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
             cap = 10
             yield cls(s, dur, e, demand, cap, is_present)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield cls(start=s, duration=cp.intvar(1, 5, shape=4), demand=demand, capacity=cap, is_present=is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
@@ -229,6 +234,7 @@ def global_constraints(solver):
             yield cp.NoOverlap(s, dur)
             if solver != "pumpkin": # only supports with fixed durations
                 yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
+                yield cp.NoOverlap(s, cp.intvar(1, 5, shape=3))
             continue
         elif name == "NoOverlapOptional":
             s = cp.intvar(0, 10, shape=4, name="start")
@@ -236,6 +242,8 @@ def global_constraints(solver):
             dur = [1, 4, 3, 2]
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
             yield cls(s, dur, e, is_present)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield cls(start=s, duration=cp.intvar(1, 5, shape=4), is_present=is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
