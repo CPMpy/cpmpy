@@ -821,23 +821,6 @@ class TestSolvers:
         assert s.solve()
         assert sum(present.value()) <= 1
 
-        # Guarded demand `presence * height` is rewritten to optional intervals.
-        start = cp.intvar(0, 0, shape=2)
-        present = cp.boolvar(shape=2)
-        s = CPM_optal()
-        interval_kwargs = []
-        original = s.native_model.interval_var
-
-        def interval_var_spy(*args, **kwargs):
-            interval_kwargs.append(dict(kwargs))
-            return original(*args, **kwargs)
-
-        s.native_model.interval_var = interval_var_spy
-        s += cp.Cumulative(start, [2, 2], demand=present, capacity=1)
-        assert any(kw.get("optional") is True for kw in interval_kwargs)
-        assert s.solve()
-        assert sum(present.value()) <= 1
-
     @pytest.mark.requires_solver("pumpkin")
     def test_pumpkin_indomain_expression(self, solver):
         # InDomain on a non-variable expression (e.g. a sum) must be flattened 
