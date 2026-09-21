@@ -132,6 +132,7 @@
         LexLessEq
         LexChainLess
         LexChainLessEq
+        ArgMax
         DirectConstraint
 
 """
@@ -2187,8 +2188,8 @@ class Precedence(GlobalConstraint):
             return [cp.BoolVal(True)], []
 
         args = cpm_array(args)
-        a = cp.boolvar(shape=(len(args), len(args)))
-        e = cp.boolvar(shape=(len(args), len(args)))
+        a = cp.boolvar(shape=(len(args), len(precedence)))
+        e = cp.boolvar(shape=(len(args), len(precedence)))
         b = cp.boolvar(shape=(len(args), len(precedence)))
         defining = [b[i, m] == (args[i] == precedence[m]) for i in range(len(args)) for m in range(len(precedence))]
 
@@ -2205,7 +2206,7 @@ class Precedence(GlobalConstraint):
                 defining.append(e[i, j] + cp.sum(b[i, j:]) <= 1)
                 defining.append(a[i, j] <= b[i,j])
 
-            for j in range(max_j, len(args)):
+            for j in range(max_j, len(precedence)):
                 defining.append(e[i,j] + a[i,j] == 0)
 
         return constraining, defining
@@ -2273,6 +2274,18 @@ class GlobalCardinalityCount(GlobalConstraint):
             constraints.append(cp.sum(counts) <= len(vars))
             
         return constraints, []
+
+    # def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+    #     vars, vals, occ = self.args
+    #     for var in vars:
+    #         for val in range(var.lb, var.ub + 1):
+    #             if val not in vals:
+    #                 pass
+    #             else:
+    #                 e = cp.boolvar()
+    #
+
+
 
     def value(self) -> Optional[bool]:
         """
@@ -2658,6 +2671,134 @@ class LexChainLessEq(GlobalConstraint):
         if any(val is None for val in flatlist(X)):
             return None
         return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+
+
+class ArgMax(GlobalConstraint):
+    """
+    Enforces that `idx` is the index of the largest value in `vars`.
+
+    Indices are 0-based, like every other index in CPMpy (see :class:`Element`).
+
+    Ties are broken towards the *smallest* index: when several elements attain the
+    maximum, `idx` is the first of them. This makes `idx` a function of `vars`,
+    the same convention as :func:`numpy.argmax` and MiniZinc's ``arg_max``.
+
+    Examples:
+        - ``ArgMax([1,4,2], 1)`` is satisfied.
+        - ``ArgMax([4,4,2], 0)`` is satisfied, ``ArgMax([4,4,2], 1)`` is not: the tie goes to index 0.
+    """
+
+    def __init__(self, vars: ListLike[ExprLike], idx: ExprLike):
+        """
+        Arguments:
+            vars (ListLike[ExprLike]): Non-empty list of expressions or constants to take the argmax of
+            idx (ExprLike): Integer expression or constant holding the index of the maximum
+
+        Raises:
+            TypeError: If `vars` is not a list, or `idx` is a list or a Boolean expression
+            ValueError: If `vars` is empty
+        """
+        if not is_any_list(vars):
+            raise TypeError("ArgMax expects a list of expressions as first argument, but got", vars)
+        vars = flatlist(vars)
+        if len(vars) == 0:
+            raise ValueError("ArgMax expects a non-empty list of expressions as first argument")
+        if is_any_list(idx):
+            raise TypeError("ArgMax expects a single index expression as second argument, but got", idx)
+        if is_boolexpr(idx):
+            raise TypeError(f"ArgMax(vars, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
+        super().__init__("argmax", (vars, idx))
+
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the ArgMax constraint.
+
+        `idx` is kept inside the array, and for every position `i` it can take, the
+        element there must be at least as large as everything after it and strictly
+        larger than everything before it. The strictness on the earlier elements is
+        what breaks ties towards the smallest index.
+
+        Introduces no auxiliary variables, so it is also usable in a negative context.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        vars, idx = self.args
+        n = len(vars)
+
+        constraining = []
+        # only post the index bounds that the domain of `idx` does not already give us
+        lb, ub = get_bounds(idx)
+        for in_range in ([] if lb >= 0 else [idx >= 0]) + ([] if ub <= n - 1 else [idx <= n - 1]):
+            constraining.append(BoolVal(in_range) if is_bool(in_range) else in_range)
+
+        for i, x in enumerate(vars):
+            is_first_max = cp.all([x > y for y in vars[:i]] + [x >= y for y in vars[i+1:]])
+            constraining.append(implies(idx == i, is_first_max, simplify=True))
+
+        return constraining, []
+
+
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the ArgMax constraint, as a unit flow through a layered graph.
+
+        Layer `i` is the state after looking at `vars[0..i]`, and the state `j` that the
+        flow is in is the index of the largest element seen so far (the first of them, on
+        a tie), so `j <= i`. Arriving at `vars[i]` from state `j`, the flow either stays
+        in `j` (`vars[i] <= vars[j]`, the running maximum is unchanged) or takes the arc
+        into state `i` (`vars[i] > vars[j]`, a strictly larger element). Ties keep the
+        flow where it is, which is what makes the smallest index win. The state after the
+        last layer is the argmax.
+
+        Only valid in a positive context: `defining` holds the flow, which the all-zero
+        flow satisfies and which therefore does not constrain `vars` on its own, while
+        `constraining` injects the unit of flow and reads the index off the last layer.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        vars, idx = self.args
+        n = len(vars)
+
+        # e[i,j]: after layer i, the running maximum sits at index j          (j <= i)
+        # a[i,j]: at layer i, vars[i] beats the running maximum at index j,
+        #         so the flow moves out of state j and into state i           (j < i)
+        e = cp.boolvar(shape=(n, n))
+        a = cp.boolvar(shape=(n, n))
+
+        # inject one unit of flow: before any comparison the maximum is vars[0]
+        constraining = [e[0, 0] == 1]
+        # exactly one e[n-1,j] is set, and that j is the argmax
+        constraining.append(cp.sum([j * e[n-1, j] for j in range(n)]) == idx)
+
+        defining = []
+        for i in range(n):
+            for j in range(i):  # states carried in from the previous layer
+                defining.append(e[i-1, j] == e[i, j] + a[i, j])  # stay, or move to state i
+                defining.append(e[i, j].implies(vars[i] <= vars[j]))
+                defining.append(a[i, j].implies(vars[i] > vars[j]))
+            if i > 0:  # every arc taken at layer i lands in state i
+                defining.append(e[i, i] == cp.sum(a[i, :i]))
+            for j in range(i+1, n):  # states not reachable at this layer
+                defining.append(e[i, j] == 0)
+            for j in range(i, n):  # a[i,j] only exists for j < i
+                defining.append(a[i, j] == 0)
+
+        return constraining, defining
+
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        vars, idx = argvals(self.args)
+        if idx is None or any(v is None for v in vars):
+            return None
+        if not (0 <= idx < len(vars)):
+            return False
+        return idx == int(np.argmax(vars))  # np.argmax returns the first maximum
 
 
 class DirectConstraint(Expression):

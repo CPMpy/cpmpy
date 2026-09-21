@@ -112,6 +112,8 @@ Global Constraints
         LexChainLess
         LexChainLessEq
 
+        ArgMax
+
         DirectConstraint
 
 

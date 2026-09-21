@@ -22,6 +22,7 @@ List of submodules
 from .variables import boolvar, intvar, cpm_array
 from .globalconstraints import (
     AllDifferent,
+    ArgMax,
     AllDifferentExcept0,
     AllDifferentExceptN,
     AllEqual,
@@ -99,6 +100,7 @@ __all__ = [
     "AllEqual",
     "AllEqualExceptN",
     "Among",
+    "ArgMax",
     "BoolVal",
     "Circuit",
     "Count",

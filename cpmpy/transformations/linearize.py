@@ -656,6 +656,7 @@ def get_linear_positive_decompositions():
     return dict(
         regular=lambda expr: expr.decompose_linear_positive(),
         circuit=lambda expr: expr.decompose_linear_positive(),
+        argmax=lambda expr: expr.decompose_linear_positive(),
         lex_less=lambda expr: expr.decompose_linear_positive(),
         precedence=lambda expr: expr.decompose_linear_positive(),
     )

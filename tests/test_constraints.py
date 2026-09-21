@@ -22,7 +22,7 @@ ALL_SOLS = False # test whether all solutions returned by the solver satisfy the
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse","Circuit", "ArgMax",
     "Table", 'NegativeTable', "ShortTable", "Regular", "MDD",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
@@ -164,6 +164,10 @@ def global_constraints(solver):
             continue
         elif name == "Inverse":
             yield cp.Inverse(NUM_ARGS, [1,0,2])
+        elif name == "ArgMax":
+            yield cp.ArgMax(NUM_ARGS, INDEX_VAR)       # index domain wider than the array
+            yield cp.ArgMax(NUM_ARGS, INDEX_VAR2 - 2)  # index is an expression
+            yield cp.ArgMax(NUM_ARGS[:2] + [3], 1)     # constants in the array and as index
         elif name == "Table":
             yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
             yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
