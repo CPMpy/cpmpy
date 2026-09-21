@@ -560,10 +560,10 @@ class NDVarArray(np.ndarray):
         Supported ``__call__`` ufuncs map to :mod:`operator` and build Expression trees
         via :meth:`_elementwise`. Unsupported ufuncs raise :class:`TypeError` (never
         fall through to object-dtype ufuncs that boolify comparisons).
-
-        ``out=`` is supported for in-place ops like ``+=``; other kwargs raise.
         """
         out = kwargs.pop("out", None)
+        if out is not None:
+            raise NotImplementedError("out= is not supported for NDVarArray operators, if you need this, please report on github.")
         if kwargs:
             raise TypeError(
                 f"NDVarArray does not support ufunc keyword arguments {sorted(kwargs)}; "
@@ -581,19 +581,8 @@ class NDVarArray(np.ndarray):
                 f"NDVarArray does not support np.{ufunc.__name__}; use Python operators or cp.*"
             )
         result = self._elementwise(op, *inputs)
-        if out is None:
-            return result
-        # NumPy always passes out as a tuple into __array_ufunc__
-        if not isinstance(out, tuple) or len(out) != 1 or out[0] is None:
-            raise TypeError(
-                f"NDVarArray only supports a single out= array for np.{ufunc.__name__}"
-            )
-        dest = out[0]
-        np.copyto(dest, result)
-        if isinstance(dest, NDVarArray):
-            dest._has_subexpr = None  # cells may now hold non-var Expressions
-        return dest
-
+        return result
+        
     def sum(self, axis=None, dtype=None, out=None, keepdims=False, **kwargs):
         """
             overwrite np.sum(NDVarArray) as people might use it

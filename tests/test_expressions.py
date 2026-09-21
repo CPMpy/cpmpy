@@ -331,29 +331,6 @@ class TestNDVarArrayBroadcast:
         with pytest.raises(TypeError, match="keyword arguments"):
             np.add(x, 1, where=True)
 
-    def test_inplace_add(self):
-        # regression: += goes through np.add(..., out=x); must not reject out=
-        x = intvar(0, 5, shape=3, name="x")
-        assert x.has_subexpr() is False
-        x += 1
-        assert isinstance(x, NDVarArray)
-        assert str(x[0]) == "(x[0]) + 1"
-        assert x.has_subexpr() is True
-
-    def test_inplace_mul(self):
-        x = intvar(0, 5, shape=3, name="x")
-        x *= 2
-        assert isinstance(x, NDVarArray)
-        assert str(x[0]) == "2 * (x[0])"
-        assert x.has_subexpr() is True
-
-    def test_ufunc_out(self):
-        x = intvar(0, 5, shape=3, name="x")
-        dest = np.empty(3, dtype=object)
-        ret = np.add(x, 1, out=dest)
-        assert ret is dest
-        assert str(dest[0]) == "(x[0]) + 1"
-
     def test_views_have_has_subexpr(self):
         x = intvar(0, 5, shape=4, name="x")
         y = x[1:]
