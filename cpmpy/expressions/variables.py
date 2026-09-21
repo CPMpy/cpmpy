@@ -504,8 +504,12 @@ class NDVarArray(np.ndarray):
         """ clear, for each of the stored variables, the value obtained from the last solve call
         """
         for e in self.flat:
-            if isinstance(e, Expression):
+            if isinstance(e, _NumVarImpl):
                 e.clear()
+            elif isinstance(e, NDVarArray):
+                e.clear()
+            else:
+                raise ValueError(f"NDVarArray.clear is only supported if it contains variables or nested NDVarArrays, cannot clear value of {type(e)}")
 
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing

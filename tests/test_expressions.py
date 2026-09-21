@@ -562,6 +562,66 @@ class TestArrayExpressions:
                 assert isinstance(cpm_res, NDVarArray)
                 assert cpm_res.shape == np_res.shape
 
+        
+class TestNDVarArrayValueAndClear:
+
+    def test_value_vars(self):
+
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x,y,z])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value()])).all()
+    
+    def test_value_exprs(self):
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x+y, y+z, z+x])
+        assert isinstance(arr, NDVarArray)
+        xv,yv,zv = [x.value(), y.value(), z.value()]
+        assert (arr.value() == np.array([xv+yv, yv+zv, zv+xv])).all()
+
+    def test_value_constants(self):
+
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+        arr = cp.cpm_array([x,y,z,5])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value(), 5])).all()
+
+    def test_clear_vars(self):
+
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x,y,z])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value()])).all()
+        arr.clear()
+        assert (arr.value() == np.array([None, None, None])).all()
+
+    def test_clear_exprs(self):
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x+y, y+z, z+x])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value()+y.value(), y.value()+z.value(), z.value()+x.value()])).all()
+        with pytest.raises(ValueError, match="cannot clear value of"):
+            arr.clear()
+    
+    def test_clear_constants(self):
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x,y,z,5])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value(), 5])).all()
+        with pytest.raises(ValueError, match="cannot clear value of"):
+            arr.clear()
+
 class TestBounds:
     def test_bounds_mul_sub_sum(self):
         x = intvar(-8,8)
