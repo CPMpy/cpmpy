@@ -1543,6 +1543,71 @@ class TestGlobal:
 
         cp.Model(~cons).solveAll(display=check_val)
 
+    def test_no_overlap_zero_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+
+        # a zero-duration task occupies no time, so it never overlaps another task
+        start = cp.intvar(0,5, shape=3, name="start")
+        start_val = [1,0,5]  # task 0 has duration 0 and starts in the middle of task 1
+        dur = [0,5,3]
+        cons = cp.NoOverlap(start, dur)
+
+        assert cp.Model(cons, start == start_val).solve(solver=solver)
+        assert cons.value() is True
+        assert cp.Model(cons.decompose(), start == start_val).solve(solver=solver)
+        # NoOverlap has the same semantics as Cumulative with demand and capacity equal to 1
+        assert cp.Model(cp.Cumulative(start, dur, demand=1, capacity=1), start == start_val).solve(solver=solver)
+
+        # tasks with a non-zero duration must still not overlap
+        assert cp.Model(cons, start == [1,0,2]).solve(solver=solver) is False
+        assert cp.Model(~cons, start == [1,0,2]).solve(solver=solver) is True
+        assert cons.value() is False
+
+    def test_no_overlap_zero_duration_var(self, solver):
+        if solver in ("pysdd", "rc2"):
+            pytest.skip("pysdd does not support integer variables, rc2 only supports optimization")
+
+        if solver == "pumpkin":
+            pytest.skip("Pumpkin does not support variables as duration")
+
+        # same, but now 0 is only in the domain of the duration variables
+        start = cp.intvar(0,5, shape=3, name="start")
+        dur = cp.intvar(0,5, shape=3, name="dur")
+        cons = cp.NoOverlap(start, dur)
+
+        assert cp.Model(cons, start == [1,0,5], dur == [0,5,3]).solve(solver=solver)
+        assert cons.value() is True
+        assert cp.Model(cons, start == [1,0,2], dur == [0,5,3]).solve(solver=solver) is False
+
+    def test_no_overlap_optional_zero_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+
+        # a present task with zero duration occupies no time either
+        start = cp.intvar(0,5, shape=3, name="start")
+        start_val = [1,0,5]  # task 0 has duration 0 and starts in the middle of task 1
+        dur = [0,5,3]
+        is_present = cp.boolvar(shape=3, name="is_present")
+        cons = cp.NoOverlapOptional(start, dur, is_present=is_present)
+
+        assert cp.Model(cons, start == start_val, cp.all(is_present)).solve(solver=solver)
+        assert cons.value() is True
+        assert cp.Model(cons.decompose(), start == start_val, cp.all(is_present)).solve(solver=solver)
+        # NoOverlapOptional has the same semantics as CumulativeOptional with demand and capacity equal to 1
+        assert cp.Model(cp.CumulativeOptional(start, dur, demand=1, capacity=1, is_present=is_present),
+                        start == start_val, cp.all(is_present)).solve(solver=solver)
+
+        # present tasks with a non-zero duration must still not overlap
+        assert cp.Model(cons, start == [1,0,2], cp.all(is_present)).solve(solver=solver) is False
+        assert cp.Model(cons, start == [1,0,2], is_present == [True,True,False]).solve(solver=solver)
+        assert cons.value() is True
+
+
 class TestBounds:
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)
