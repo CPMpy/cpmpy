@@ -1134,15 +1134,17 @@ class TestGlobal:
         # also test decomposition
         assert not cp.Model(cons.decompose()).solve()# capacity was not taken into account and this failed
 
-    def test_cumulative_zero_duration(self):
+    def test_cumulative_zero_duration(self, solver):
         # Zero-duration tasks occupy no resource
         from cpmpy.expressions.utils import argval
+        if solver == "pumpkin":
+            pytest.skip("Bug in Pumpkin Cumulative, see test below")
 
-        s = cp.intvar(0, 0, name="s")
-        d = cp.intvar(0, 0, name="d")
+        s = cp.intvar(0, 5, name="s")
+        d = 0
         cons = cp.Cumulative([s], [d], demand=[2], capacity=1)
 
-        assert cp.Model([s == 0, d == 0]).solve()
+        assert cp.Model([cons, s == 0]).solve(solver=solver)
         assert cons.value() is True
 
         task, _ = cons.decompose(how="task")
@@ -1151,6 +1153,19 @@ class TestGlobal:
         assert all(argval(q) for q in time)
         assert cp.Model(cons.decompose(how="task")).solve()
         assert cp.Model(cons.decompose(how="time")).solve()
+
+    @pytest.mark.xfail(reason="Bug in Pumpkin Cumulative, issue at: https://github.com/ConSol-Lab/Pumpkin/issues/577")
+    def test_cumulative_zero_duration_pumpkin(self):
+        if not cp.SolverLookup.lookup("pumpkin").supported():
+            pytest.skip("Pumpkin not installed")
+
+        s = cp.intvar(0, 5, name="s")
+        d = 0
+        cons = cp.Cumulative([s], [d], demand=[2], capacity=1)
+
+        assert cp.Model([cons, s == 0]).solve(solver="pumpkin")
+        assert cons.value() is True
+
 
     def test_cumulative_nested_expressions(self):
         import numpy as np
