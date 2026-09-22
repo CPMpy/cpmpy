@@ -2029,10 +2029,11 @@ class NoOverlap(GlobalConstraint):
             return False
         if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
-        for (s1,d1), (s2,d2) in all_pairs(zip(start,duration)):
-            if d1 > 0 and d2 > 0 and s1 + d1 > s2 and s2 + d2 > s1:
-                return False
-        return True
+
+        # zero-duration tasks occupy no time, the other tasks may not overlap: sorted by start
+        # time, that means every task has to start after the previous one ended
+        tasks = sorted((s,e) for s,d,e in zip(start, duration, end) if d > 0)
+        return all(e <= s for (_,e), (s,_) in zip(tasks, tasks[1:]))
 
 class NoOverlapOptional(GlobalConstraint):
     """
@@ -2120,10 +2121,11 @@ class NoOverlapOptional(GlobalConstraint):
             return False
         if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
-        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,duration,is_present)):
-            if p1 and p2 and d1 > 0 and d2 > 0 and (s1 + d1 > s2) and (s2 + d2 > s1):
-                return False
-        return True
+
+        # absent tasks are not scheduled and zero-duration tasks occupy no time, the other tasks
+        # may not overlap: sorted by start time, every task has to start after the previous ended
+        tasks = sorted((s,e) for s,d,e,p in zip(start, duration, end, is_present) if p and d > 0)
+        return all(e <= s for (_,e), (s,_) in zip(tasks, tasks[1:]))
     
 class Precedence(GlobalConstraint):
     """

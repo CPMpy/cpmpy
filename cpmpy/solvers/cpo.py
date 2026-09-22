@@ -598,11 +598,11 @@ class CPM_cpo(SolverInterface):
                         continue
                     else:
                         task_demand = dom.pulse(task, get_bounds(h))
+                        # a zero-duration task has an empty pulse, so it occupies no resource and its demand should not be channeled
+                        active = dom.size_of(task) > 0
                         if is_present is not None:
-                            cons += [dom.if_then(self._cpo_expr(is_present[i], boolexpr=True),
-                                                 self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
-                        else:
-                            cons += [self._cpo_expr(h) == dom.height_at_start(task, task_demand)]
+                            active = dom.logical_and(active, self._cpo_expr(is_present[i], boolexpr=True))
+                        cons += [dom.if_then(active, self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
                         total_usage.append(task_demand)
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
@@ -613,7 +613,14 @@ class CPM_cpo(SolverInterface):
                     end = None
                 else:
                     start, dur, end = cpm_con.args
-                return self._make_no_overlap(start, dur, end, None)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # CP Optimizer's NoOverlap has strict semantics for zero duration tasks: they cannot start when another task is planned.
+                    # In order to use the non-strict semantics, we rewrite NoOverlap as Cumulative.
+                    return self._cpo_expr(Cumulative(start, dur, end, demand=1, capacity=1))
+
+                tasks, cons = self._make_tasks(start, dur, end, None)
+                return cons + [dom.no_overlap(tasks)]
             
             elif cpm_con.name == "no_overlap_optional":
                 if len(cpm_con.args) == 3:
@@ -622,7 +629,12 @@ class CPM_cpo(SolverInterface):
                 else:
                     start, dur, end, is_present = cpm_con.args
 
-                return self._make_no_overlap(start, dur, end, is_present)
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # possible zero-duration tasks, see 'no_overlap'
+                    return self._cpo_expr(CumulativeOptional(start, dur, end, demand=1, capacity=1, is_present=is_present))
+
+                tasks, cons = self._make_tasks(start, dur, end, is_present)
+                return cons + [dom.no_overlap(tasks)]
             
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
@@ -682,8 +694,6 @@ class CPM_cpo(SolverInterface):
             extra_cons += task_cons
         return tasks, extra_cons
 
-
-
     def _make_task(self, start, dur, end, is_present):
         """
             Helper function to create a task object and additional constraints enforcing task-relation
@@ -718,35 +728,6 @@ class CPM_cpo(SolverInterface):
             if is_optional: # enforce presence of task
                 extra_cons += [dom.presence_of(task) == self._cpo_expr(is_present, boolexpr=True)]
             return task, extra_cons
-
-    def _make_no_overlap(self, start, dur, end, is_present):
-        """
-            Helper function to create a no_overlap constraint over (optional) tasks
-
-            CP Optimizer sequences every present task, also the zero-duration ones, while in the non-strict
-            zero-duration task occupies no time and never overlaps. Such tasks are made absent instead,
-            as CP Optimizer's no_overlap ignores absent tasks.
-        """
-        dom = self.get_docp().modeler
-
-        # CPO crashes if size of interval is negative
-        dur, cons = get_nonneg_args(dur, is_present)
-        if end is not None:
-            cons += [implies(True if is_present is None else is_present[i], start[i] + dur[i] == end[i])
-                     for i in range(len(start))]
-
-        # a task that can have duration 0 is made absent when it has, so it is not sequenced
-        present = []
-        for i, d in enumerate(dur):
-            p = None if is_present is None else is_present[i]
-            if get_bounds(d)[0] > 0:  # duration is never 0, no need to make the task optional
-                present.append(p)
-            else:
-                present.append(d > 0 if p is None else p & (d > 0))
-
-        tasks, task_cons = self._make_tasks(start, dur, end, present)
-        # tasks with a constant duration of 0 are not created at all (None)
-        return self._cpo_expr(cons) + task_cons + [dom.no_overlap([t for t in tasks if t is not None])]
 
     @classmethod
     def mus_native(cls, soft, hard=[]):

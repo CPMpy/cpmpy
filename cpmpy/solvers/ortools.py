@@ -677,10 +677,12 @@ class CPM_ortools(SolverInterface):
                 # make interval variables
                 tasks, task_cons = self._get_ort_intervals(start, dur, end)
                 self.add(task_cons)
-                # posted as cumulative with unit demand and capacity:
-                # NoOverlap in OR-Tools can have zero-duration tasks overlap with other tasks
-                # we instead follow the global constraint catalog: zero-duration tasks cannot overlap with other tasks
-                return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # OR-Tools' NoOverlap has strict semantics for zero duration tasks: they cannot start when another task is planned.
+                    # In order to use the non-strict semantics, we rewrite NoOverlap as Cumulative.
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
+                return self.ort_model.AddNoOverlap(tasks)
 
             elif cpm_expr.name == "no_overlap_optional":
                 if len(cpm_expr.args) == 3:
@@ -695,8 +697,11 @@ class CPM_ortools(SolverInterface):
                 # make interval variables   
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
-                # posted as cumulative with unit demand and capacity, see 'no_overlap'
-                return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # possible zero-duration tasks, see 'no_overlap'
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
+                return self.ort_model.AddNoOverlap(tasks)
 
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
