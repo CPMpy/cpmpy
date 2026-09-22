@@ -1564,7 +1564,8 @@ class Cumulative(GlobalConstraint):
         - duration >= 0
         - demand >= 0
         - start + duration == end
-
+    
+    Zero-duration tasks do not occupy any resource.
     Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
     Supports both varying demand across tasks or equal demand for all jobs.
     """
@@ -1759,6 +1760,7 @@ class CumulativeOptional(GlobalConstraint):
 
         If the task is not present, the constraint does not enforce any of the above.
 
+        Zero-duration tasks do not occupy any resource.
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlapOptional` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
     """
