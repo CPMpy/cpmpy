@@ -70,9 +70,11 @@ from __future__ import annotations
         or in logical operators.
 
     - :func:`~cpmpy.expressions.core.Expression.value`    
-        computes the value of this expression, by calling .value() on its
-        subexpressions and doing the appropriate computation
-        this is used to conveniently print variable values, objective values
+        computes the value of this expression, by calling :meth:`~cpmpy.expressions.core.Expression.compute_value`
+        on the expression (subclasses implement ``compute_value()``, not ``value()``).
+        For Boolean expressions, nested partial functions that are undefined
+        (e.g. division by zero) evaluate to False, following relational semantics.
+        This is used to conveniently print variable values, objective values
         and any other expression value (e.g. during debugging).
 
     :class:`~cpmpy.expressions.core.Description` bundles optional human-readable text and print flags for
@@ -98,7 +100,7 @@ import numpy as np
 import cpmpy as cp
 
 from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
-from ..exceptions import TypeError
+from ..exceptions import TypeError, IncompleteFunctionError
 
 # Common typing helpers
 T = TypeVar("T")
@@ -118,7 +120,7 @@ class Expression(object):
 
     - :attr:`~cpmpy.expressions.core.Expression.args`:                  can override it with a narrower type for the arguments
     - :func:`~cpmpy.expressions.core.Expression.is_bool`:               whether its return type is Boolean
-    - :func:`~cpmpy.expressions.core.Expression.value`:                 the value of the expression, default None
+    - :func:`~cpmpy.expressions.core.Expression.compute_value`:         implementation of ``value()``; subclasses override this, not ``value()``
     - :func:`implies(x) <cpmpy.expressions.core.Expression.implies>`:   logical implication of this expression towards `x`
     - :func:`~cpmpy.expressions.core.Expression.__repr__`:              for pretty printing the expression
     - :meth:`~cpmpy.expressions.core.Expression.set_description`:      optional custom :meth:`__str__` text (class default ``_description`` is ``None``; set on the instance when used)
@@ -239,8 +241,29 @@ class Expression(object):
         """
         return True
 
-    def value(self) -> Optional[int]:
-        raise NotImplementedError(f"`value` is not yet implemented for type {self}")
+    def value(self) -> Optional[int|bool]:
+        """
+        Compute the value of this expression under the current variable assignment.
+
+        For Boolean expressions, nested partial functions that are undefined
+        (e.g. division by zero, out-of-range Element) evaluate to False, following
+        relational semantics.
+
+        Returns:
+            Optional[int]: The value of the expression, or None if any variable is unassigned
+        """
+        try:
+            return self.compute_value()
+        except IncompleteFunctionError:
+            if self.is_bool():
+                return False
+            raise
+
+    def compute_value(self) -> Optional[int]:
+        """
+        Compute the value of this expression. Called by :meth:`value`. Subclasses override this, not ``value()``.
+        """
+        raise NotImplementedError(f"`compute_value` is not yet implemented for type {self}")
 
     def get_bounds(self) -> tuple[int, int]:
         if self.is_bool():
@@ -561,7 +584,7 @@ class BoolVal(Expression):
         arg = bool(arg)
         super(BoolVal, self).__init__("boolval", (arg,))
 
-    def value(self) -> bool:
+    def value(self) -> bool:  # no compute_value because no subexpressions
         return self.args[0]
 
     def __invert__(self) -> Expression:
@@ -708,7 +731,7 @@ class Comparison(Expression):
 
     # return the value of the expression
     # optional, default: None
-    def value(self) -> Optional[bool]:
+    def compute_value(self) -> Optional[bool]:
         arg_vals = argvals(self.args)
 
         if any(a is None for a in arg_vals): return None
@@ -832,7 +855,7 @@ class Operator(Expression):
         else:  # n-ary
             return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
 
-    def value(self) -> Optional[int]:
+    def compute_value(self) -> Optional[int]:
         """
         Returns the value of the expression (or None if not everything has a value).
         """
