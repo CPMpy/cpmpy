@@ -727,9 +727,13 @@ class Operator(Expression):
 
     Convention for 2-ary operators: if one of the two is a constant,
     it is stored first (as expr[0]), this eases weighted sum detection
+
+    N-ary operators (``and``, ``or``, ``sum``) require at least one argument (arity >= 1).
+    ``wsum`` likewise requires at least one term. Empty argument lists are rejected: while
+    logically plausible, they usually indicate a construction / user mistake (e.g. unexpectedly empty input).
     """
     allowed: Final[dict[str, tuple[int, bool]]] = {
-        #name: (arity, is_bool)       arity 0 = n-ary, min 2
+        #name: (arity, is_bool)       arity 0 = n-ary, min 1
         'and': (0, True),
         'or':  (0, True),
         '->':  (2, True),
@@ -747,6 +751,7 @@ class Operator(Expression):
             name (str): Operator name (one of :attr:`Operator.allowed`)
             arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants, 
                         or list of size 2 with list of weights and list of expressions for wsum.
+                        For n-ary operators (``and``, ``or``, ``sum``), at least one argument is required.
         """
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
@@ -759,9 +764,11 @@ class Operator(Expression):
                     raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
             arg_list = flatlist(arg_list)
-            assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
+            if len(arg_list) == 0:
+                raise ValueError(f"Operator '{name}' must be given at least one argument")
         else:
-            assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
+            if len(arg_list) != arity:
+                raise ValueError("Operator: {}, number of arguments must be {}".format(name, arity))
 
         # automatic weighted sum (wsum) creation:
         # if all args are an expression (not a constant)
@@ -780,6 +787,7 @@ class Operator(Expression):
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
             assert isinstance(arg_list[0], (list, tuple, np.ndarray)), "wsum: arg0 has to be a list-like"
+            assert isinstance(arg_list[1], (list, tuple, np.ndarray)), "wsum: arg1 has to be a list-like"
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
             weights: list[ExprLike] = []
             for a in arg_list[0]:
@@ -787,7 +795,12 @@ class Operator(Expression):
                     weights.append(int(a)) # bool or int, simplifies things later on
                 else:
                     weights.append(a) # can be float
-            arg_list = (weights, arg_list[1])
+            exprs = arg_list[1]
+            if len(weights) != len(exprs):
+                raise ValueError(f"Operator 'wsum' expects equal lengths, got {len(weights)} weights and {len(exprs)} expressions")
+            if len(weights) == 0:
+                raise ValueError("Operator 'wsum' must be given at least one term")
+            arg_list = (weights, exprs)
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
