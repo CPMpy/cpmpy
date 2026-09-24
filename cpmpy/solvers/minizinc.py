@@ -906,7 +906,7 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "mul":
             assert isinstance(expr, Multiplication)
             if expr.is_lhs_num:
-                return "{}*({})".format(args_str[1], args_str[0])
+                return "({})*({})".format(args_str[1], args_str[0])
             else:
                 return "({}) * ({})".format(args_str[1], args_str[0])
 
