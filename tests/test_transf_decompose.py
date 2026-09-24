@@ -26,8 +26,8 @@ class TestTransfDecomp:
         cons = [bv.implies(cp.AllDifferent(ivs))]
         assert str(decompose_in_tree(cons)) == \
                          "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
-        assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
-                         "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
+        # assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
+        #                  "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]" # reformulated to toplevel
         assert str(decompose_in_tree(cons, supported={"alldifferent"}, supported_reified={"alldifferent"})) ==str(cons)
 
         cons = [cp.AllDifferent(ivs).implies(bv)]
@@ -387,3 +387,23 @@ class TestTransfDecomp:
         assert str(decomposed) == "[(boolval(True)) or (boolval(True))]"
 
         assert cp.Model(cons).solve(solver="ortools")
+
+
+    def test_decompose_reformulate_toplevel(self):
+        x = cp.intvar(1,3, shape=3, name="x")
+        bv = cp.boolvar(name="bv")
+        cons = [bv.implies(cp.AllDifferent(x))]
+
+        decomposed = decompose_in_tree(cons, supported={"alldifferent"}, supported_reified=set())
+        assert set(map(str, decomposed)) == {
+            "(bv) -> (and((IV0) == (x[0]), (IV1) == (x[1]), (IV2) == (x[2])))",
+            "alldifferent(IV0,IV1,IV2)",
+        }
+
+        x_small = cp.intvar(1,2, shape=3, name="x")
+        cons = [bv.implies(cp.AllDifferent(x_small))]
+
+        decomposed = decompose_in_tree(cons, supported={"alldifferent"}, supported_reified=set())
+        assert set(map(str, decomposed)) == {
+            "(bv) -> (boolval(False))",
+        }

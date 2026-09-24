@@ -258,6 +258,23 @@ class AllDifferent(GlobalConstraint):
         lb, ub = min(lbs), max(ubs)
         return [cp.sum((arg_i == val) for arg_i in self.args) <= 1 for val in range(lb, ub + 1)], []
 
+    def reformulate_toplevel(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Post constraint to top-level with auxiliary variables and replace original global with channeling constraint
+        Based on:
+            Ignace Bleukx, Hélène Verhaeghe, Dimos Tsouros, and Tias Guns. 2026. 
+            Efficient Reformulations of Half-reified GlobalConstraints using Auxiliary Variables. 
+            Journal of Artificial Intelligence Research 86, Article 52 (August 2026).
+        """
+
+        has_sol = cp.Model(self).solve(solver='ortools', num_workers=1)
+        if not has_sol:
+            return [cp.BoolVal(False)], []
+
+        new_args = [cp.intvar(lb, ub) for lb, ub in zip(*get_bounds(self.args))]
+        return [new_arg == arg for new_arg, arg in zip(new_args, self.args)], [cp.AllDifferent(new_args)]
+
+
     def value(self) -> Optional[bool]:
         """
         Returns:
