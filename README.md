@@ -142,7 +142,7 @@ Other projects that build on CPMpy:
 * [Sudoku Assistant](https://sudoku-assistant.cs.kuleuven.be): an Android app for sudoku scanning, solving and intelligent hints
 * [CHAT-Opt demonstrator](https://chatopt.cs.kuleuven.be): translates natural language problem descriptions into CPMpy models
 
-Also, CPMpy participated in both the [2024 and 2025 XCSP3 competition](https://www.xcsp.org/competitions/), twice making its solvers win 3 gold and 1 silver medal.
+Also, CPMpy participated in both the [2024, 2025 and 2026 XCSP3 competition](https://www.xcsp.org/competitions/), making its solvers win several gold and silver medals.
 
 ## 🔧 Library development
 
@@ -157,15 +157,17 @@ Are you a **solver developer**? We are keen to integrate solvers that have a Pyt
 
 Part of the development received funding through Prof. Tias Guns' European Research Council (ERC) Consolidator grant, under the European Union’s Horizon 2020 research and innovation programme (grant agreement No 101002802, [CHAT-Opt](https://people.cs.kuleuven.be/~tias.guns/chat-opt.html)).
 
-You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language convenience with a universal n-dimensional array, CPpy as python-embedded example. The 18th workshop on Constraint Modelling and Reformulation at CP (ModRef 2019).
+You can cite CPMpy as follows: "Guns, T., Bleukx, I., Bierlee, H., Devriendt, J., Gamba, E., Lomis, O., Piessens, W., Sergeys, T., Tsouros, D., Vanroose, W., & Verhaeghe, H. (2026). Translating finite-domain integer constraint models to CP/SMT/ILP/PB/SAT solvers with CPMpy".
 
 ```
-@inproceedings{guns2019increasing,
-    title={Increasing modeling language convenience with a universal n-dimensional array, CPpy as python-embedded example},
-    author={Guns, Tias},
-    booktitle={Proceedings of the 18th workshop on Constraint Modelling and Reformulation at CP (Modref 2019)},
-    volume={19},
-    year={2019}
+@misc{guns2026translating,
+      title={Translating finite-domain integer constraint models to CP/SMT/ILP/PB/SAT solvers with CPMpy}, 
+      author={Tias Guns and Ignace Bleukx and Hendrik Bierlee and Jo Devriendt and Emilio Gamba and Orestis Lomis and Wout Piessens and Thomas Sergeys and Dimos Tsouros and Wout Vanroose and Hélène Verhaeghe},
+      year={2026},
+      eprint={2608.15143},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2608.15143}, 
 }
 ```
 
