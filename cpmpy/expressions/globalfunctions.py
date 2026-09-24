@@ -1235,6 +1235,11 @@ class NValue(GlobalFunction):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
         super().__init__("nvalue", tuple(arr))
 
+    @property
+    def args(self) -> tuple[ExprLike,...]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of the NValue global function.
@@ -1298,7 +1303,18 @@ class NValueExcept(GlobalFunction):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
-        super().__init__("nvalue_except", (arr, n))
+
+        if isinstance(arr, list):
+            arr_lst = arr
+        else:
+            arr_lst = list(arr)
+
+        super().__init__("nvalue_except", (arr_lst, int(n))) # make sure no np integer
+
+    @property
+    def args(self) -> tuple[list[ExprLike], int]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
