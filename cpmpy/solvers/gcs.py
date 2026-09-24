@@ -209,7 +209,7 @@ class CPM_gcs(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.gcs_result["solve_time"]
+        self.cpm_status.solve_time = self.gcs_result["solve_time"]
 
         # translate exit status
         if self.gcs_result['solutions'] != 0:
@@ -321,7 +321,7 @@ class CPM_gcs(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.gcs_result["solve_time"]
+        self.cpm_status.solve_time = self.gcs_result["solve_time"]
 
         num_sols = self.gcs_result["solutions"]
         if self.gcs_result["completed"] and num_sols >= 1:

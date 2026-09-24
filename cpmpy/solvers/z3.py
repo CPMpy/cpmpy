@@ -207,9 +207,9 @@ class CPM_z3(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         st = self.z3_solver.statistics()
         if 'time' not in st.keys():
-            self.cpm_status.runtime = 0
+            self.cpm_status.solve_time = 0
         else:
-            self.cpm_status.runtime = st.get_key_value('time')
+            self.cpm_status.solve_time = st.get_key_value('time')
 
         # translate exit status
         if my_status == "sat":

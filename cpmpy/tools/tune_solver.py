@@ -68,7 +68,7 @@ class ParameterTuner:
         if not _has_finished(solver):
             raise TimeoutError("Time's up before solving init solver call")
 
-        self.base_runtime = solver.status().runtime
+        self.base_runtime = solver.status().solve_time
         self.best_runtime = self.base_runtime
         self._best_config = {}
         if verbose >= 1:
@@ -117,7 +117,7 @@ class ParameterTuner:
             # run solver
             solver.solve(**params_dict, time_limit=timeout)
             if _has_finished(solver):
-                self.best_runtime = solver.status().runtime
+                self.best_runtime = solver.status().solve_time
                 # update surrogate
                 self._best_config = params_np
                 if verbose >= 1:
@@ -190,7 +190,7 @@ class GridSearchTuner(ParameterTuner):
             raise TimeoutError("Time's up before solving init solver call")
 
 
-        self.base_runtime = solver.status().runtime
+        self.base_runtime = solver.status().solve_time
         self.best_runtime = self.base_runtime
         if verbose >= 1:
             print(f" - took {self.best_runtime:.1f} seconds")
@@ -223,7 +223,7 @@ class GridSearchTuner(ParameterTuner):
             # run solver
             solver.solve(**params_dict, time_limit=timeout)
             if _has_finished(solver):
-                self.best_runtime = solver.status().runtime
+                self.best_runtime = solver.status().solve_time
                 # update surrogate
                 self.best_params = params_dict
                 if verbose >= 1:
@@ -329,7 +329,7 @@ class MultiSolver(SolverInterface):
             all_has_sol = all_has_sol and has_sol
         end = time.time()
         # update runtime
-        self.cpm_status.runtime = end - init_start
+        self.cpm_status.solve_time = end - init_start
         return all_has_sol
 
     def has_finished(self):

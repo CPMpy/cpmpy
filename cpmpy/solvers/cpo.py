@@ -236,7 +236,7 @@ class CPM_cpo(SolverInterface):
         # new status, translate runtime
         self.cpo_status = self.cpo_result.get_solve_status()
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.cpo_result.get_solve_time() # wallclock time in (float) seconds
+        self.cpm_status.solve_time = self.cpo_result.get_solve_time() # wallclock time in (float) seconds
 
         # translate solver exit status to CPMpy exit status
         if self.cpo_status == "Feasible":
@@ -335,11 +335,11 @@ class CPM_cpo(SolverInterface):
             self.cpo_model.add(docp.modeler.forbidden_assignments(solvars, [vals]))
 
             if time_limit is not None: # update remaining time
-                time_limit -= self.status().runtime
+                time_limit -= self.status().solve_time
         end = time.time()
 
         # update solver status
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
         if solution_count:
             if solution_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE

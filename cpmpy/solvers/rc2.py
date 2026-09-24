@@ -184,7 +184,7 @@ class CPM_rc2(CPM_pysat):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = solver.oracle_time()
+        self.cpm_status.solve_time = solver.oracle_time()
 
         # translate exit status
         if solution is None:

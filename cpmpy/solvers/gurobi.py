@@ -215,7 +215,7 @@ class CPM_gurobi(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.grb_model.runtime
+        self.cpm_status.solve_time = self.grb_model.runtime
 
         # translate exit status
         if grb_status == GRB.OPTIMAL:

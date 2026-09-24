@@ -177,7 +177,7 @@ class CPM_pindakaas(SolverInterface):
 
         t = time.time()
         with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
-            self.cpm_status.runtime = time.time() - t
+            self.cpm_status.solve_time = time.time() - t
 
             # translate pindakaas result status to cpmpy status
             import pindakaas as pdk

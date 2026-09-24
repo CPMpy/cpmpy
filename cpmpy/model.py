@@ -28,13 +28,14 @@
 from __future__ import annotations
 import copy
 import warnings
+import time
 from typing import Optional
 
 from .exceptions import NotSupportedError
 from .expressions.core import Expression, NestedBoolExprLike
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, Callback
+from .solvers.solver_interface import ExitStatus, SolverInterface, SolverStatus, Callback
 
 import pickle
 
@@ -190,6 +191,10 @@ class Model(object):
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("time_limit must be positive")
+
+        t0 = time.time()
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
@@ -197,9 +202,20 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solve(time_limit=time_limit, **kwargs)
+        if time_limit is not None:
+            remaining_time_limit = time_limit - (time.time() - t0)
+            if remaining_time_limit <= 0:
+                self.cpm_status.runtime = time.time() - t0
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                return False
+        else:
+            remaining_time_limit = None
+
+            
+        ret = s.solve(time_limit=remaining_time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
+        self.cpm_status.runtime = time.time() - t0
         return ret
 
     def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):

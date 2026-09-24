@@ -299,7 +299,7 @@ class CPM_pysat(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.pysat_solver.time()
+        self.cpm_status.solve_time = self.pysat_solver.time()
 
         # translate exit status
         if has_sol is True:
