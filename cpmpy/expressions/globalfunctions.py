@@ -560,7 +560,12 @@ class Division(GlobalFunction):
         return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
-    def decompose(self):
+    @property
+    def args(self) -> tuple[ExprLike, ExprLike]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Integer Division global function, rounding towards zero.
 
@@ -581,7 +586,7 @@ class Division(GlobalFunction):
         _div = intvar(*self.get_bounds())
         return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
             int: The integer division of the arguments, or None if the arguments are not assigned
@@ -597,7 +602,7 @@ class Division(GlobalFunction):
                                           + "\n Use argval(expr) to get the value of expr with relational "
                                             "semantics.")
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int,int]:
         """
         Returns the bounds of the Division global function
 
