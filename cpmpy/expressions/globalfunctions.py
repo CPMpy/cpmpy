@@ -565,11 +565,6 @@ class Division(GlobalFunction):
         return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
-    @property
-    def args(self) -> tuple[ExprLike, ExprLike]:
-        """ READ-ONLY, well-typed argument of this global function"""
-        return self._args
-
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Integer Division global function, rounding towards zero.
