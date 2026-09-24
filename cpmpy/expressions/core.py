@@ -692,7 +692,23 @@ class Comparison(Expression):
         We expect at least one of the two to be an :class:`Expression`.
         """
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
-        super().__init__(name, (left, right))
+        # convert numpy bool/integers to Python natives (keep bool as bool, unlike npint2int)
+        if isinstance(left, np.bool_):
+            left = bool(left)
+        elif isinstance(left, np.integer):
+            left = int(left)
+        if isinstance(right, np.bool_):
+            right = bool(right)
+        elif isinstance(right, np.integer):
+            right = int(right)
+
+        args: tuple[int|Expression, int|Expression] = (left, right)
+        super().__init__(name, args)
+
+    @property
+    def args(self) -> tuple[int|Expression, int|Expression]:
+        """ READ-ONLY, well-typed arguments of this comparison"""
+        return self._args
 
     def __repr__(self) -> str:
         if all(isinstance(x, Expression) for x in self.args):
@@ -709,7 +725,7 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self) -> Optional[bool]:
-        arg_vals = argvals(self.args)
+        arg_vals = argvals(self.args)  # TODO: argvals_intexpr, but argvals handles IncompleteFunctionError...
 
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return arg_vals[0] == arg_vals[1]

@@ -470,6 +470,7 @@ class CPM_cplex(SolverInterface):
                     return self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                 else:
                     # Global functions
+                    assert isinstance(lhs, Expression)
                     if lhs.name == 'min':
                         return self.cplex_model.add_constraint(self.cplex_model.min(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'max':
@@ -481,8 +482,7 @@ class CPM_cplex(SolverInterface):
                         cplexlhs = self._make_numexpr(lhs)
                         return self.cplex_model.add_constraint(cplexlhs == cplexrhs)
                     else:
-                        raise NotImplementedError(
-                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
+                        raise NotImplementedError("Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
             else:
                 raise NotImplementedError(
                 "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
@@ -499,7 +499,7 @@ class CPM_cplex(SolverInterface):
                 cond, trigger_val = self.solver_var(cond), True
 
             lhs, rhs = sub_expr.args
-            if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
+            if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Expression) and lhs.name in {'sum', 'wsum', 'sub'}):
                 lin_expr = self._make_numexpr(lhs)
             else:
                 raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")

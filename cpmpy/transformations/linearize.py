@@ -466,7 +466,7 @@ def canonical_comparison(lst_of_expr: ListLike[Expression]) -> list[Expression]:
                 assert cpm_expr.name == "==", "Expected a reification of a comparison here, but got {}".format(cpm_expr.name)
                 (lhs,) = canonical_comparison((lhs,))
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum", "sub"}):
-                if lhs.name == "sub":
+                if isinstance(lhs, Operator) and lhs.name == "sub":
                     lhs = Operator("wsum", [[1,-1],lhs.args])
                 # bring all vars to lhs
                 lhs2 = []
