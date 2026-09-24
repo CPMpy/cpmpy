@@ -832,7 +832,8 @@ class Element(GlobalFunction):
             arr (ListLike[ExprLike]): List of expressions or constants to index into
             idx (Expression): Integer expression for the index (not a Boolean expression)
         """
-        assert isinstance(idx, Expression), f"Element(arr, idx) takes an integer expression as second argument, got {type(idx)}: {idx}"
+        if not isinstance(idx, Expression):
+            raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, got {type(idx)}: {idx}")
         if idx.is_bool():
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if isinstance(arr, np.ndarray):
@@ -842,7 +843,17 @@ class Element(GlobalFunction):
             raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         assert len(arr) > 0, "Element: array should not be empty"
 
-        super().__init__("element", (arr, idx))
+        if isinstance(arr, NDVarArray):
+            nd_arr = arr
+        else:
+            nd_arr = cpm_array(arr)
+
+        super().__init__("element", (nd_arr, idx)) # most likely already an NDVarArray
+
+    @property
+    def args(self) -> tuple[NDVarArray, Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2].")
