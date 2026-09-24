@@ -63,7 +63,7 @@ from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.reification import reify_rewrite
 from ..exceptions import ChocoBoundsException, NotSupportedError
 
@@ -365,7 +365,7 @@ class CPM_choco(SolverInterface):
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
-
+        obj = push_down_negation_objective(obj)
         # make objective function non-nested
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
 
@@ -471,6 +471,8 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.and_(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'or':
                 return self.chc_model.or_(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == 'not':
+                return self.chc_model.not_(self._get_constraint(cpm_expr.args[0]))
 
             elif cpm_expr.name == "->":
                 cond, subexpr = cpm_expr.args
