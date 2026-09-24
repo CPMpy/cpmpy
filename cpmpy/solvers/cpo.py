@@ -598,7 +598,7 @@ class CPM_cpo(SolverInterface):
                         continue
                     else:
                         task_demand = dom.pulse(task, get_bounds(h))
-                        # a zero-duration task has an empty pulse, so it occupies no resource and its demand should not be channeled
+                        # a zero-duration task occupies no resource, set as non-active
                         active = dom.size_of(task) > 0
                         if is_present is not None:
                             active = dom.logical_and(active, self._cpo_expr(is_present[i], boolexpr=True))
@@ -615,8 +615,7 @@ class CPM_cpo(SolverInterface):
                     start, dur, end = cpm_con.args
 
                 if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
-                    # CP Optimizer's NoOverlap has strict semantics for zero duration tasks: they cannot start when another task is planned.
-                    # In order to use the non-strict semantics, we rewrite NoOverlap as Cumulative.
+                    # CPO has strict semantics for NoOverlap, post as Cumulative instead
                     return self._cpo_expr(Cumulative(start, dur, end, demand=1, capacity=1))
 
                 tasks, cons = self._make_tasks(start, dur, end, None)
@@ -630,7 +629,7 @@ class CPM_cpo(SolverInterface):
                     start, dur, end, is_present = cpm_con.args
 
                 if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
-                    # possible zero-duration tasks, see 'no_overlap'
+                    # CPO has strict semantics, see 'no_overlap'
                     return self._cpo_expr(CumulativeOptional(start, dur, end, demand=1, capacity=1, is_present=is_present))
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)

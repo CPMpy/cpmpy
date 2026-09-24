@@ -679,8 +679,7 @@ class CPM_ortools(SolverInterface):
                 self.add(task_cons)
 
                 if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
-                    # OR-Tools' NoOverlap has strict semantics for zero duration tasks: they cannot start when another task is planned.
-                    # In order to use the non-strict semantics, we rewrite NoOverlap as Cumulative.
+                    # OR-Tools has strict semantics for NoOverlap, post as Cumulative instead
                     return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
@@ -699,7 +698,7 @@ class CPM_ortools(SolverInterface):
                 self.add(task_cons)
 
                 if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
-                    # possible zero-duration tasks, see 'no_overlap'
+                    # OR-Tools has strict semantics, see 'no_overlap'
                     return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
