@@ -292,7 +292,7 @@ class CPM_pysat(SolverInterface):
             has_sol = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
             # ensure timer is stopped if early stopping
             t.cancel()
-            ## this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
+            ## this part cannot be added to timer otherwise it "interrupts" the timeout timer too soon
             self.pysat_solver.clear_interrupt()
         else:
             has_sol = self.pysat_solver.solve(assumptions=pysat_assum_vars)

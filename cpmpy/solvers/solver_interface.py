@@ -65,7 +65,7 @@ class SolverInterface(object):
 
     def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """
-            Initalize solver interface
+            Initialize solver interface
 
             - name: str: name of this solver
             - subsolver: string: not used/allowed here
@@ -412,7 +412,7 @@ class ExitStatus(Enum):
 
         `UNSATISFIABLE`: No satisfying solution exists
 
-        `ERROR`: Some error occured (solver should have thrown Exception)
+        `ERROR`: Some error occurred (solver should have thrown Exception)
 
         `UNKNOWN`: Outcome unknown, for example when timeout is reached
     """

@@ -253,7 +253,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
 
         elif expr.name == "and":
             # ~(x & y) :: ~x | ~y -- negate all arguments
-            # copy experession to avoid init checks and keep _has_subexpr
+            # copy expression to avoid init checks and keep _has_subexpr
             new_op = copy.copy(expr)
             new_op.name = "or"
             new_op.update_args([recurse_negation(a) for a in expr.args])
@@ -261,7 +261,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
         
         elif expr.name == "or":
             # ~(x | y) :: ~x & ~y -- negate all arguments
-            # copy experession to avoid init checks and keep _has_subexpr
+            # copy expression to avoid init checks and keep _has_subexpr
             new_op = copy.copy(expr)
             new_op.name = "and"
             new_op.update_args([recurse_negation(a) for a in expr.args])

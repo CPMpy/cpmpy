@@ -11,7 +11,7 @@
     to it. Processing only starts when :meth:`solve() <cpmpy.model.Model.solve>` is called, and this does not modify
     the constraints or objective stored in the model.
 
-    A model can be solved multiple times, and constraints can be added inbetween solve calls.
+    A model can be solved multiple times, and constraints can be added in between solve calls.
     Note that constraints are added using :meth:`.add(...) <cpmpy.model.Model.add>` or using the ``+=`` operator (implemented by :meth:`__add__()`).
 
     See the full list of functions below.
@@ -322,7 +322,7 @@ def _update_variable_counters(model: Model):
                 pass
 
     if (_BoolVarImpl.counter > 0 and bv_counter > 0) or (_IntVarImpl.counter > 0 and iv_counter > 0):
-        warnings.warn(f"Model contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
+        warnings.warn(f"Model contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loading this model to avoid issues with duplicate variables.")
     # update counters for future variables
     _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
     _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)

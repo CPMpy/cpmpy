@@ -349,7 +349,7 @@ class CPM_minizinc(SolverInterface):
             =======================  ===========             
             
             
-            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by omitting the '-' (e.g. 'f' instead of '-f')?
             
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve

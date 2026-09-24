@@ -141,7 +141,7 @@ class CPM_gurobi(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.")
         elif not self.license_ok():
-            raise ModuleNotFoundError("CPM_gurobi: No license found or a problem occured during license check. Make sure your license is activated!")
+            raise ModuleNotFoundError("CPM_gurobi: No license found or a problem occurred during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
@@ -590,7 +590,7 @@ class CPM_gurobi(SolverInterface):
         grb_soft_cons = []
 
         for soft_con in soft_cons:
-            # transform each constraint seperately, can map to multiple Gurobi-level constraints
+            # transform each constraint separately, can map to multiple Gurobi-level constraints
             soft_con_tf = s.transform(soft_con)
 
             if len(soft_con_tf) == 0:
@@ -620,7 +620,7 @@ class CPM_gurobi(SolverInterface):
             # use ._add_transformed instead of .add because we need the Gurobi constraint object later
             grb_hard_cons.append(s._add_transformed(cpm_con))
 
-        # update model so we can access constraint attribtutes
+        # update model so we can access constraint attributes
         # model updates can be expensive, so we do this only once!
         s.native_model.update()
         for grb_con in grb_hard_cons:
@@ -756,7 +756,7 @@ class CPM_gurobi(SolverInterface):
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
                 else: # found all solutions
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-        # if unsat or timout with no solution, .solve() will have already set the state accordingly (so nothing to update)
+        # if unsat or timeout with no solution, .solve() will have already set the state accordingly (so nothing to update)
 
         return opt_sol_count
 

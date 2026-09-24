@@ -148,7 +148,7 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     data = np.array([_BoolVarImpl(name=n) for n in names])
     # insert into custom ndarray
     r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    r._has_subexpr = False # A bit ugly (access to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
 
 
@@ -234,7 +234,7 @@ def intvar(lb: int, ub: int, shape: int|np.integer|tuple[int|np.integer, ...] = 
     data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
     # insert into custom ndarray
     r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    r._has_subexpr = False # A bit ugly (access to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
 
 
@@ -635,7 +635,7 @@ class NDVarArray(np.ndarray):
         return cpm_array(np.apply_along_axis(cp.all, axis=axis, arr=self))
 
     def get_bounds(self) -> tuple[np.ndarray, np.ndarray]:
-        if self.size == 0:  # believe it or not, this does happen... e.g. in test_int2bool and an exmaple
+        if self.size == 0:  # believe it or not, this does happen... e.g. in test_int2bool and an example
             z = np.empty(self.shape, dtype=np.int64)
             return z, z
 
