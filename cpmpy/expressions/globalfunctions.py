@@ -740,19 +740,24 @@ class Power(GlobalFunction):
     Only non-negative constant integer exponents are supported.
     """
 
-    def __init__(self, base: ExprLike, exponent: int|np.integer):
+    def __init__(self, base: Expression, exponent: int|np.integer):
         """
         Arguments:
-            base (ExprLike): Expression or constant to raise to the power
+            base (Expression): Expression or constant to raise to the power
             exponent (int | np.integer): Non-negative integer exponent (constant only, no variable)
         """
         if not is_num(exponent):
             raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
         if exponent < 0:
             raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
-        super().__init__("pow", (base, exponent))
+        super().__init__("pow", (base, int(exponent)))
 
-    def decompose(self):
+    @property
+    def args(self) -> tuple[Expression, int]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Power global function, using integer multiplication.
 
@@ -763,25 +768,26 @@ class Power(GlobalFunction):
         """
         base, exp = self.args
         if exp == 0:
-            return 1,[]
+            return intvar(1,1), [] # need to return Expression
 
         _pow = base
         for _ in range(1,exp):
             _pow *= base
         return _pow,[]
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
             int: The power of the arguments, or None if the arguments are not assigned
         """
-        base, exp = argvals(self.args)
-        if base is None or exp is None:
+        base, exp = self.args
+        base_val = base.value()
+        if base_val is None:
             return None
 
-        return base**exp
+        return base_val**exp
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the Power global function
 
