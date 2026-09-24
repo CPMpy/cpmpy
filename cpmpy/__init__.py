@@ -11,6 +11,12 @@ The package consists of 4 modules:
 - `expressions`: all forms of expression objects that allow you to specify constraints and objectives over variables
 - `solvers`: CPMpy classes that translate a model into approriate calls of a solver's API
 - `transformations`: common methods for transforming expressions into other expressions, used by `solvers` modules to simplify/rewrite expressions
+
+Agent Skills are authored in ``skills/`` and copied into ``cpmpy/.agents/skills/``
+at install time. Install them into a project with ``pip install 'cpmpy[skills]'``
+then ``cpmpy skills``; refresh after upgrading with ``cpmpy skills update``.
+Rebuild generated references from a source checkout with
+``cpmpy skills update --regenerate`` (requires ``cpmpy[docs]``).
 """
 # Tias Guns, 2019-2026
 
