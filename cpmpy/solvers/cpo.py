@@ -598,11 +598,11 @@ class CPM_cpo(SolverInterface):
                         continue
                     else:
                         task_demand = dom.pulse(task, get_bounds(h))
+                        # a zero-duration task occupies no resource, set as non-active
+                        active = dom.size_of(task) > 0
                         if is_present is not None:
-                            cons += [dom.if_then(self._cpo_expr(is_present[i], boolexpr=True),
-                                                 self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
-                        else:
-                            cons += [self._cpo_expr(h) == dom.height_at_start(task, task_demand)]
+                            active = dom.logical_and(active, self._cpo_expr(is_present[i], boolexpr=True))
+                        cons += [dom.if_then(active, self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
                         total_usage.append(task_demand)
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
@@ -613,6 +613,11 @@ class CPM_cpo(SolverInterface):
                     end = None
                 else:
                     start, dur, end = cpm_con.args
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # CPO has strict semantics for NoOverlap, post as Cumulative instead
+                    return self._cpo_expr(Cumulative(start, dur, end, demand=1, capacity=1))
+
                 tasks, cons = self._make_tasks(start, dur, end, None)
                 return cons + [dom.no_overlap(tasks)]
             
@@ -622,6 +627,10 @@ class CPM_cpo(SolverInterface):
                     end = None
                 else:
                     start, dur, end, is_present = cpm_con.args
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # CPO has strict semantics, see 'no_overlap'
+                    return self._cpo_expr(CumulativeOptional(start, dur, end, demand=1, capacity=1, is_present=is_present))
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
                 return cons + [dom.no_overlap(tasks)]

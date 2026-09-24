@@ -1959,6 +1959,8 @@ class NoOverlap(GlobalConstraint):
     Enforces that a set of tasks are scheduled without overlapping, and enforces:
         - duration >= 0
         - start + duration == end
+
+    Zero-duration tasks occupy no time, so they never overlap with any other tasks.
     """
 
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None):
@@ -2003,9 +2005,9 @@ class NoOverlap(GlobalConstraint):
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
         
         cons += [d >= 0 for d in duration]
-            
-        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
-            cons.append((e1 <= s2) | (e2 <= s1))
+
+        for (s1, d1, e1), (s2, d2, e2) in all_pairs(zip(start, duration, end)):
+            cons.append(cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -2020,17 +2022,18 @@ class NoOverlap(GlobalConstraint):
             end = [s + d for s,d in zip(start, duration)]
         else:
             start, duration,end = argvals(self.args)
-            if any(a is None for a in [start, duration,end]):
+            if any(a is None for a in start + duration + end):
                 return None
        
         if any(d < 0 for d in duration):
             return False
         if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
-        for (s1,d1), (s2,d2) in all_pairs(zip(start,duration)):
-            if s1 + d1 > s2 and s2 + d2 > s1:
-                return False
-        return True
+
+        # zero-duration tasks occupy no time, the other tasks may not overlap: sorted by start
+        # time, that means every task has to start after the previous one ended
+        tasks = sorted((s,e) for s,d,e in zip(start, duration, end) if d > 0)
+        return all(e <= s for (_,e), (s,_) in zip(tasks, tasks[1:]))
 
 class NoOverlapOptional(GlobalConstraint):
     """
@@ -2043,6 +2046,8 @@ class NoOverlapOptional(GlobalConstraint):
         - start + duration == end
 
         if the task is not present, it does not enforce any of the above.
+
+        Zero-duration tasks occupy no time, so they never overlap with any other tasks.
     """
     
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[BoolExprLike]] = None):
@@ -2091,9 +2096,9 @@ class NoOverlapOptional(GlobalConstraint):
         else:
             start, duration, end, is_present = self.args
             cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
-        
-        for (s1, e1, p1), (s2, e2, p2) in all_pairs(zip(start, end, is_present)):
-            cons += [implies(p1 & p2, (e1 <= s2) | (e2 <= s1))]
+
+        for (s1, d1, e1, p1), (s2, d2, e2, p2) in all_pairs(zip(start, duration, end, is_present)):
+            cons += [implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))]
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -2116,10 +2121,11 @@ class NoOverlapOptional(GlobalConstraint):
             return False
         if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
-        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,duration,is_present)):
-            if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
-                return False
-        return True
+
+        # absent tasks are not scheduled and zero-duration tasks occupy no time, the other tasks
+        # may not overlap: sorted by start time, every task has to start after the previous ended
+        tasks = sorted((s,e) for s,d,e,p in zip(start, duration, end, is_present) if p and d > 0)
+        return all(e <= s for (_,e), (s,_) in zip(tasks, tasks[1:]))
     
 class Precedence(GlobalConstraint):
     """
