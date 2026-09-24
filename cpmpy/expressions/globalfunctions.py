@@ -88,6 +88,8 @@ import sys
 import warnings  # for deprecation warning
 import math
 from typing import Any, Optional, Iterable, NoReturn, Final, cast
+
+from typing_extensions import Unpack
 import numpy as np
 import cpmpy as cp
 
@@ -972,6 +974,11 @@ class NDElement(GlobalFunction):
             raise ValueError(f"NDElement expects {nd_array.ndim} indices, got {len(indices)}")
 
         super().__init__("nd_element", (nd_array, *tuple(indices)))
+
+    @property
+    def args(self) -> tuple[NDVarArray, Unpack[tuple[Expression, ...]]]: # Python 3.11+ supports *tuple[Expression,...]
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
