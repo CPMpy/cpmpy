@@ -1091,7 +1091,18 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
-        super().__init__("count", (arr, val))
+
+        if isinstance(arr, list):
+            arr_lst = arr
+        else:
+            arr_lst = list(arr)
+
+        super().__init__("count", (arr_lst, val))
+
+    @property
+    def args(self) -> tuple[list[ExprLike], ExprLike]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -1152,7 +1163,23 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
-        super().__init__("among", (arr, vals))
+
+        if isinstance(arr, list):
+            arr_lst = arr
+        else:
+            arr_lst = list(arr)
+
+        if isinstance(vals, list):
+            vals_lst = vals
+        else:
+            vals_lst = list(vals)
+
+        super().__init__("among", (arr_lst, vals_lst))
+
+    @property
+    def args(self) -> tuple[list[ExprLike], list[ExprLike]]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -1173,11 +1200,12 @@ class Among(GlobalFunction):
             Optional[int]: The number of variables in arr that take a value present in vals, or None if any element in arr is not assigned
         """
         arr, vals = self.args
-        varr = argvals(arr)  # recursive handling of nested structures
+        varr = argvals(arr)
         if any(v is None for v in varr):
             return None
 
-        return int(sum(np.isin(varr, vals)))
+        vals_set = frozenset(vals) # faster lookups below
+        return sum(var_val in vals_set for var_val in varr)
 
     def get_bounds(self) -> tuple[int, int]:
         """
