@@ -551,10 +551,11 @@ class Division(GlobalFunction):
             x (ExprLike): Expression or constant to divide
             y (ExprLike): Expression or constant to divide by
         """
+        x, y = npint2int((x, y))
         super().__init__("div", (x, y))
 
     @property
-    def args(self) -> tuple[ExprLike, ExprLike]:
+    def args(self) -> tuple[int|Expression, int|Expression]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
@@ -650,10 +651,11 @@ class Modulo(GlobalFunction):
             x (ExprLike): Expression or constant for the dividend
             y (ExprLike): Expression or constant for the divisor
         """
+        x, y = npint2int((x, y))
         super().__init__("mod", (x, y))
 
     @property
-    def args(self) -> tuple[ExprLike, ExprLike]:
+    def args(self) -> tuple[int|Expression, int|Expression]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
@@ -1092,15 +1094,12 @@ class Count(GlobalFunction):
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
 
-        if isinstance(arr, list):
-            arr_lst = arr
-        else:
-            arr_lst = list(arr)
-
+        arr_lst = list(npint2int(arr))
+        val, = npint2int((val,))
         super().__init__("count", (arr_lst, val))
 
     @property
-    def args(self) -> tuple[list[ExprLike], ExprLike]:
+    def args(self) -> tuple[list[int|Expression], int|Expression]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
@@ -1164,20 +1163,13 @@ class Among(GlobalFunction):
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
 
-        if isinstance(arr, list):
-            arr_lst = arr
-        else:
-            arr_lst = list(arr)
-
-        if isinstance(vals, list):
-            vals_lst = vals
-        else:
-            vals_lst = list(vals)
+        arr_lst = list(npint2int(arr))
+        vals_lst = list(np.asarray(vals).tolist()) # converts np ints to python ints
 
         super().__init__("among", (arr_lst, vals_lst))
 
     @property
-    def args(self) -> tuple[list[ExprLike], list[ExprLike]]:
+    def args(self) -> tuple[list[int|Expression], list[int]]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
@@ -1233,10 +1225,10 @@ class NValue(GlobalFunction):
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
-        super().__init__("nvalue", tuple(arr))
+        super().__init__("nvalue", npint2int(arr))
 
     @property
-    def args(self) -> tuple[ExprLike,...]:
+    def args(self) -> tuple[int|Expression, ...]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
@@ -1304,15 +1296,11 @@ class NValueExcept(GlobalFunction):
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
 
-        if isinstance(arr, list):
-            arr_lst = arr
-        else:
-            arr_lst = list(arr)
-
+        arr_lst = list(npint2int(arr))
         super().__init__("nvalue_except", (arr_lst, int(n))) # make sure no np integer
 
     @property
-    def args(self) -> tuple[list[ExprLike], int]:
+    def args(self) -> tuple[list[int|Expression], int]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
