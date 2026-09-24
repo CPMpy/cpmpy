@@ -551,6 +551,11 @@ class Division(GlobalFunction):
         """
         super().__init__("div", (x, y))
 
+    @property
+    def args(self) -> tuple[ExprLike, ExprLike]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
     def __repr__(self):
         """
         Returns:
