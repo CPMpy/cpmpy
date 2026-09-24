@@ -280,10 +280,73 @@ class TestNDVarArrayBroadcast:
         for idx in np.ndindex(expr.shape):
             assert str(expr[idx]) == str(ref[idx])
 
+    def test_full_broadcast_mul(self):
+        # ufunc-style: (2,1) * (2,3) -> (2,3)
+        x = intvar(0, 10, shape=(2, 1), name="x")
+        w = np.array([[1, 2, 3], [4, 5, 6]])
+        expr = x * w
+        assert expr.shape == (2, 3)
+        assert isinstance(expr, NDVarArray)
+
     def test_incompatible_broadcast_raises(self):
         x = intvar(0, 10, shape=(3, 4), name="x")
         with pytest.raises(ValueError, match="broadcast"):
             x * np.array([1, 2])
+
+    def test_np_equal_returns_comparisons(self):
+        x = intvar(0, 5, shape=3, name="x")
+        w = np.array([1, 2, 3])
+        eq = np.equal(x, w)
+        assert isinstance(eq, NDVarArray)
+        assert all(isinstance(e, Comparison) for e in eq)
+        assert str(eq[0]) == "x[0] == 1"
+
+    def test_np_logical_and(self):
+        b = boolvar(shape=3, name="b")
+        expr = np.logical_and(b, ~b)
+        assert isinstance(expr, NDVarArray)
+        assert str(expr[0]) == "(b[0]) and (~b[0])"
+
+    def test_reflected_add(self):
+        x = intvar(0, 5, shape=3, name="x")
+        r = 1 + x
+        assert isinstance(r, NDVarArray)
+        assert str(r[0]) == "1 + (x[0])"
+
+    def test_expr_left_of_array(self):
+        # Expression.__lt__/__add__ reverse onto NDVarArray (ndarray ufuncs)
+        x = intvar(0, 5, name="x")
+        arr = intvar(0, 5, shape=3, name="arr")
+        lt = x < arr
+        assert isinstance(lt, NDVarArray)
+        assert str(lt[0]) == "(arr[0]) > (x)"
+        s = x + arr
+        assert isinstance(s, NDVarArray)
+        assert str(s[0]) == "(x) + (arr[0])"
+
+    def test_unsupported_ufunc_raises(self):
+        x = intvar(0, 5, shape=3, name="x")
+        with pytest.raises(TypeError, match="does not support"):
+            np.sin(x)
+        with pytest.raises(TypeError, match="keyword arguments"):
+            np.add(x, 1, where=True)
+
+    def test_views_have_has_subexpr(self):
+        x = intvar(0, 5, shape=4, name="x")
+        y = x[1:]
+        assert isinstance(y, NDVarArray)
+        assert y.has_subexpr() is False
+        z = (x + 1)[1:]
+        assert z.has_subexpr() is True
+
+    def test_np_sum_unsupported_kwargs(self):
+        x = intvar(0, 5, shape=3, name="x")
+        # signature accepts numpy's kwargs (no TypeError), then rejects unsupported ones
+        with pytest.raises(NotImplementedError, match="out/dtype/keepdims"):
+            np.sum(x, keepdims=True)
+        with pytest.raises(NotImplementedError, match="out/dtype/keepdims"):
+            np.sum(x, where=np.array([True, False, True]))
+
 
 
 class TestNDVarArrayVectorizedIndex:
@@ -475,6 +538,66 @@ class TestArrayExpressions:
                 cpm_res = getattr(bv, func)(axis=axis)
                 assert isinstance(cpm_res, NDVarArray)
                 assert cpm_res.shape == np_res.shape
+
+        
+class TestNDVarArrayValueAndClear:
+
+    def test_value_vars(self):
+
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x,y,z])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value()])).all()
+    
+    def test_value_exprs(self):
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x+y, y+z, z+x])
+        assert isinstance(arr, NDVarArray)
+        xv,yv,zv = [x.value(), y.value(), z.value()]
+        assert (arr.value() == np.array([xv+yv, yv+zv, zv+xv])).all()
+
+    def test_value_constants(self):
+
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+        arr = cp.cpm_array([x,y,z,5])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value(), 5])).all()
+
+    def test_clear_vars(self):
+
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x,y,z])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value()])).all()
+        arr.clear()
+        assert (arr.value() == np.array([None, None, None])).all()
+
+    def test_clear_exprs(self):
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x+y, y+z, z+x])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value()+y.value(), y.value()+z.value(), z.value()+x.value()])).all()
+        with pytest.raises(ValueError, match="cannot clear value of"):
+            arr.clear()
+    
+    def test_clear_constants(self):
+        x,y,z = cp.intvar(0,5, shape=3, name=tuple("xyz"))
+        assert cp.Model((x+y+z) == 0).solve()
+
+        arr = cp.cpm_array([x,y,z,5])
+        assert isinstance(arr, NDVarArray)
+        assert (arr.value() == np.array([x.value(), y.value(), z.value(), 5])).all()
+        with pytest.raises(ValueError, match="cannot clear value of"):
+            arr.clear()
 
 class TestBounds:
     def test_bounds_mul_sub_sum(self):

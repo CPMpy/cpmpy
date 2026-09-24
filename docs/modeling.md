@@ -297,8 +297,7 @@ M.T            # transpose
 np.dot(x, w)   # dot-product
 ```
 
-Binary operators follow NumPy broadcasting: the other operand is broadcast to the shape of the CPMpy array. So `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. One limitation compared to plain NumPy is that the result always keeps the shape of the CPMpy array — e.g. a `(3,1)` array plus a length-3 vector does not expand to `(3,3)`.
-
+Numpy broadcasting is also supported on CPMpy arrays: e.g., `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. 
 What does **not** work are operations whose result depends on the (still unknown) values of the decision variables. In particular, you cannot use Boolean decision variables as a mask, because the length of the result would depend on how many are `True`:
 
 ```python
