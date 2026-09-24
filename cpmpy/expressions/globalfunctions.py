@@ -650,6 +650,11 @@ class Modulo(GlobalFunction):
         """
         super().__init__("mod", (x, y))
 
+    @property
+    def args(self) -> tuple[ExprLike, ExprLike]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
     def __repr__(self):
         """
         Returns:
@@ -659,7 +664,7 @@ class Modulo(GlobalFunction):
         return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Modulo global function, using integer division (rounding towards zero)
         
@@ -682,7 +687,7 @@ class Modulo(GlobalFunction):
             x * _mod >= 0        # remainder is negative iff x is negative
         ]
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
             int: The modulo of the arguments, or None if the arguments are not assigned
@@ -698,7 +703,7 @@ class Modulo(GlobalFunction):
                                           + "\n Use argval(expr) to get the value of expr with relational "
                                             "semantics.")
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int,int]:
         """
         Returns the bounds of the Modulo global function
 
