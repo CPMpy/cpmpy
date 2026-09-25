@@ -88,6 +88,8 @@ import sys
 import warnings  # for deprecation warning
 import math
 from typing import Any, Optional, Iterable, NoReturn, Final, cast
+
+from typing_extensions import Unpack
 import numpy as np
 import cpmpy as cp
 
@@ -549,7 +551,13 @@ class Division(GlobalFunction):
             x (ExprLike): Expression or constant to divide
             y (ExprLike): Expression or constant to divide by
         """
+        x, y = npint2int((x, y))
         super().__init__("div", (x, y))
+
+    @property
+    def args(self) -> tuple[int|Expression, int|Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def __repr__(self):
         """
@@ -560,7 +568,7 @@ class Division(GlobalFunction):
         return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Integer Division global function, rounding towards zero.
 
@@ -581,7 +589,7 @@ class Division(GlobalFunction):
         _div = intvar(*self.get_bounds())
         return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
             int: The integer division of the arguments, or None if the arguments are not assigned
@@ -597,7 +605,7 @@ class Division(GlobalFunction):
                                           + "\n Use argval(expr) to get the value of expr with relational "
                                             "semantics.")
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int,int]:
         """
         Returns the bounds of the Division global function
 
@@ -643,7 +651,13 @@ class Modulo(GlobalFunction):
             x (ExprLike): Expression or constant for the dividend
             y (ExprLike): Expression or constant for the divisor
         """
+        x, y = npint2int((x, y))
         super().__init__("mod", (x, y))
+
+    @property
+    def args(self) -> tuple[int|Expression, int|Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def __repr__(self):
         """
@@ -654,7 +668,7 @@ class Modulo(GlobalFunction):
         return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Modulo global function, using integer division (rounding towards zero)
         
@@ -677,7 +691,7 @@ class Modulo(GlobalFunction):
             x * _mod >= 0        # remainder is negative iff x is negative
         ]
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
             int: The modulo of the arguments, or None if the arguments are not assigned
@@ -693,7 +707,7 @@ class Modulo(GlobalFunction):
                                           + "\n Use argval(expr) to get the value of expr with relational "
                                             "semantics.")
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int,int]:
         """
         Returns the bounds of the Modulo global function
 
@@ -730,19 +744,24 @@ class Power(GlobalFunction):
     Only non-negative constant integer exponents are supported.
     """
 
-    def __init__(self, base: ExprLike, exponent: int|np.integer):
+    def __init__(self, base: Expression, exponent: int|np.integer):
         """
         Arguments:
-            base (ExprLike): Expression or constant to raise to the power
+            base (Expression): Expression or constant to raise to the power
             exponent (int | np.integer): Non-negative integer exponent (constant only, no variable)
         """
         if not is_num(exponent):
             raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
         if exponent < 0:
             raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
-        super().__init__("pow", (base, exponent))
+        super().__init__("pow", (base, int(exponent)))
 
-    def decompose(self):
+    @property
+    def args(self) -> tuple[Expression, int]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Power global function, using integer multiplication.
 
@@ -753,25 +772,26 @@ class Power(GlobalFunction):
         """
         base, exp = self.args
         if exp == 0:
-            return 1,[]
+            return intvar(1,1), [] # need to return Expression
 
         _pow = base
         for _ in range(1,exp):
             _pow *= base
         return _pow,[]
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
             int: The power of the arguments, or None if the arguments are not assigned
         """
-        base, exp = argvals(self.args)
-        if base is None or exp is None:
+        base, exp = self.args
+        base_val = base.value()
+        if base_val is None:
             return None
 
-        return base**exp
+        return base_val**exp
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the Power global function
 
@@ -816,7 +836,8 @@ class Element(GlobalFunction):
             arr (ListLike[ExprLike]): List of expressions or constants to index into
             idx (Expression): Integer expression for the index (not a Boolean expression)
         """
-        assert isinstance(idx, Expression), f"Element(arr, idx) takes an integer expression as second argument, got {type(idx)}: {idx}"
+        if not isinstance(idx, Expression):
+            raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, got {type(idx)}: {idx}")
         if idx.is_bool():
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if isinstance(arr, np.ndarray):
@@ -826,7 +847,17 @@ class Element(GlobalFunction):
             raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         assert len(arr) > 0, "Element: array should not be empty"
 
-        super().__init__("element", (arr, idx))
+        if isinstance(arr, NDVarArray):
+            nd_arr = arr
+        else:
+            nd_arr = cpm_array(arr)
+
+        super().__init__("element", (nd_arr, idx)) # most likely already an NDVarArray
+
+    @property
+    def args(self) -> tuple[NDVarArray, Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2].")
@@ -946,6 +977,11 @@ class NDElement(GlobalFunction):
 
         super().__init__("nd_element", (nd_array, *tuple(indices)))
 
+    @property
+    def args(self) -> tuple[NDVarArray, Unpack[tuple[Expression, ...]]]: # Python 3.11+ supports *tuple[Expression,...]
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
 
@@ -1057,7 +1093,18 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
-        super().__init__("count", (arr, val))
+
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        arr_lst = list(npint2int(arr_iter))
+        val, = npint2int((val,))
+        super().__init__("count", (arr_lst, val))
+
+    @property
+    def args(self) -> tuple[list[int|Expression], int|Expression]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -1118,7 +1165,19 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
-        super().__init__("among", (arr, vals))
+
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        arr_lst = list(npint2int(arr_iter))
+        vals_lst = list(np.asarray(vals).tolist()) # converts np ints to python ints
+
+        super().__init__("among", (arr_lst, vals_lst))
+
+    @property
+    def args(self) -> tuple[list[int|Expression], list[int]]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -1139,11 +1198,12 @@ class Among(GlobalFunction):
             Optional[int]: The number of variables in arr that take a value present in vals, or None if any element in arr is not assigned
         """
         arr, vals = self.args
-        varr = argvals(arr)  # recursive handling of nested structures
+        varr = argvals(arr)
         if any(v is None for v in varr):
             return None
 
-        return int(sum(np.isin(varr, vals)))
+        vals_set = frozenset(vals) # faster lookups below
+        return sum(var_val in vals_set for var_val in varr)
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -1171,7 +1231,15 @@ class NValue(GlobalFunction):
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
-        super().__init__("nvalue", tuple(arr))
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        super().__init__("nvalue", npint2int(arr_iter))
+
+    @property
+    def args(self) -> tuple[int|Expression, ...]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -1236,7 +1304,17 @@ class NValueExcept(GlobalFunction):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
-        super().__init__("nvalue_except", (arr, n))
+
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        arr_lst = list(npint2int(arr_iter))
+        super().__init__("nvalue_except", (arr_lst, int(n))) # make sure no np integer
+
+    @property
+    def args(self) -> tuple[list[int|Expression], int]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
