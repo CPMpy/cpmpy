@@ -1094,7 +1094,10 @@ class Count(GlobalFunction):
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
 
-        arr_lst = list(npint2int(arr))
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        arr_lst = list(npint2int(arr_iter))
         val, = npint2int((val,))
         super().__init__("count", (arr_lst, val))
 
@@ -1163,7 +1166,10 @@ class Among(GlobalFunction):
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
 
-        arr_lst = list(npint2int(arr))
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        arr_lst = list(npint2int(arr_iter))
         vals_lst = list(np.asarray(vals).tolist()) # converts np ints to python ints
 
         super().__init__("among", (arr_lst, vals_lst))
@@ -1225,7 +1231,10 @@ class NValue(GlobalFunction):
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
-        super().__init__("nvalue", npint2int(arr))
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        super().__init__("nvalue", npint2int(arr_iter))
 
     @property
     def args(self) -> tuple[int|Expression, ...]:
@@ -1296,7 +1305,10 @@ class NValueExcept(GlobalFunction):
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
 
-        arr_lst = list(npint2int(arr))
+        arr_iter: Iterable[ExprLike] = arr
+        if isinstance(arr, np.ndarray):
+            arr_iter = arr.flat  # flatten multi-dimensional arrays
+        arr_lst = list(npint2int(arr_iter))
         super().__init__("nvalue_except", (arr_lst, int(n))) # make sure no np integer
 
     @property
