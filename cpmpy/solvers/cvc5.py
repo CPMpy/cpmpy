@@ -604,7 +604,6 @@ class CPM_cvc5(SolverInterface):
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_con, Operator):
-            arity, _ = Operator.allowed[cpm_con.name]
             # 'and'/n, 'or'/n, '->'/2
             # cvc5 requires And/Or to have at least 2 children (unlike Z3)
             if cpm_con.name == 'and':
