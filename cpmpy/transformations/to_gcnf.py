@@ -25,8 +25,11 @@ def to_gcnf(
     ) -> tuple[cp.Model, list[Expression], list[Expression], list[_BoolVarImpl]]:
     """
     Similar to :func:`~cpmpy.tools.explain.utils.make_assump_model`, but the returned model is in (grouped) CNF.
+    Concretely, this means that each constraint in `constraints` is treated as a soft constraint and assigned to a separate group.
+    The resulting `value` clauses are grouped by the soft constraint that they belong to, while the resulting `defining` clauses are considered hard. 
+    Optionally an additional list of `hard` constraints of which the `value` and `defining` clauses are all considered hard.
 
-    Follows https://satisfiability.org/competition/2011/rules.pdf. 
+    Follows the specification in https://satisfiability.org/competition/2011/rules.pdf. 
     To guarentee that the groups are disjoint, set `disjoint` to True.
 
     Arguments:
