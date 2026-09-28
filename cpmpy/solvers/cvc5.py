@@ -275,6 +275,7 @@ class CPM_cvc5(SolverInterface):
             self.assumption_dict = {cvc5_var: cpm_var for (cpm_var, cvc5_var) in zip(assumptions, cvc5_assum_vars)}
         else:
             cvc5_assum_vars = []
+            self.assumption_dict = {}  # no assumptions used in this call, avoid a stale core in get_core()
 
         # call the solver, with parameters
         for (key, value) in kwargs.items():
