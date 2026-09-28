@@ -64,7 +64,7 @@
 """
 import time
 import warnings
-from typing import Optional, Iterable
+from typing import Any, Optional, Iterable
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
@@ -189,7 +189,7 @@ class CPM_cvc5(SolverInterface):
 
         # initialise the native solver object
         self.cvc5_solver = cvc5.Solver()
-        self.assumption_dict = {}
+        self.assumption_dict: dict[Any, _BoolVarImpl] = {}
         self._unsat_cores = unsat_cores
         if unsat_cores:
             # must be set before the first constraint is posted
