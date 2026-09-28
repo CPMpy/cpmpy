@@ -544,6 +544,14 @@ class TestSolvers:
         with pytest.raises(NotSupportedError, match="non-integral constant"):
             cp.SolverLookup.get("cvc5", m)
 
+        # tlimit-per is sticky on the native solver; omitting time_limit must clear it
+        b = cp.boolvar()
+        s = cp.SolverLookup.get("cvc5", cp.Model(b))
+        assert s.solve(time_limit=1)
+        assert s.cvc5_solver.getOption("tlimit-per") == "1000"
+        assert s.solve()
+        assert s.cvc5_solver.getOption("tlimit-per") == "0"
+
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
