@@ -603,6 +603,19 @@ class TestBounds:
         assert repr(cons) == "(a) or (b)"
         assert str(cons) == "either a or b should be true, but not both -- (a) or (b)"
 
+        # variables: description must not replace the unique name
+        x = cp.boolvar(name="x")
+        x.set_description("a flag")
+        assert x.name == "x"
+        assert repr(x) == "x"
+        assert str(x) == "a flag"
+
+        y = cp.intvar(0, 5, name="y")
+        y.set_description("an integer", full_print=True)
+        assert y.name == "y"
+        assert repr(y) == "y"
+        assert str(y) == "an integer -- y"
+
 
     def test_dtype(self):
 
