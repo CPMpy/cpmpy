@@ -205,7 +205,7 @@ class CPM_cvc5(SolverInterface):
             self.cvc5_solver.set("proof-format-mode", self._proof_format)
             # after unsat, self-check the generated proof (raises if unsound); skip with
             # check_proofs=False if you will use an external checker instead
-            if check_proofs:
+            if self._check_proofs:
                 self.cvc5_solver.set("check-proofs", "true")
             # disable let-abbreviation when printing terms (default: shared subterms get
             # folded into "let" bindings), so the .smt2 file written by _write_proof_files()
