@@ -536,9 +536,13 @@ class TestSolvers:
         assert s.solve()
 
         x = cp.intvar(0, 1)
-        m = cp.Model((x >= 0.1) & (x != 1))
+        m = cp.Model((x > 0) & (x != 1))
         s = cp.SolverLookup.get("cvc5", m)
-        assert not s.solve() # TODO: same bug as z3?
+        assert not s.solve()
+
+        m = cp.Model((x >= 0.1) & (x != 1))
+        with pytest.raises(NotSupportedError, match="non-integral constant"):
+            cp.SolverLookup.get("cvc5", m)
 
 
     def test_pow(self):
