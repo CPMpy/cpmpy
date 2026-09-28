@@ -356,7 +356,7 @@ Coming back to the Python-builtin functions `min(),max(),abs()`, these are a bit
 
 However, CPMpy also wishes to support the expressions `min(xs) > v` as well as `v + min(xs) != 4` and other nested expressions.
 
-In CPMpy we do this by instantiating min/max/abs as **global functions**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the global function is used within a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` ([link](./api/expressions/globalfunctions.rst#cpmpy.expressions.globalfunctions.Abs.decompose_comparison)) on the global function.
+In CPMpy we do this by instantiating min/max/abs as **global functions**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarily nested expressions, such that the global function is used within a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` ([link](./api/expressions/globalfunctions.rst#cpmpy.expressions.globalfunctions.Abs.decompose_comparison)) on the global function.
 
 A non-exhaustive list of **numeric global constraints** that are available in CPMpy is: `Minimum(), Maximum(), Count(), Element()`.   
 

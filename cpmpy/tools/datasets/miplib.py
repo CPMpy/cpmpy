@@ -59,13 +59,10 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
                 or if the requested year/track combination is not available.
         """
 
-        self.root = pathlib.Path(root)
         self.year = year
 
-        dataset_dir = self.root / self.name / str(year)
-
         super().__init__(
-            dataset_dir=dataset_dir, 
+            root=root, subdirs=(str(year),),
             transform=transform, target_transform=target_transform, 
             download=download, extension=".mps.gz",
             **kwargs

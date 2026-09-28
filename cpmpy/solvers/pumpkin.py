@@ -164,15 +164,12 @@ class CPM_pumpkin(SolverInterface):
         return self._solve_return(self.cpm_status)
 
 
-    def solve(self, time_limit:Optional[float]=None, prove=False, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
         Call the Pumpkin solver
 
         Arguments:
             time_limit (float, optional):  maximum solve time in seconds 
-            prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
-            proof_name: name for the the proof files.
-            proof_location: location for the proof files (default to current working directory).
             assumptions: iterable (e.g. list, set, tuple) of Boolean variables (or their negation) that are assumed to be true.
                             For repeated solving, and/or for use with :func:`s.get_core() <cpmpy.solvers.pumpkin.CPM_pumpkin.get_core>`: if the model is UNSAT,
                             `get_core()` returns a small subset of assumption variables that are unsat together.
@@ -182,10 +179,6 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_solver import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
         from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
         from pumpkin_solver.optimisation import OptimisationResult, Direction
-
-        if "proof" in kwargs or "prove" in kwargs or "prove_location" in kwargs or "proof_name" in kwargs:
-            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve."
-                             "`cpmpy.SolverLookup.get('pumpkin', model, proof='path/to/proof.drcp')`")
 
         if self.pum_solver.is_inconsistent():
             return self._unsat_at_rootlevel()
@@ -701,3 +694,13 @@ class CPM_pumpkin(SolverInterface):
         """
         if self.pum_solver.is_inconsistent() is False: # otherwise, not guaranteed all variables are known
             self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
+
+        
+    def verify(self, verifier, verifier_args: list[str] = [], time_limit: Optional[float] = None, display_output: bool = False) -> bool:
+        raise NotSupportedError("Pumpkin does not support external proof verification, only through the MiniZinc interface.")
+
+    def get_proof_files(self) -> tuple[str]:
+        """
+        Returns the path where the proof is stored.
+        """
+        return (self._proof,)

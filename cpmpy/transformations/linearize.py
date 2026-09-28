@@ -237,7 +237,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     continue
                 elif not t_lb and not t_ub:
                     newlist += linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap) # post the linear version of False
-                    break
+                    continue
 
             # now fix the comparisons themselves
             if cpm_expr.name == "<":

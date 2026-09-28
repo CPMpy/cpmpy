@@ -62,6 +62,8 @@ def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[E
     Boolean constants are promoted to integers in numerical context (e.g. in wsum);
     integers are never converted to Booleans. 
 
+    Conjunctions and disjunctions that end up with a single argument are replaced by that argument.
+
     Arguments:
         lst_of_expr (list[Expression]): list of CPMpy expressions
         num_context (bool): whether the expressions are used as numeric arguments (default: False)
@@ -114,7 +116,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
             newargs = None
             for i, a in enumerate(args):
                 if is_true_cst(a):
-                    return True, BoolVal(True)
+                    return True, (1 if num_context else BoolVal(True))
                 elif is_false_cst(a):
                     changed = True
                     if newargs is None:
@@ -122,9 +124,14 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 elif newargs is not None:
                     newargs.append(a)
 
-            if changed:
-                if newargs is None: # when args where simplified recursively above
-                    newargs = list(args)
+            if newargs is None:
+                newargs = list(args)
+
+            if len(newargs) == 0: # empty disjunction
+                return True, (0 if num_context else BoolVal(False))
+            elif len(newargs) == 1: # single argument, drop the operator
+                return True, newargs[0]
+            elif changed:
                 newexpr = copy.copy(expr)
                 newexpr.update_args(newargs)
                 return True, newexpr
@@ -134,7 +141,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
             newargs = None
             for i, a in enumerate(args):
                 if is_false_cst(a):
-                    return True, BoolVal(False)
+                    return True, (0 if num_context else BoolVal(False))
                 elif is_true_cst(a):
                     changed = True
                     if newargs is None:
@@ -142,9 +149,14 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 elif newargs is not None:
                     newargs.append(a)
 
-            if changed:
-                if newargs is None: # when args where simplified recursively above
-                    newargs = list(args)
+            if newargs is None: # when args where simplified recursively above
+                newargs = list(args)
+
+            if len(newargs) == 0: # empty conjunction
+                return True, (1 if num_context else BoolVal(True))
+            elif len(newargs) == 1: # single argument, drop the operator
+                return True, newargs[0]
+            elif changed:
                 newexpr = copy.copy(expr)
                 newexpr.update_args(newargs)
                 return True, newexpr
@@ -153,13 +165,13 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
         elif expr.name == "->":
             cond, bool_expr = args
             if is_false_cst(cond) or is_true_cst(bool_expr):
-                return True, BoolVal(True)
+                return True, (1 if num_context else BoolVal(True))
             elif is_true_cst(cond):
                 if is_bool(bool_expr):
-                    return True, BoolVal(bool_expr)
+                    return True, (int(bool_expr) if num_context else BoolVal(bool_expr))
                 return True, bool_expr
             elif is_false_cst(bool_expr):
-                _, newcond = _simplify_boolean_expr(recurse_negation(cond), num_context=False)
+                _, newcond = _simplify_boolean_expr(recurse_negation(cond), num_context=num_context)
                 # always changed, because negated cond
                 return True, newcond
 
@@ -242,10 +254,9 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
         """
         if isinstance(lhs, Expression) and lhs.is_bool() and is_num(rhs):
             # direct simplification of boolean comparisons
-            if isinstance(rhs, BoolVal):
-                rhs = int(rhs.value())
             if rhs < 0:
-                return True, BoolVal(name in  {"!=", ">", ">="}) # all other operators evaluate to False
+                val = name in {"!=", ">", ">="} # all other operators evaluate to False
+                return True, (int(val) if num_context else BoolVal(val))
             elif rhs == 0:
                 if name == "!=" or name == ">":
                     return True, lhs
@@ -267,7 +278,8 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 if name == "<=":
                     return True, (1 if num_context else BoolVal(True))
             elif rhs > 1:
-                return True, BoolVal(name in {"!=", "<", "<="}) # all other operators evaluate to False
+                val = name in {"!=", "<", "<="} # all other operators evaluate to False
+                return True, (int(val) if num_context else BoolVal(val))
 
         # normalize comparison orientation to keep expression on lhs
         if is_num(lhs) and isinstance(rhs, Expression):

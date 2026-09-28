@@ -12,6 +12,7 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
 - :doc:`OPBDataset </api/tools/datasets/opb>`: Pseudo-Boolean Competition benchmark instances.
 - :doc:`SATDataset </api/tools/datasets/sat>`: SAT competition benchmark instances (DIMACS CNF).
 - :doc:`NurseRosteringDataset </api/tools/datasets/nurserostering>`: Nurse rostering benchmark instances.
+- :doc:`ScaledSudokuDataset </api/tools/datasets/scaledsudoku>`: Scaled Sudoku puzzles of varying sizes with hardness labels.
 
 
 .. note::
@@ -31,6 +32,7 @@ With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, 
         └── OPBDataset
         └── SATDataset
         └── NurseRosteringDataset
+        └── ScaledSudokuDataset
         └── (your dataset here)
 
 Whilst the class hierarchy will support more exotic dataset types in the future, with a structure put in place 
@@ -312,18 +314,22 @@ class FileDataset(Dataset):
 
     def __init__(
             self,
-            dataset_dir: str | os.PathLike[str] = ".",
+            root: str | os.PathLike[str] = ".",
             transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
             parse: bool = False,
             extension: str = ".txt",
+            subdirs: tuple[str, ...] | list[str] = (),
+            dataset_dir: str | os.PathLike[str] | None = None,
             **kwargs: Any
         ):
         """
         Constructor for the FileDataset base class.
 
         Arguments:
-            dataset_dir (str): Path to the dataset directory.
+            root (str): Root directory where datasets are stored or downloaded
+                (``~`` is expanded). Instance files live under
+                ``root/<name>/...`` unless ``dataset_dir`` is given.
             transform (callable, optional): Optional transform applied to the instance file path.
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
@@ -331,6 +337,10 @@ class FileDataset(Dataset):
                 applying ``transform``. Intended for data-only datasets that do
                 not directly encode a model in the source file.
             extension (str): Extension of the instance files. Used to filter instance files within the dataset directory.
+            subdirs (tuple|list): Path parts under ``root/<name>/`` selecting a
+                subset (e.g. year, track, size). Ignored if ``dataset_dir`` is set.
+            dataset_dir (str, optional): Full path to the instance directory.
+                Overrides ``root/<name>/...`` (used by ``from_files`` and similar).
             **kwargs: Advanced options. Currently supports:
                 - ignore_sidecar (bool): If True, do not read/write metadata
                   sidecars and collect metadata on demand at iteration time
@@ -342,7 +352,11 @@ class FileDataset(Dataset):
             ValueError: If the dataset directory does not contain any instance files.
         """
 
-        self.dataset_dir = pathlib.Path(dataset_dir)
+        self.root = pathlib.Path(root).expanduser()
+        if dataset_dir is not None:
+            self.dataset_dir = pathlib.Path(dataset_dir).expanduser()
+        else:
+            self.dataset_dir = self.root.joinpath(self.name, *subdirs)
         self.extension = extension
         self._parse = parse
 

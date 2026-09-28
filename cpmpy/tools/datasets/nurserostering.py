@@ -69,12 +69,8 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         Initialize the Nurserostering Dataset.
         """
 
-        self.root = pathlib.Path(root)
-
-        dataset_dir = self.root / self.name
-
         super().__init__(
-            dataset_dir=dataset_dir,
+            root=root,
             transform=transform, target_transform=target_transform, 
             download=download, extension=".txt",
             **kwargs

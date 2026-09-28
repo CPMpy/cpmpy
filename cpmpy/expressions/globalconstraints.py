@@ -1564,7 +1564,8 @@ class Cumulative(GlobalConstraint):
         - duration >= 0
         - demand >= 0
         - start + duration == end
-
+    
+    Zero-duration tasks do not occupy any resource.
     Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
     Supports both varying demand across tasks or equal demand for all jobs.
     """
@@ -1676,17 +1677,16 @@ class Cumulative(GlobalConstraint):
         else:
             start, duration, end, demand, capacity = self.args
 
-        # demand doesn't exceed capacity
-        # tasks are uninterruptible, so we only need to check each starting point of each task
-        # I.e., for each task, we check if it can be started, given the tasks that are already running.
+        # Check capacity at each task's start time (enough for non-preemptive tasks).
+        # A task is active on [start, end), so duration 0 never contributes demand —
+        # same convention as .value() and the time-based decomposition.
         for t in range(len(start)):
             st = start[t]
-            demand_at_start_of_t = []
-            for j in range(len(start)):
-                if t != j:
-                    demand_at_start_of_t.append(demand[j] * ((start[j] <= st) & (end[j] > st)))
-
-            cons.append((demand[t] + sum(demand_at_start_of_t)) <= capacity)
+            demand_at_start_of_t = [
+                demand[j] * ((start[j] <= st) & (end[j] > st))
+                for j in range(len(start))
+            ]
+            cons.append(sum(demand_at_start_of_t) <= capacity)
 
         return cons, []
 
@@ -1760,6 +1760,7 @@ class CumulativeOptional(GlobalConstraint):
 
         If the task is not present, the constraint does not enforce any of the above.
 
+        Zero-duration tasks do not occupy any resource.
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlapOptional` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
     """
@@ -1880,17 +1881,16 @@ class CumulativeOptional(GlobalConstraint):
         else:
             start, duration, end, demand, capacity, is_present = self.args
 
-        # demand of tasks that are present doesn't exceed capacity
-        # tasks are uninterruptible, so we only need to check each starting point of each task
-        # I.e., for each task, we check if it can be started, given the tasks that are already running.
+        # Check capacity at each present task's start time (enough for non-preemptive tasks).
+        # A task is active on [start, end), so duration 0 never contributes demand —
+        # same convention as .value() and the time-based decomposition.
         for t in range(len(start)):
             st = start[t]
-            demand_at_start_of_t = []
-            for j in range(len(start)):
-                if t != j:
-                    demand_at_start_of_t.append(demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st)))
-
-            cons.append(implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity))
+            demand_at_start_of_t = [
+                demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st))
+                for j in range(len(start))
+            ]
+            cons.append(implies(is_present[t], sum(demand_at_start_of_t) <= capacity))
 
         return cons, []
 
@@ -1959,6 +1959,8 @@ class NoOverlap(GlobalConstraint):
     Enforces that a set of tasks are scheduled without overlapping, and enforces:
         - duration >= 0
         - start + duration == end
+
+    Zero-duration tasks occupy no time, so they never overlap with any other tasks.
     """
 
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None):
@@ -2003,9 +2005,9 @@ class NoOverlap(GlobalConstraint):
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
         
         cons += [d >= 0 for d in duration]
-            
-        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
-            cons.append((e1 <= s2) | (e2 <= s1))
+
+        for (s1, d1, e1), (s2, d2, e2) in all_pairs(zip(start, duration, end)):
+            cons.append(cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -2020,17 +2022,18 @@ class NoOverlap(GlobalConstraint):
             end = [s + d for s,d in zip(start, duration)]
         else:
             start, duration,end = argvals(self.args)
-            if any(a is None for a in [start, duration,end]):
+            if any(a is None for a in start + duration + end):
                 return None
        
         if any(d < 0 for d in duration):
             return False
         if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
-        for (s1,d1), (s2,d2) in all_pairs(zip(start,duration)):
-            if s1 + d1 > s2 and s2 + d2 > s1:
-                return False
-        return True
+
+        # zero-duration tasks occupy no time, the other tasks may not overlap: sorted by start
+        # time, that means every task has to start after the previous one ended
+        tasks = sorted((s,e) for s,d,e in zip(start, duration, end) if d > 0)
+        return all(e <= s for (_,e), (s,_) in zip(tasks, tasks[1:]))
 
 class NoOverlapOptional(GlobalConstraint):
     """
@@ -2043,6 +2046,8 @@ class NoOverlapOptional(GlobalConstraint):
         - start + duration == end
 
         if the task is not present, it does not enforce any of the above.
+
+        Zero-duration tasks occupy no time, so they never overlap with any other tasks.
     """
     
     def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[BoolExprLike]] = None):
@@ -2091,9 +2096,9 @@ class NoOverlapOptional(GlobalConstraint):
         else:
             start, duration, end, is_present = self.args
             cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
-        
-        for (s1, e1, p1), (s2, e2, p2) in all_pairs(zip(start, end, is_present)):
-            cons += [implies(p1 & p2, (e1 <= s2) | (e2 <= s1))]
+
+        for (s1, d1, e1, p1), (s2, d2, e2, p2) in all_pairs(zip(start, duration, end, is_present)):
+            cons += [implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))]
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -2116,10 +2121,11 @@ class NoOverlapOptional(GlobalConstraint):
             return False
         if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
-        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,duration,is_present)):
-            if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
-                return False
-        return True
+
+        # absent tasks are not scheduled and zero-duration tasks occupy no time, the other tasks
+        # may not overlap: sorted by start time, every task has to start after the previous ended
+        tasks = sorted((s,e) for s,d,e,p in zip(start, duration, end, is_present) if p and d > 0)
+        return all(e <= s for (_,e), (s,_) in zip(tasks, tasks[1:]))
     
 class Precedence(GlobalConstraint):
     """

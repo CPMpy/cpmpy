@@ -677,6 +677,10 @@ class CPM_ortools(SolverInterface):
                 # make interval variables
                 tasks, task_cons = self._get_ort_intervals(start, dur, end)
                 self.add(task_cons)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # OR-Tools has strict semantics for NoOverlap, post as Cumulative instead
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
             elif cpm_expr.name == "no_overlap_optional":
@@ -692,6 +696,10 @@ class CPM_ortools(SolverInterface):
                 # make interval variables   
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # OR-Tools has strict semantics, see 'no_overlap'
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
             elif cpm_expr.name == "circuit":

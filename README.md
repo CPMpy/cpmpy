@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/CPMpy_Logo__Vertical_Blue.png" alt="CPMpy logo" width="220">
+<img src="https://raw.githubusercontent.com/CPMpy/cpmpy/master/docs/CPMpy_Logo__Vertical_Blue.png" alt="CPMpy logo" width="220">
 
 ![Github Version](https://img.shields.io/github/v/release/CPMpy/cpmpy?label=Github%20Release&logo=github)
 ![PyPI version](https://img.shields.io/pypi/v/cpmpy?color=blue&label=Pypi%20version&logo=pypi&logoColor=white)
