@@ -371,19 +371,10 @@ class CPM_cvc5(SolverInterface):
             if proof_text:
                 f.write(proof_text + "\n")
 
-        # collect all declared constants (variables) appearing in the assertions,
-        # by walking each assertion's term tree (mirrors cvc5.pythonic's own ModelRef.vars())
-        seen, consts = set(), []
-        stack = list(assertions)
-        while stack:
-            t = stack.pop()
-            if t in seen:
-                continue
-            seen.add(t)
-            if t.getKind() == cvc5.Kind.CONSTANT:
-                consts.append(t)
-            else:
-                stack.extend(list(t))
+        # collect all declared constants (variables): self._varmap already holds the native
+        # term created for every cpmpy variable used so far, filter out compound terms such
+        # as the Not(...) wrapper cached for a NegBoolView
+        consts = [t.ast for t in self._varmap.values() if t.ast.getKind() == cvc5.Kind.CONSTANT]
 
         with open(f"{self._proof}.smt2", "w") as f:
             f.write("(set-logic ALL)\n")
