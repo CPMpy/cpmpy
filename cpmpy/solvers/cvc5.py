@@ -280,16 +280,14 @@ class CPM_cvc5(SolverInterface):
         for (key, value) in kwargs.items():
             self.cvc5_solver.setOption(key, value)
 
-        # check assumption variables
+        # check assumption variables, timing the call ourselves: cvc5's own 'global::totalTime'
+        # statistic is cumulative over the solver's lifetime, not per-call
+        start_time = time.time()
         my_status = repr(self.cvc5_solver.check(*cvc5_assum_vars))
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        try:
-            st = self.cvc5_solver.statistics()
-            self.cpm_status.runtime = float(st['global::totalTime']["value"][:-2]) / 1000
-        except Exception:
-            self.cpm_status.runtime = 0
+        self.cpm_status.runtime = time.time() - start_time
 
         # translate exit status
         if my_status == "sat":
