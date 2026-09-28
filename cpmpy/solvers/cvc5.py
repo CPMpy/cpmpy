@@ -265,7 +265,7 @@ class CPM_cvc5(SolverInterface):
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             # cvc5 expects milliseconds in int; 0 means no limit
-            self.cvc5_solver.set(**{"tlimit-per": int(time_limit * 1000)})
+            self.cvc5_solver.set(**{"tlimit-per": max(1, int(time_limit * 1000))})
         else:
             self.cvc5_solver.set(**{"tlimit-per": 0})
 
