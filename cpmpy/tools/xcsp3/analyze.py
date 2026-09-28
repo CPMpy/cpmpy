@@ -102,7 +102,7 @@ def xcsp3_plot(df, time_limit=None):
 def get_cost(row):
     """
     Get the achieved objective value from the provided row.
-    If intermediate solutions are available, get the best found (not neccesarily proven optimal).
+    If intermediate solutions are available, get the best found (not necessarily proven optimal).
     """
     intermediate = row['intermediate']
 
