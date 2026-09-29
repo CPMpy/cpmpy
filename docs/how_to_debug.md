@@ -34,7 +34,7 @@ Here are a few quirks in Python/CPMpy:
   - When using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter won't work, because Python will unfortunately think you meant `x == (1 & y) == 0`.
   - You can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
   - Only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
-  - When providing names for decision variables, make sure that they are unique. Many solvers depend on this uniqueness and you will encounter strange (and hard to debug) behaviour if you don't enforce this.
+  - When providing names for decision variables, make sure that they are unique. Many solvers depend on this uniqueness and you will encounter strange (and hard to debug) behavior if you don't enforce this.
 
 Try printing the expression `print(e)` or subexpressions, and check that the output matches what you wish to express. Decompose the expression and try printing the individual components and their piecewice composition to see what works and when it starts to break.
 
@@ -149,7 +149,7 @@ More information about these tools can be found in [their API documentation](./a
 ## Debugging a satisfiable model which does not contain an expected solution
 
 We will ignore the (possible) objective function here and focus on the feasibility part. 
-Actually, in case of an optimisation problem where you know a certain value is attainable, you can add `objective == known_value` as constraint and proceed similarly.
+Actually, in case of an optimization problem where you know a certain value is attainable, you can add `objective == known_value` as constraint and proceed similarly.
 
 Add the solution that you know should be a feasible solution as a constraint:
 `model.add( (x == 1) & (y == 2) & (z == 3) ) # yes, brackets around each!`
