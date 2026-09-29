@@ -1,5 +1,5 @@
 """
-This module provides an abstract, PyTorch-style dataset interface for Constraint Optimisation (CO) benchmarks.
+This module provides an abstract, PyTorch-style dataset interface for Constraint Optimization (CO) benchmarks.
 With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, etc. can be downloaded and iterated over.
 
 **Available datasets:**
@@ -144,7 +144,7 @@ class Dataset(ABC):
     the PyTorch-compatible access pattern for CO benchmark datasets. It is not meant to be instantiated directly, 
     but rather subclassed. Have a look at :class:`FileDataset` for a concrete implementation.
 
-    Each instance in a dataset is characterised by a (x, y) pair of:
+    Each instance in a dataset is characterized by a (x, y) pair of:
 
         - x: instance reference (e.g., file path, database key, generated seed, ...)
         - y: instance metadata  (solution, features, origin, etc.)
@@ -427,7 +427,7 @@ class FileDataset(Dataset):
     def open(cls, instance: os.PathLike) -> io.TextIOBase:
         """
         How an instance file from the dataset should be opened.
-        Especially usefull when files come compressed and won't work with
+        Especially useful when files come compressed and won't work with
         Python standard library's 'open', e.g. '.xz', '.lzma'.
 
         Arguments:

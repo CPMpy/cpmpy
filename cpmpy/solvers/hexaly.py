@@ -21,7 +21,7 @@
         $ pip install hexaly -i https://pip.hexaly.com                
     
     It also requires to install the Hexaly Optimizer with a Hexaly license (for example a free academic license)
-    You can read more about available licences at https://www.hexaly.com/
+    You can read more about available licenses at https://www.hexaly.com/
 
     See detailed installation instructions at:
     https://www.hexaly.com/docs/last/installation/pythonsetup.html
@@ -130,7 +130,7 @@ class CPM_hexaly(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_hexaly: Install the python package 'cpmpy[hexaly]' to use this solver interface.") 
         elif not self.license_ok():
-            raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occured during license check. Make sure your license is activated!")
+            raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occurred during license check. Make sure your license is activated!")
 
         from hexaly.optimizer import HexalyOptimizer
 
@@ -169,7 +169,7 @@ class CPM_hexaly(SolverInterface):
             - iteration_limit: max number of iterations
             - verbosity: verbosity level
 
-            full list of parameters availble at:
+            full list of parameters available at:
             https://www.hexaly.com/docs/last/pythonapi/optimizer/hxparam.html
         """
         from hexaly.optimizer import HxObjectiveDirection

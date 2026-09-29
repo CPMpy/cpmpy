@@ -11,7 +11,7 @@ from .utils import make_assump_model
 def mss(soft, hard=[], solver="ortools"):
     """
         Compute Maximal Satisfiable Subset of unsatisfiable model.
-        Computes a subset of constraints which maximises the total number of constraints
+        Computes a subset of constraints which maximizes the total number of constraints
     """
     return mss_opt(soft, hard, 1, solver)
 
@@ -38,9 +38,9 @@ def mss_opt(soft, hard=[], weights=1, solver="ortools"):
 
 def mss_grow(soft, hard=[], solver="ortools"):
     """
-        Compute Maximal Satisfiable Subset of unsatsifiable model.
-        Computes a subset-maximal set of constraints by greedily adding contraints.
-        Relies on solving under assumptions, so using an incremental solver is adviced
+        Compute Maximal Satisfiable Subset of unsatisfiable model.
+        Computes a subset-maximal set of constraints by greedily adding constraints.
+        Relies on solving under assumptions, so using an incremental solver is advised
         No guarantees on optimality, but can be faster in some cases
 
         :param: soft: list of soft constraints to find a maximal satisfiable subset of
@@ -81,8 +81,8 @@ def mss_grow(soft, hard=[], solver="ortools"):
 
 def mss_grow_naive(soft, hard=[], solver="ortools"):
     """
-        Compute Maximal Satisfiable Subset of unsatsifiable model.
-        Computes a subset-maximal set of constraints by greedily adding contraints.
+        Compute Maximal Satisfiable Subset of unsatisfiable model.
+        Computes a subset-maximal set of constraints by greedily adding constraints.
         Can be used when solver does not support assumptions
         No guarantees on optimality, but can be faster in some cases
 

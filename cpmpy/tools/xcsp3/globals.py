@@ -632,7 +632,7 @@ class DynamicCumulative(GlobalConstraint):
 
         # start, dur, end are np arrays
         start, dur, end, demand, capacity = arg_vals
-        # start and end seperated by duration
+        # start and end separated by duration
         if not (start + dur == end).all():
             return False
 

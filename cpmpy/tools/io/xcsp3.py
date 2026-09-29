@@ -6,7 +6,7 @@
 """
 Helper functions for loading CPMpy models from XCSP3-core formatted files.
 
-XCSP3 is an XML-based format for constraint satisfaction and optimisation problems.
+XCSP3 is an XML-based format for constraint satisfaction and optimization problems.
 More can be read about it here: 
 
 - https://xcsp.org/specifications/

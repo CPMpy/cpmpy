@@ -32,7 +32,7 @@
     See detailed installation instructions at:
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
     
-    It also requires an active licence.
+    It also requires an active license.
     Academic license:
     https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
 
@@ -149,7 +149,7 @@ class CPM_cplex(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_cplex: Install the python package 'cpmpy[cplex]' to use this solver interface.")
         elif not self.license_ok():
-            raise ModuleNotFoundError("CPM_cplex: No license found or a problem occured during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
+            raise ModuleNotFoundError("CPM_cplex: No license found or a problem occurred during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
 
         from docplex.mp.model import Model
         self.cplex_model = Model()

@@ -90,7 +90,7 @@ class CPM_rc2(CPM_pysat):
         Requires a CPMpy model as input, and will create the corresponding
         PySAT clauses and solver object
 
-        Only supports optimisation problems (MaxSAT)
+        Only supports optimization problems (MaxSAT)
 
         Arguments:
             cpm_model (Model(), optional): a CPMpy Model()

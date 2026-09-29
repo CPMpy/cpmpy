@@ -32,7 +32,7 @@ To get a good linearisation, solver backends typically apply these transformatio
 - Call :func:`decompose_linear` / :func:`decompose_linear_objective` instead of the standard 'decompose_in_tree'.
 - Put constraints in flat normal form (:func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
 - Apply :func:`linearize_reified_variables` to replace reified equalities of the form
-  ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalisation).
+  ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalization).
 - Ensure implications are of the form ``bv -> <expr>`` (:func:`~cpmpy.transformations.reification.only_implies`).
 - Call :func:`linearize_constraint` to transform the inequalities, strict equalities and implications.
 - Optionally run post-passes such as :func:`only_positive_bv` (e.g. for ILP solvers that do not support NegBoolView)
