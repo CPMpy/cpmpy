@@ -58,7 +58,7 @@ Tools are not part of the core of CPMpy. They are additional tools that _use_ CP
 ## Documentation
 
 When contributing changes back to use, we kindly ask you to add some documentation to your code. Both comments above individual lines adding clarificiations and larger docstring comments at the beginning of methods, classes, files. CPMpy follows the [Google docstring style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). 
-Documentation is written in American english (modeling, optimiZation...).
+Documentation is written in US english (modeling, optimiZation...).
 
 Further guidelines:
 
