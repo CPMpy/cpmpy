@@ -404,11 +404,11 @@ class ExitStatus(Enum):
 
         `NOT_RUN`: Has not been run
 
-        `OPTIMAL`: Optimal solution to an optimisation problem found
+        `OPTIMAL`: Optimal solution to an optimization problem found
 
         `FEASIBLE`: Feasible solution to a satisfaction problem found,
                     or feasible (but not proven optimal) solution to an
-                    optimisation problem found
+                    optimization problem found
 
         `UNSATISFIABLE`: No satisfying solution exists
 

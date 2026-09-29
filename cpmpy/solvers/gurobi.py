@@ -20,8 +20,8 @@
 
         $ pip install gurobipy
     
-    Gurobi Optimizer requires an active licence (for example a free academic license)
-    You can read more about available licences at https://www.gurobi.com/downloads/
+    Gurobi Optimizer requires an active license (for example a free academic license)
+    You can read more about available licenses at https://www.gurobi.com/downloads/
 
     See detailed installation instructions at:
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-

@@ -9,7 +9,7 @@
     Using global constraints
     ------------------------
 
-    Solvers can have specialised implementations for global constraints. CPMpy has :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`
+    Solvers can have specialized implementations for global constraints. CPMpy has :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`
     expressions so that they can be passed to the solver as is when supported.
 
     If a solver does not support a global constraint (see :ref:`Solver Interfaces <solver-interfaces>`) then it will be automatically

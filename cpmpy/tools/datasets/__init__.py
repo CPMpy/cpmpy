@@ -4,7 +4,7 @@
 ## __init__.py
 ##
 """
-PyTorch-style dataset interface for Constraint Optimisation (CO) benchmarks.
+PyTorch-style dataset interface for Constraint Optimization (CO) benchmarks.
 
 CPMpy provides a PyTorch-style dataset interface for loading and iterating over
 benchmark instance collections. Each dataset handles downloading, file discovery,

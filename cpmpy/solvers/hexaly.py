@@ -21,7 +21,7 @@
         $ pip install hexaly -i https://pip.hexaly.com                
     
     It also requires to install the Hexaly Optimizer with a Hexaly license (for example a free academic license)
-    You can read more about available licences at https://www.hexaly.com/
+    You can read more about available licenses at https://www.hexaly.com/
 
     See detailed installation instructions at:
     https://www.hexaly.com/docs/last/installation/pythonsetup.html

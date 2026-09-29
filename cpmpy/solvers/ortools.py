@@ -185,7 +185,7 @@ class CPM_ortools(SolverInterface):
             ``cp_model_presolve=False``       to disable presolve (default: True, almost always beneficial)
             ``cp_model_probing_level=0``      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
             ``linearization_level=0``         to disable linearisation (default: 1, can also set to 2)
-            ``optimize_with_core=True``       to do max-sat like lowerbound optimisation (default: False)
+            ``optimize_with_core=True``       to do max-sat like lowerbound optimization (default: False)
             ``use_branching_in_lp=True``      to generate more info in lp propagator (default: False)
             ``polish_lp_solution=True``       to spend time in lp propagator searching integer values (default: False)
             ``symmetry_level=1``              only do symmetry breaking in presolve (default: 2, also possible: 0)

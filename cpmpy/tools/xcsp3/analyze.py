@@ -1,5 +1,5 @@
 """
-Collection of visualisation tools for processing the result of a `benchmark.py` run.
+Collection of visualization tools for processing the result of a `benchmark.py` run.
 
 Best used though its CLI, a command-line tool to visualize and analyze solver performance 
 based on CSV output files.

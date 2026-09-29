@@ -12,7 +12,7 @@
     (see https://github.com/Z3Prover/z3)
 
     .. warning::
-        For incrementally solving an optimisation function, instantiate the solver object
+        For incrementally solving an optimization function, instantiate the solver object
         with a model that has an objective function, e.g. ``s = cp.SolverLookup.get("z3", Model(maximize=1))``.
 
     Always use :func:`cp.SolverLookup.get("z3") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
