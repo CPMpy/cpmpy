@@ -48,14 +48,14 @@ PRIMES = [2,3,5,7,11,13,17,19]
 
 def get_reachable_neighbours(row, column):
     """
-    from a cell get the indices of its reachable neighbours
+    from a cell get the indices of its reachable neighbors
     
     Args:
         row (int): row index
         column (int): column index
         
     Returns:
-        list: list of tuples representing the indices of reachable neighbours
+        list: list of tuples representing the indices of reachable neighbors
     """
     reachable_neighbours = []
     if row != 0:
