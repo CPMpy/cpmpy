@@ -105,7 +105,7 @@ total_energy = cp.sum(active * df_data["energy"])
 model.minimize(100 * makespan + total_energy)
 
 
-# --- solving and graphical visualisation ---
+# --- solving and graphical visualization ---
 if model.solve():
     print(model.status())
     print("Total makespan:", makespan.value(), "energy:", total_energy.value())
@@ -133,7 +133,7 @@ for solvername in cp.SolverLookup.solvernames():
 
 ### 🌳 Ecosystem
 
-CPMpy is part of the scientific Python ecosystem, making it easy to use in Jupyter notebooks, to add visualisations, or to use it in machine learning pipelines.
+CPMpy is part of the scientific Python ecosystem, making it easy to use in Jupyter notebooks, to add visualizations, or to use it in machine learning pipelines.
 
 Other projects that build on CPMpy:
 * [XCP-explain](https://github.com/CPMpy/XCP-explain): a library for explainable constraint programming
