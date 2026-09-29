@@ -777,9 +777,11 @@ class CPM_minizinc(SolverInterface):
             extra_cons += demand_cons
 
             # absent tasks do not have to be scheduled: expressed with an optional start time
-            opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
-                                                              self._convert_expression(s))
-                         for s, p in zip(start, is_present)]
+            # zero-duration tasks occupy no resource, so they are made absent
+            opt_start = ["if {} /\\ {} > 0 then {} else <> endif".format(self._convert_expression(p),
+                                                                         self._convert_expression(d),
+                                                                         self._convert_expression(s))
+                         for s, d, p in zip(start, dur, is_present)]
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
@@ -819,9 +821,11 @@ class CPM_minizinc(SolverInterface):
             extra_cons += dur_cons
 
             # absent tasks do not have to be scheduled: expressed with an optional start time
-            opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
-                                                              self._convert_expression(s))
-                         for s, p in zip(start, is_present)]
+            # zero-duration tasks occupy no resource, so they are made absent
+            opt_start = ["if {} /\\ {} > 0 then {} else <> endif".format(self._convert_expression(p),
+                                                                         self._convert_expression(d),
+                                                                         self._convert_expression(s))
+                         for s, d, p in zip(start, dur, is_present)]
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
