@@ -23,7 +23,7 @@ A **constraint satisfaction problem (CSP)** consists of a set of variables and c
 
 A more general version, called **constraint optimization programming (COP)**, finds amongst all the feasible solutions the one that optimizes some measure, called 'objective function'.
 
-The state-of-the-art CP solvers can perform both very efficiently, so it is up to you to decide wether you have a satisfaction or an optimisation problem.
+The state-of-the-art CP solvers can perform both very efficiently, so it is up to you to decide wether you have a satisfaction or an optimization problem.
 
 
 What is necessary to model a CP problem?
@@ -99,7 +99,7 @@ Solving a model is as easy as calling `.solve()` on it, which will automatically
 
     model.solve()
 
-The return value will be whether the model was satisfiable or not (True/False) in case of a satisfaction problem, and what the optimal value was in case of an optimisation problem.
+The return value will be whether the model was satisfiable or not (True/False) in case of a satisfaction problem, and what the optimal value was in case of an optimization problem.
 
 The solution will be backpopulated in the decision variables used, and can be obtained by calling the `.value()` function on a decision variable. For example:
 
@@ -139,7 +139,7 @@ We first model the constraints as before:
         m > 0,
     )
 
-And now the objective function. Note that this just *states* that it is a maximisation problem, it does not yet compute the maximization.
+And now the objective function. Note that this just *states* that it is a maximization problem, it does not yet compute the maximization.
 
 .. code-block:: python
 

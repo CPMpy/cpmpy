@@ -11,7 +11,7 @@ Implementing the template consists of the following parts:
   * `__init__()` and `native_model()` where you initialize and return the underlying solver object.
   * `solver_var()` where you create new solver variables and map them to CPMpy decision variables.
   * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving.
-  * `objective()` if your solver supports optimisation (optionally override `minimize`/`maximize`/`objective` with `Expression | FloatSum` type hints if your solver also supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives).
+  * `objective()` if your solver supports optimization (optionally override `minimize`/`maximize`/`objective` with `Expression | FloatSum` type hints if your solver also supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives).
   * `supported_global_constraints` and `supported_reified_global_constraints` where you declare which integer functions and global constraints should reach the solver interface directly instead of being decomposed first.
   * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports.
   * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver.
@@ -32,7 +32,7 @@ Now, to get your solver known and easy to use, you also have to register it in a
 Once the above works, consider connection optional extra solver features, if your solver supports them. These can also always be added in later commits.
 
   * `solution_hint()` for warm-starting the solver with a suggested variable assignment
-  * `solve(solution_callback=..., display=...)` if the optimisation solver can return intermediate solutions during search
+  * `solve(solution_callback=..., display=...)` if the optimization solver can return intermediate solutions during search
   * `solveAll()` if the solver natively supports solution enumeration
   * `solvernames()` and `solverversion()` if the interface exposes named subsolvers
   * `solve(assumptions=...)` and `get_core()` if the solver supports solving under assumptions and UNSAT core extraction
@@ -44,7 +44,7 @@ CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to 
 
 CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from actually *posting* the supported constraints directly to the solver.
 
-For example, a SAT solver only accepts clauses (disjunctions) as constraints. So, its `transform()` method has the challenge of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. Transformations like these are exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory that can achieve that and more. You hence only need to chain the right transformations in the solver's `transform()` method. It is best to look at a solver accepting a similar input, to see what transformations (and in what order) that one uses. 
+For example, a SAT solver only accepts clauses (disjunctions) as constraints. So, its `transform()` method has the challenge of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. Transformations like these are exactly the task of a constraint modeling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory that can achieve that and more. You hence only need to chain the right transformations in the solver's `transform()` method. It is best to look at a solver accepting a similar input, to see what transformations (and in what order) that one uses. 
 
 The `__add__()` method will first call this `transform()`. This will return a list of CPMpy 'or' expression over decision variables. It then only has to iterate over those and call the solver its native API to create such clauses. All other constraints may not be directly supported by the solver, and can hence be rejected.
 
