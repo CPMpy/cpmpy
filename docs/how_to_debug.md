@@ -10,7 +10,7 @@ The bug can be situated in one of three layers:
 
 Coincidentally, they are ordered from most likely to least likely. So let's start at the bottom.
 
-If you don't have a bug yet, but are curious, here is some general advise from expert modeller [Håkan Kjellerstrand](http://www.hakank.org/):
+If you don't have a bug yet, but are curious, here is some general advice from expert modeler [Håkan Kjellerstrand](http://www.hakank.org/):
 - Test the model early and often. This makes it easier to detect problems in the model.
 - When a model is not working, try to comment out all the constraints and then activate them again one by one to test which constraint is the culprit.
 - Check the domains (see lower). The domains should be as small as possible, but not smaller. If they are too large it can take a lot of time to get a solution. If they are too small, then there will be no solution.
@@ -94,7 +94,7 @@ from cpmpy.transformations.flatten_model import flatten_objective
 print(f"Optimizing {obj_var} subject to", s.transform(obj_expr))
 ``` 
 
-### Automatically minimising the UNSAT program
+### Automatically minimizing the UNSAT program
 If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to a 'Minimal Unsatisfiable Subset' (MUS).
 
 This is now part of our [standard tools](./api/tools.rst), that you can use as follows:
