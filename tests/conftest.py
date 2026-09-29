@@ -5,7 +5,7 @@ This config defines:
 - pytest cli arguments
 - pytest fixtures
 - pytest markers
-- test parametrisation logic
+- test parametrization logic
 - test filtering logic
 """
 
@@ -125,9 +125,9 @@ def solver(request):
 
     Special values:
     - "all" expands to all installed solvers from SolverLookup
-    - "None" skips all solver-parametrized tests (no solver at all), only runs tests that don't depend on solver parametrisation
+    - "None" skips all solver-parametrized tests (no solver at all), only runs tests that don't depend on solver parametrization
 
-    By not providing a value for `--solver`, the default behaviour will be to run non-solver-specific tests only on the default solver (OR-Tools),
+    By not providing a value for `--solver`, the default behavior will be to run non-solver-specific tests only on the default solver (OR-Tools),
     and to run all solver-specific tests for which the solver has been installed on the system.
     """
     # Check if test has been parametrized with a solver (via pytest_generate_tests or explicit parametrisation)
@@ -161,7 +161,7 @@ def constraint(request):
     """
     Fixture for tests having a 'constraint' parameter
 
-    Will be parametrised using a constraint generator function.
+    Will be parametrized using a constraint generator function.
     """
     if not hasattr(request, "param"):
         raise RuntimeError(
@@ -273,9 +273,9 @@ def pytest_configure(config):
 
 def pytest_generate_tests(metafunc):
     """
-    Pytest hook which allows to define custom test parametrisation schemes. Gets called for each test function.
+    Pytest hook which allows to define custom test parametrization schemes. Gets called for each test function.
 
-    We currently use the following custom parametrisation schemes:
+    We currently use the following custom parametrization schemes:
     
     1) Dynamically parametrize non-solver-specific tests with all provided solvers.
     
@@ -356,7 +356,7 @@ def pytest_collection_modifyitems(config, items):
         items (list[pytest.Item]): The list of test items to filter and modify
 
     Note:
-        pytest_collection_modifyitems gets called after pytest_generate_tests, so the tests have already been parametrised at this point
+        pytest_collection_modifyitems gets called after pytest_generate_tests, so the tests have already been parametrized at this point
     """
     initial_count = len(items)
     logger.info(f"Test suite size before filtering: {initial_count} tests")
