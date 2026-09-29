@@ -11,7 +11,7 @@ from .utils import make_assump_model
 def mss(soft, hard=[], solver="ortools"):
     """
         Compute Maximal Satisfiable Subset of unsatisfiable model.
-        Computes a subset of constraints which maximises the total number of constraints
+        Computes a subset of constraints which maximizes the total number of constraints
     """
     return mss_opt(soft, hard, 1, solver)
 

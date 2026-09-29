@@ -77,7 +77,7 @@ print(x)  # [[x[0,0] x[0,1]]
 ```
 Similar to individual decision variables, you can call `v.value()` on these n-dimensional arrays. This will return an n-dimensional **numpy** array of values, one value for each of the included decision variables. 
 
-Since the arrays of decision variables are based on numpy, you can do **vectorized operations** and **comparisons** on them. As we will see below, this is very convenient and avoids having to write out many loops. It also makes it compatible with many existing scientific Python tools, including machine learning and visualisation libraries. A lot less glue code will need to be written!
+Since the arrays of decision variables are based on numpy, you can do **vectorized operations** and **comparisons** on them. As we will see below, this is very convenient and avoids having to write out many loops. It also makes it compatible with many existing scientific Python tools, including machine learning and visualization libraries. A lot less glue code will need to be written!
 
 See [the API documentation on variables](./api/expressions/variables.rst) for more detailed information.
 
@@ -87,7 +87,7 @@ Note that decision variables are not tied to a model. You can use the same varia
 
 A **model** is a collection of constraints over decision variables, optionally with an objective function. It represents a problem for which a solution must be found, e.g. through the use of a solver. A solution is an assignment of values to the decision variables, such that the values lie within their respective variables' domain and such that each of the constraints is satisfied.
 
-In CPMpy, the `Model()` object is a simple container that stores a list of CPMpy expressions representing constraints. In the case of an optimisation problem, it can also store a CPMpy expression representing an objective function that must be minimized or maximized. Constraints are added in the constructor, or using the built-in `+=` addition operator that corresponds to calling the `__add__()` function.
+In CPMpy, the `Model()` object is a simple container that stores a list of CPMpy expressions representing constraints. In the case of an optimization problem, it can also store a CPMpy expression representing an objective function that must be minimized or maximized. Constraints are added in the constructor, or using the built-in `+=` addition operator that corresponds to calling the `__add__()` function.
 
 Here is an example, where we explain how to express constraints in the next section:
 
@@ -97,7 +97,7 @@ import cpmpy as cp
 # Decision variables
 (x,y,z) = cp.intvar(1,10, shape=3)  # Python unpacks the array into the individual variables
 
-# Initialise the model, here with 2 constraints
+# Initialize the model, here with 2 constraints
 m = cp.Model(
    x == 1,
    x + y > 5
@@ -319,11 +319,11 @@ If you encounter a NumPy operation that you think should work, but doesn't, plea
 
 You may wonder if you are allowed to use functions like `abs(),min(),max()` because some solvers might not have support for it? The answer is _yes you can use them_, because they are **global constraints**. 
 
-In constraint solving, a global constraint is a function that expresses a relation between decision variables. There are **two pathways when solving** a model with global constraints: 1) the solver natively supports them, or 2) the constraint modelling library automatically _decomposes_ the constraint into an equivalent set of simpler constraints.
+In constraint solving, a global constraint is a function that expresses a relation between decision variables. There are **two pathways when solving** a model with global constraints: 1) the solver natively supports them, or 2) the constraint modeling library automatically _decomposes_ the constraint into an equivalent set of simpler constraints.
 
 A good example is the `AllDifferent()` global constraint that ensures all its arguments have distinct values. `AllDifferent(x,y,z)` can be decomposed into `[x!=y, x!=z, y!=z]`. For AllDifferent, the decomposition consists of _n*(n-1)_ pairwise inequalities, which are simpler constraints that most solvers support.
 
-However, a solver that has specialised datastructures for this constraint specifically does not need to create the decomposition. Furthermore, solvers can implement specialised algorithms that can propagate strictly stronger than the decomposed constraints can.
+However, a solver that has specialized datastructures for this constraint specifically does not need to create the decomposition. Furthermore, solvers can implement specialized algorithms that can propagate strictly stronger than the decomposed constraints can.
 
 
 
@@ -487,9 +487,9 @@ else:
 
 CPMpy can be used as a declarative modeling language: you create a `Model()`, add constraints and call `solve()` on it. See the example above.
 
-The return value of `solve()` is a Boolean indicating whether a solution was found. So regardless of whether it was a satisfaction or optimisation problem or with a timeout, it returns true if 'a' solution has been found in the process.
+The return value of `solve()` is a Boolean indicating whether a solution was found. So regardless of whether it was a satisfaction or optimization problem or with a timeout, it returns true if 'a' solution has been found in the process.
 
-To know the exact solver state and runtime after solve, call `status()`. In case of an optimisation problem, you can get the objective value of the solution with `objective_value()`.
+To know the exact solver state and runtime after solve, call `status()`. In case of an optimization problem, you can get the objective value of the solution with `objective_value()`.
 
 ```python
 import cpmpy as cp
@@ -504,7 +504,7 @@ else:
     print("No solution found.")
 ```
 The status of solve-call can be the following:
-1. `ExitStatus.OPTIMAL`: The solver found a solution to an optimisation problem and proved its optimality.
+1. `ExitStatus.OPTIMAL`: The solver found a solution to an optimization problem and proved its optimality.
 2. `ExitStatus.FEASIBLE`: The solver found a solution to a satisfaction problem, or a feasible solution to an optimization problem but did not prove optimality
 3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
 4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
@@ -787,7 +787,7 @@ s.solve()
 print(s.status())
 ```
 
-On a technical note, remark that a solver object does not modify the Model object with which it is initialised. So adding constraints to the solver does not add them to that model, and calling `s.solve()` does not update the status of `m.status()`, only of `s.status()`.
+On a technical note, remark that a solver object does not modify the Model object with which it is initialized. So adding constraints to the solver does not add them to that model, and calling `s.solve()` does not update the status of `m.status()`, only of `s.status()`.
 
 ## Setting solver parameters
 
@@ -1020,7 +1020,7 @@ Another built-in tuner is `GridSearchTuner`, which does random gridsearch (with 
 
 ### External tuners
 
-You can also use external hyperparameter optimisation libraries, such as `hyperopt`:
+You can also use external hyperparameter optimization libraries, such as `hyperopt`:
 ```python
 from hyperopt import tpe, hp, fmin
 import cpmpy as cp

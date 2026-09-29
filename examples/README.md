@@ -25,7 +25,7 @@ A quickstart guido to constraint solving, using the venerable sudoku problem.
 
 ### `nqueens_1000.ipynb`
 
-Another classic constraint satisfaction problem, N-queens (with visualisation and parameter tuning for larger N).
+Another classic constraint satisfaction problem, N-queens (with visualization and parameter tuning for larger N).
 
 <a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/nqueens.py">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
@@ -35,7 +35,7 @@ Another classic constraint satisfaction problem, N-queens (with visualisation an
 
 ### `vehicle_routing.ipynb`
 
-Exact vehicle routing model, with nice visualisation on real world map.
+Exact vehicle routing model, with nice visualization on real world map.
 
 <a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/vehicle_routing.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
@@ -45,7 +45,7 @@ Exact vehicle routing model, with nice visualisation on real world map.
 
 ### `scheduling.ipynb`
 
-A makespan minimising jobshop problem, with nice Gantt visualisation.
+A makespan minimizing jobshop problem, with nice Gantt visualization.
 
 <a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/scheduling.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
@@ -75,7 +75,7 @@ CSPlib problem number 1, nicely demonstrates the complex expressions CP can hand
 
 ### `packing_rectangles.ipynb`
 
-A 2D rectangular packing problem, with visualisation.
+A 2D rectangular packing problem, with visualization.
 
 <a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/packing_rectangles.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>

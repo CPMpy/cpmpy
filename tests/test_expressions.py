@@ -227,7 +227,7 @@ class TestMul:
         assert self.bvar in set(expr.args)
 
     def test_mul_is_lhs_num(self):
-        """Multiplication normalises const to first arg and sets is_lhs_num."""
+        """Multiplication normalizes const to first arg and sets is_lhs_num."""
         x = cp.intvar(0, 5, name="x")
         # const * var -> constant first, is_lhs_num True
         expr = 3 * x

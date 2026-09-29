@@ -1,7 +1,7 @@
 """
 Problem 015 on CSPLib
 
-Given n balls, labelled 1 to n, put them into c boxes such that for any triple of balls (x1,x2,...,xc) with sum(x1,x2,...,xc-1) = xc, not all are in the same box.
+Given n balls, labeled 1 to n, put them into c boxes such that for any triple of balls (x1,x2,...,xc) with sum(x1,x2,...,xc-1) = xc, not all are in the same box.
 
 
 Adapted from Numberjack implementation https://github.com/csplib/csplib/blob/master/Problems/prob015/models/SchursLemma.py

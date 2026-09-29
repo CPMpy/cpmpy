@@ -69,7 +69,7 @@ Supported solvers
    * - :doc:`Hexaly <api/solvers/hexaly>`
      - Global Opt.
      - SAT ISAT ALLSAT - OPT IOPT FLOBJ
-     - pip + local + (aca.) licence
+     - pip + local + (aca.) license
      -
    * - :doc:`HiGHS <api/solvers/highs>`
      - ILP
@@ -119,7 +119,7 @@ Supported solvers
 
 Native capability abbreviations:
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
-    * OPT: Optimisation, IOPT: Incremental optimisation
+    * OPT: Optimization, IOPT: Incremental optimization
     * PAR: Parallel solving, PROOF: Proof logging, KC: Knowledge Compilation
     * FLOBJ: :class:`~cpmpy.expressions.globalfunctions.FloatSum` objective (solver ``minimize``/``maximize`` only; see :doc:`modeling`)
 

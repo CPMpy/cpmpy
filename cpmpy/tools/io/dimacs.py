@@ -92,7 +92,7 @@ def write_dimacs(
         If the model has an objective, WCNF is emitted. DIMACS/WCNF has no field for
         constant objective offsets; when objective transformation introduces one, it
         is ignored and a warning is raised. The written model still preserves the
-        optimisation, but its objective value may differ by that constant.
+        optimization, but its objective value may differ by that constant.
 
     Arguments:
         model (cp.Model): a CPMpy model

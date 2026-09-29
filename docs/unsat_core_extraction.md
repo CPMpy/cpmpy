@@ -43,6 +43,6 @@ We welcome any additional examples that use CPMpy in this way! Here is one examp
 
 More information on how to use these tools can be found in [the tools API documentation](./api/tools.rst)
 
-One OR-Tools specific caveat is that this particular (default) solver's Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learnt clauses that are kept, no incrementality, so there will be some pre-processing overhead. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!
+One OR-Tools specific caveat is that this particular (default) solver's Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learned clauses that are kept, no incrementality, so there will be some pre-processing overhead. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!
 
 A final-final note is that you can manually warm-start OR-Tools with a previously found solution through `s.solution_hint()`; see also the MARCO code linked above.

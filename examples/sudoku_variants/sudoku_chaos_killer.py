@@ -44,14 +44,14 @@ def killer_cage(idxs, values, regions, total):
 
 def get_neighbours(r, c):
     """
-    from a cell get the indices of its orthogonally adjacent neighbours
+    from a cell get the indices of its orthogonally adjacent neighbors
 
     Args:
         r (int): row index
         c (int): column index
 
     Returns:
-        list: list of tuples representing the indices of orthogonally adjacent neighbours
+        list: list of tuples representing the indices of orthogonally adjacent neighbors
     """
     # a cell must be orthogonally adjacent to a cell in the same region
 

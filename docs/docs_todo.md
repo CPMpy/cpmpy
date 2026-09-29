@@ -6,14 +6,14 @@ A lot of proof-reading is still needed to catch all formatting mistakes (especia
 
 
 - [ ] Outdated copyright
-    - whilst updated on the repo, ReadTheDocs still gives 2021 as copyright year
+    - while updated on the repo, ReadTheDocs still gives 2021 as copyright year
 
 - [ ] Mention Exact
     - In many places where solvers get listed, Exact is not inluded (especially for things that make Exact stand out; e.g. unsat core extraction)
 
 - [ ] Solver overview table
     - available solvers and their supported features
-    e.g. incrementality, core exctraction, proof logging, parallelisation, ...
+    e.g. incrementality, core exctraction, proof logging, parallelization, ...
 
 - [ ] Overview of available CPMpy tools
 - [ ] "frietkot" link in ocus is down

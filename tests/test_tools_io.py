@@ -152,7 +152,7 @@ def _assert_same_solutions(ref: cp.Model, other: cp.Model) -> None:
     - optimization models: both solve and reach the same optimal objective value;
     - satisfaction models: both have the same number of solutions.
     Variable names/order and auxiliary encoding variables may differ between the two,
-    so we compare observable behaviour rather than structure.
+    so we compare observable behavior rather than structure.
     """
     if ref.has_objective():
         assert ref.solve(), "reference model should solve"
@@ -507,7 +507,7 @@ class TestRoundtrip:
 
     Writing then reading back renames variables and may add auxiliary encoding variables,
     so the model structure is not preserved verbatim; what must be preserved is the
-    observable behaviour (optimal objective, or number of solutions)."""
+    observable behavior (optimal objective, or number of solutions)."""
 
     @pytest.mark.parametrize("case", _params(RT_MODEL_CASES, "write", "load"))
     def test_write_then_load(self, case):

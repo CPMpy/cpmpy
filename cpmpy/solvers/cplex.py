@@ -32,7 +32,7 @@
     See detailed installation instructions at:
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
     
-    It also requires an active licence.
+    It also requires an active license.
     Academic license:
     https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
 

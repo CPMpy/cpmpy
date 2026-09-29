@@ -58,6 +58,7 @@ Tools are not part of the core of CPMpy. They are additional tools that _use_ CP
 ## Documentation
 
 When contributing changes back to use, we kindly ask you to add some documentation to your code. Both comments above individual lines adding clarificiations and larger docstring comments at the beginning of methods, classes, files. CPMpy follows the [Google docstring style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). 
+Documentation is written in US english (modeling, optimiZation...).
 
 Further guidelines:
 
@@ -76,7 +77,7 @@ When filing a bug, please add a small case that allows us to reproduce it. If th
 
 Only documentation changes can be directly applied on the master branch. All other changes should be submitted as a pull request.
 
-When submitting a pull request, make sure it passes all tests.
+When submitting a pull request, make sure it passes all tests, and add a line to the changelog describing the changes.
 
 When fixing a bug, you should also add a test that checks we don't break it again in the future (typically, the case from the bugreport).
 

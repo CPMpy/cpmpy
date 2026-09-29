@@ -174,7 +174,7 @@ def load_opb(opb: Union[str, os.PathLike, TextIO], open:Callable = builtins.open
     Supports:
         - Linear and non-linear terms (e.g., -1 x1 x14 +2 x2)
         - Negated variables using '~' (e.g., ~x5)
-        - Minimisation objective
+        - Minimization objective
         - Comparison operators in constraints: '=', '>='
 
     Arguments:

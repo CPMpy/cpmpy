@@ -147,7 +147,7 @@ class SolverLookup():
         """
             get a specific solver (by name), with 'model' passed to its constructor
 
-            This is the preferred way to initialise a solver from its name
+            This is the preferred way to initialize a solver from its name
 
             :param name: name of the solver to use
             :param model: model to pass to the solver constructor

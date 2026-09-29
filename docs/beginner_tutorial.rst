@@ -6,7 +6,7 @@ Constraint Programming
 
 Many real-life decision problems involve searching over a large number of possible solutions to find one that satisfies all constraints and/or optimizes an objective function. For example in timetabling, scheduling, packing, routing and many more.
 
-To decide if a problem is feasible or finding the best one amongst all the options is hard task to do by hand. And enumerating all possible solutions and simply checking whether they are good (generate-and-test) is usually infeasible in practice.
+To decide if a problem is feasible or finding the best one among all the options is hard task to do by hand. And enumerating all possible solutions and simply checking whether they are good (generate-and-test) is usually infeasible in practice.
 
 Instead, the paradigm of **constraint programming (CP)** allow you to:
 
@@ -16,14 +16,14 @@ Instead, the paradigm of **constraint programming (CP)** allow you to:
 
 So despite the word 'Programming' in Constraint Programming (since forever), as a user you only have to focus on *modeling* the problem, not on programming the search. This is the convenience and appeal of Constraint Programming.
 
-Satisfaction versus Optimisation
+Satisfaction versus Optimization
 --------------------------------
 
 A **constraint satisfaction problem (CSP)** consists of a set of variables and constraints establishing relationships between them. Each variable has a finite of possible values (its domain). The goal is to assign values to the variables in its domains satisfying all the constraints. 
 
-A more general version, called **constraint optimization programming (COP)**, finds amongst all the feasible solutions the one that optimizes some measure, called 'objective function'.
+A more general version, called **constraint optimization programming (COP)**, finds among all the feasible solutions the one that optimizes some measure, called 'objective function'.
 
-The state-of-the-art CP solvers can perform both very efficiently, so it is up to you to decide wether you have a satisfaction or an optimisation problem.
+The state-of-the-art CP solvers can perform both very efficiently, so it is up to you to decide wether you have a satisfaction or an optimization problem.
 
 
 What is necessary to model a CP problem?
@@ -99,7 +99,7 @@ Solving a model is as easy as calling `.solve()` on it, which will automatically
 
     model.solve()
 
-The return value will be whether the model was satisfiable or not (True/False) in case of a satisfaction problem, and what the optimal value was in case of an optimisation problem.
+The return value will be whether the model was satisfiable or not (True/False) in case of a satisfaction problem, and what the optimal value was in case of an optimization problem.
 
 The solution will be backpopulated in the decision variables used, and can be obtained by calling the `.value()` function on a decision variable. For example:
 
@@ -114,7 +114,7 @@ The solution will be backpopulated in the decision variables used, and can be ob
 
 And that is all there is to it...
 
-Cryptarythmetic optimisation problem
+Cryptarythmetic optimization problem
 ------------------------------------
 
 So far we have considered a *satisfaction* problem, where we needed to find any satisfying solution (it was unique, see `multiple_solutions` doc on how to find out).
@@ -139,7 +139,7 @@ We first model the constraints as before:
         m > 0,
     )
 
-And now the objective function. Note that this just *states* that it is a maximisation problem, it does not yet compute the maximization.
+And now the objective function. Note that this just *states* that it is a maximization problem, it does not yet compute the maximization.
 
 .. code-block:: python
 

@@ -6,7 +6,7 @@
 """
     Interface to Pumpkin's API
 
-    Pumpkin is a combinatorial optimisation solver developed by the ConSol Lab at TU Delft. 
+    Pumpkin is a combinatorial optimization solver developed by the ConSol Lab at TU Delft. 
     It is based on the (lazy clause generation) constraint programming paradigm.
     (see https://github.com/consol-lab/pumpkin)
 

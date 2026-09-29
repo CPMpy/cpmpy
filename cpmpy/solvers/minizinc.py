@@ -345,7 +345,7 @@ class CPM_minizinc(SolverInterface):
             Keyword                  Description
             =======================  ===========
             free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
-            optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
+            optimisation_level=0          Set the MiniZinc compiler optimization level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
             =======================  ===========             
             
             
