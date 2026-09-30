@@ -1155,6 +1155,9 @@ class TestGlobal:
     
     def test_cumulative_optional_zero_duration(self, solver):
          # Present, zero-duration tasks occupy no resource
+        if solver == "minizinc":
+            pytest.skip("Bug in Gecode CumulativeOptional (default MiniZinc solver), see test below")
+
         s = cp.intvar(0, 5, name="s")
         d = 0
         active = cp.boolvar(name="active")
@@ -1183,6 +1186,31 @@ class TestGlobal:
         cons = cp.Cumulative([s], [d], demand=[2], capacity=1)
 
         assert cp.Model([cons, s == 0]).solve(solver="pumpkin")
+        assert cons.value() is True
+
+    @pytest.mark.xfail(reason="Bug in Gecode CumulativeOptional (default MiniZinc solver): present zero-duration tasks occupy resource")
+    def test_cumulative_optional_zero_duration_minizinc(self):
+        if not cp.SolverLookup.lookup("minizinc").supported():
+            pytest.skip("MiniZinc not installed")
+
+        s = cp.intvar(0, 5, name="s")
+        active = cp.boolvar(name="active")
+        cons = cp.CumulativeOptional([s], [0], demand=[2], capacity=1, is_present=[active])
+
+        assert cp.Model(cons, active == True).solve(solver="minizinc")
+        assert cons.value() is True
+
+    @pytest.mark.xfail(reason="Bug in Gecode CumulativeOptional (default MiniZinc solver): present zero-duration tasks occupy resource")
+    def test_cumulative_optional_zero_duration_overlap_minizinc(self):
+        if not cp.SolverLookup.lookup("minizinc").supported():
+            pytest.skip("MiniZinc not installed")
+
+        # task 0 has duration 0 and starts in the middle of task 1
+        start = cp.intvar(0, 5, shape=3, name="start")
+        is_present = cp.boolvar(shape=3, name="is_present")
+        cons = cp.CumulativeOptional(start, [0, 5, 3], demand=1, capacity=1, is_present=is_present)
+
+        assert cp.Model(cons, start == [1, 0, 5], cp.all(is_present)).solve(solver="minizinc")
         assert cons.value() is True
 
 
@@ -1330,7 +1358,13 @@ class TestGlobal:
         assert cp.Model(cons).solve(solver="ortools")
         assert cons.value()
 
-    def test_optional_cumulative(self):
+    @pytest.mark.usefixtures("solver")
+    def test_optional_cumulative(self, solver):
+        if solver == "pysdd":
+            pytest.skip(f"{solver} does not support integer variables")
+        if solver == "rc2":
+            pytest.skip(f"{solver} only supports optimization problems")
+
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 3, 2]
         end = cp.intvar(0, 10, shape=4, name="end")
@@ -1338,45 +1372,73 @@ class TestGlobal:
         is_present = cp.boolvar(shape=4)
         capacity = 10
         expr = cp.CumulativeOptional(start, duration, end, demand, capacity, is_present)
-        assert cp.Model(expr).solve()
+        assert cp.Model(expr).solve(solver=solver)
         assert expr.value()
         assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
         # also test decomposition
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr.decompose()).solve(solver=solver)
         assert expr.value()
         assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
 
+        # also test without end times
+        expr = cp.CumulativeOptional(start, duration, demand=demand, capacity=capacity, is_present=is_present)
+        assert cp.Model(expr).solve(solver=solver)
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+
+        # absent tasks consume none of the resource, so they can overlap freely
+        expr = cp.CumulativeOptional(start, duration, end, demand, capacity, [False, True, False, False])
+        assert cp.Model(expr, cp.all(start == start[0])).solve(solver=solver)
+        assert expr.value()
+
         # weird cases, allow negative duration or demand when task is not present
         expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, False])
-        assert cp.Model(expr).solve()
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr).solve(solver=solver)
+        assert cp.Model(expr.decompose()).solve(solver=solver)
 
         expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, True])
-        assert cp.Model(expr).solve() is False
-        assert cp.Model(expr.decompose()).solve() is False
+        assert cp.Model(expr).solve(solver=solver) is False
+        assert cp.Model(expr.decompose()).solve(solver=solver) is False
 
         expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, False])
-        assert cp.Model(expr).solve()
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr).solve(solver=solver)
+        assert cp.Model(expr.decompose()).solve(solver=solver)
 
         expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, True])
-        assert cp.Model(expr).solve() is False
-        assert cp.Model(expr.decompose()).solve() is False
+        assert cp.Model(expr).solve(solver=solver) is False
+        assert cp.Model(expr.decompose()).solve(solver=solver) is False
 
 
-    def test_optional_no_overlap(self):
+    @pytest.mark.usefixtures("solver")
+    def test_optional_no_overlap(self, solver):
+        if solver == "pysdd":
+            pytest.skip(f"{solver} does not support integer variables")
+        if solver == "rc2":
+            pytest.skip(f"{solver} only supports optimization problems")
+
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 6, 2]
         end = cp.intvar(0, 10, shape=4, name="end")
         is_present = cp.boolvar(shape=4)
         expr = cp.NoOverlapOptional(start, duration, end, is_present)
-        assert cp.Model(expr, cp.any(is_present)).solve()
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver)
         assert expr.value()
         assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
         # also test decomposition
-        assert cp.Model(expr.decompose(), cp.any(is_present)).solve()
+        assert cp.Model(expr.decompose(), cp.any(is_present)).solve(solver=solver)
         assert expr.value()
         assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # also test without end times
+        expr = cp.NoOverlapOptional(start, duration, is_present=is_present)
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver)
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # absent tasks do not have to be scheduled, so they can overlap freely
+        expr = cp.NoOverlapOptional(start, duration, end, [False, True, False, False])
+        assert cp.Model(expr, cp.all(start == start[0])).solve(solver=solver)
+        assert expr.value()
 
         # test large task
         start = cp.intvar(0, 10, shape=4, name="start")
@@ -1384,9 +1446,9 @@ class TestGlobal:
         end = cp.intvar(0, 10, shape=4, name="end")
         is_present = cp.boolvar(shape=4)
         expr = cp.NoOverlapOptional(start, duration, end, is_present)
-        assert cp.Model(expr, cp.any(is_present)).solve() is False
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver) is False
 
-    
+
     def test_ite(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
@@ -1635,6 +1697,8 @@ class TestGlobal:
             pytest.skip("pysdd does not support integer variables")
         if solver == "rc2":
             pytest.skip("rc2 only supports optimization")
+        if solver == "minizinc":
+            pytest.skip("Bug in Gecode CumulativeOptional (default MiniZinc solver), see test_cumulative_optional_zero_duration_overlap_minizinc")
 
         # a present task with zero duration occupies no time either
         start = cp.intvar(0,5, shape=3, name="start")
