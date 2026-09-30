@@ -223,7 +223,7 @@ def test_solver_var(solver):
     # Test with integer variable
 
     # SAT solvers encode integers to Booleans via int2bool, not via solver_var
-    if solver_name in ("pysat", "pindakaas", "rc2", "pysdd"):
+    if solver_name in ("pysat", "pindakaas", "paramita", "rc2", "pysdd"):
         return
 
     # Test with integer variable
@@ -305,7 +305,7 @@ def test_has_objective(solver):
         slv.minimize(ivar)
         assert slv.has_objective()
 
-        if solver != "rc2": # rc2 can set obj only once
+        if solver != "rc2" and solver != "paramita":  # soft-obj solvers: set obj only once
             slv.maximize(ivar)
             assert slv.has_objective()
     except NotImplementedError:
