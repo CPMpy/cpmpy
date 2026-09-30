@@ -1155,6 +1155,9 @@ class TestGlobal:
     
     def test_cumulative_optional_zero_duration(self, solver):
          # Present, zero-duration tasks occupy no resource
+        if solver == "minizinc":
+            pytest.skip("Bug in Gecode CumulativeOptional (default MiniZinc solver), see test below")
+
         s = cp.intvar(0, 5, name="s")
         d = 0
         active = cp.boolvar(name="active")
@@ -1183,6 +1186,31 @@ class TestGlobal:
         cons = cp.Cumulative([s], [d], demand=[2], capacity=1)
 
         assert cp.Model([cons, s == 0]).solve(solver="pumpkin")
+        assert cons.value() is True
+
+    @pytest.mark.xfail(reason="Bug in Gecode CumulativeOptional (default MiniZinc solver): present zero-duration tasks occupy resource")
+    def test_cumulative_optional_zero_duration_minizinc(self):
+        if not cp.SolverLookup.lookup("minizinc").supported():
+            pytest.skip("MiniZinc not installed")
+
+        s = cp.intvar(0, 5, name="s")
+        active = cp.boolvar(name="active")
+        cons = cp.CumulativeOptional([s], [0], demand=[2], capacity=1, is_present=[active])
+
+        assert cp.Model(cons, active == True).solve(solver="minizinc")
+        assert cons.value() is True
+
+    @pytest.mark.xfail(reason="Bug in Gecode CumulativeOptional (default MiniZinc solver): present zero-duration tasks occupy resource")
+    def test_cumulative_optional_zero_duration_overlap_minizinc(self):
+        if not cp.SolverLookup.lookup("minizinc").supported():
+            pytest.skip("MiniZinc not installed")
+
+        # task 0 has duration 0 and starts in the middle of task 1
+        start = cp.intvar(0, 5, shape=3, name="start")
+        is_present = cp.boolvar(shape=3, name="is_present")
+        cons = cp.CumulativeOptional(start, [0, 5, 3], demand=1, capacity=1, is_present=is_present)
+
+        assert cp.Model(cons, start == [1, 0, 5], cp.all(is_present)).solve(solver="minizinc")
         assert cons.value() is True
 
 
@@ -1669,6 +1697,8 @@ class TestGlobal:
             pytest.skip("pysdd does not support integer variables")
         if solver == "rc2":
             pytest.skip("rc2 only supports optimization")
+        if solver == "minizinc":
+            pytest.skip("Bug in Gecode CumulativeOptional (default MiniZinc solver), see test_cumulative_optional_zero_duration_overlap_minizinc")
 
         # a present task with zero duration occupies no time either
         start = cp.intvar(0,5, shape=3, name="start")
