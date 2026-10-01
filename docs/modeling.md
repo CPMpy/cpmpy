@@ -308,7 +308,7 @@ b = cp.boolvar(shape=10)
 # np.arange(10)[b]  # IndexError
 ```
 
-Because of our overloading of `+,-,*,//` some NumPy functions like `np.sum(x)` will also create a CPMpy expression. This is not guaranteed for all NumPy functions though — `np.equal(x, y)` for example returns a plain Boolean array, not constraints. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `x.sum()`, `.min()`, `.max()`, `.any()` and `.all()` (including the `axis=` argument), so these are safe to use.
+Element-wise NumPy ufuncs that map to Python operators — including `np.add`, `np.equal`, `np.logical_and`, `np.absolute`, … — result in the same array of expressions as using plain `+`, `==`, `&`, `abs`... . Unsupported functions (e.g. `np.sin`, `np.maximum`, `np.where`) raise a `TypeError`. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. when in doubt.
 
 Also note that `np.concatenate` / `stack` / `hstack` / `vstack` return a plain `ndarray`, so wrap the result with `cp.cpm_array(...)` before doing further CPMpy operations on it.
 
