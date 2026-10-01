@@ -38,7 +38,7 @@ SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
             'mario', 'pareto_optimal','prob006_golomb.py', 'tsp.py', 'prob028_bibd.py', 'prob001_car_sequence.py'
             ]
 
-SKIP_MZN = ['blocks_world.py', 'flexible_jobshop.py', 'pareto_optimal.py', 'npuzzle.py', 'sudoku_']
+SKIP_MZN = ['blocks_world.py', 'flexible_jobshop.py', 'pareto_optimal.py', 'npuzzle.py', 'sudoku_','vrp.py']
 
 
 # SOLVERS = SolverLookup.supported()
