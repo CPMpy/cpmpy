@@ -233,7 +233,7 @@ class CPM_template(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds
+        self.cpm_status.solve_time = self.TPL_solver.time() # wallclock time in (float) seconds
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
@@ -552,7 +552,7 @@ class CPM_template(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds (of entire solveAll call)
+        self.cpm_status.solve_time = self.TPL_solver.time() # wallclock time in (float) seconds (of entire solveAll call)
 
         # Translate solver exit status to CPMpy exit status
         # CSP & COP:
