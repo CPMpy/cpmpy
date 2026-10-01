@@ -4,11 +4,11 @@
 
 ### Added
 
-* Use PySCIPOpt's native `cumulative` [#998](https://github.com/CPMpy/cpmpy/pull/998)
-* Sudoku dataset [#1067](https://github.com/CPMpy/cpmpy/pull/1067)
+* **New Dataset** Sudoku [#1067](https://github.com/CPMpy/cpmpy/pull/1067)
 * Native MUS for CPO [#987](https://github.com/CPMpy/cpmpy/pull/987)
 * Native MUS for CPLEX [#986](https://github.com/CPMpy/cpmpy/pull/986)
 * Unified prooflogging [#862](https://github.com/CPMpy/cpmpy/pull/862)
+* PySCIPOpt's native `cumulative` [#998](https://github.com/CPMpy/cpmpy/pull/998)
 * Typing of `abs` and `mult` [#1075](https://github.com/CPMpy/cpmpy/pull/1075)
 
 ### Changed
