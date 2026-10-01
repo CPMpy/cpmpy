@@ -13,6 +13,8 @@
 
 ### Changed
 
+* Following modern Numpy ndarray subclassing with ufunc [#1062](https://github.com/CPMpy/cpmpy/pull/1062)
+Account for transformation time in `model.solve()` [#803](https://github.com/CPMpy/cpmpy/pull/803)
 * Increase OR-Tools lower bound to 9.12 [#1074](https://github.com/CPMpy/cpmpy/pull/1074)
 * Modernise hyperparameter search example [#960](https://github.com/CPMpy/cpmpy/pull/960)
 
