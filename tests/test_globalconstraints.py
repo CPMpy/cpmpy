@@ -1535,6 +1535,29 @@ class TestGlobal:
         iv = cp.intvar(0, 10, shape=(3, 3))
         assert cp.Model([cp.NValueExcept(i, val) == 3 for i in iv.T]).solve()
 
+    @pytest.mark.parametrize("make_expr, expected, optimum", [
+        (lambda x: cp.Count(x, 1), 4, 6),
+        (lambda x: cp.Among(x, [1, 2]), 5, 6),
+        (lambda x: cp.NValue(x), 3, 4),
+        (lambda x: cp.NValueExcept(x, 0), 2, 3),
+    ], ids=["count", "among", "nvalue", "nvalue_except"])
+    def test_multidim_count_functions(self, make_expr, expected, optimum):
+        # https://github.com/CPMpy/cpmpy/issues/1109
+        x = cp.intvar(0, 3, shape=(2, 3), name="x")
+        expr = make_expr(x)
+        assert expr.get_bounds()[1] == 6
+
+        assert cp.Model(x == [[1, 1, 2], [1, 0, 1]]).solve()
+        assert expr.value() == expected
+        assert expr.value() == make_expr(x.flatten()).value()
+
+        # as constraint and as objective
+        assert cp.Model(expr == expected).solve()
+        assert expr.value() == expected
+        m = cp.Model(maximize=expr)
+        assert m.solve()
+        assert m.objective_value() == optimum
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
