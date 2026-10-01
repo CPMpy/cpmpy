@@ -297,8 +297,7 @@ M.T            # transpose
 np.dot(x, w)   # dot-product
 ```
 
-Binary operators follow NumPy broadcasting: the other operand is broadcast to the shape of the CPMpy array. So `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. One limitation compared to plain NumPy is that the result always keeps the shape of the CPMpy array — e.g. a `(3,1)` array plus a length-3 vector does not expand to `(3,3)`.
-
+Numpy broadcasting is also supported on CPMpy arrays: e.g., `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. 
 What does **not** work are operations whose result depends on the (still unknown) values of the decision variables. In particular, you cannot use Boolean decision variables as a mask, because the length of the result would depend on how many are `True`:
 
 ```python
@@ -309,7 +308,7 @@ b = cp.boolvar(shape=10)
 # np.arange(10)[b]  # IndexError
 ```
 
-Because of our overloading of `+,-,*,//` some NumPy functions like `np.sum(x)` will also create a CPMpy expression. This is not guaranteed for all NumPy functions though — `np.equal(x, y)` for example returns a plain Boolean array, not constraints. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `x.sum()`, `.min()`, `.max()`, `.any()` and `.all()` (including the `axis=` argument), so these are safe to use.
+Element-wise NumPy ufuncs that map to Python operators — including `np.add`, `np.equal`, `np.logical_and`, `np.absolute`, … — result in the same array of expressions as using plain `+`, `==`, `&`, `abs`... . Unsupported functions (e.g. `np.sin`, `np.maximum`, `np.where`) raise a `TypeError`. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. when in doubt.
 
 Also note that `np.concatenate` / `stack` / `hstack` / `vstack` return a plain `ndarray`, so wrap the result with `cp.cpm_array(...)` before doing further CPMpy operations on it.
 
