@@ -1,5 +1,40 @@
 # Change log
 
+## 1.1.0
+
+### Added
+
+* Use PySCIPOpt's native `cumulative` [#998](https://github.com/CPMpy/cpmpy/pull/998)
+* Sudoku dataset [#1067](https://github.com/CPMpy/cpmpy/pull/1067)
+* Native MUS for CPO [#987](https://github.com/CPMpy/cpmpy/pull/987)
+* Native MUS for CPLEX [#986](https://github.com/CPMpy/cpmpy/pull/986)
+* Unified prooflogging [#862](https://github.com/CPMpy/cpmpy/pull/862)
+* Typing of `abs` and `mult` [#1075](https://github.com/CPMpy/cpmpy/pull/1075)
+
+### Changed
+
+* Increase OR-Tools lower bound to 9.12 [#1074](https://github.com/CPMpy/cpmpy/pull/1074)
+* Modernise hyperparameter search example [#960](https://github.com/CPMpy/cpmpy/pull/960)
+
+### Fixed
+
+* Analyzing XCSP3 benchmark csvs with empty time metrics [#923](https://github.com/CPMpy/cpmpy/pull/923)
+* Typos in docstrings, comments and error messages [#1097](https://github.com/CPMpy/cpmpy/pull/1097)
+* NoOverlap non-strict semantics for zero duration tasks [#1105](https://github.com/CPMpy/cpmpy/pull/1105)
+* Cumulative no demand when duration is zero [#1102](https://github.com/CPMpy/cpmpy/pull/1102)
+* Logo image link for PyPI [#1104](https://github.com/CPMpy/cpmpy/pull/1104)
+* Fix MUS tests [#1095](https://github.com/CPMpy/cpmpy/pull/1095)
+* Fix linearize when trivially unsat comparison [#1101](https://github.com/CPMpy/cpmpy/pull/1101)
+* Support trivial arities of `And` and `Or` [#1080](https://github.com/CPMpy/cpmpy/pull/1080)
+* Docs: small typo [#1092](https://github.com/CPMpy/cpmpy/pull/1092)
+* Small fixes to Hexaly [#983](https://github.com/CPMpy/cpmpy/pull/983)
+* Rename `InDomain` to `indomain` [#1087](https://github.com/CPMpy/cpmpy/pull/1087)
+* Typo csemap OR-Tools [#1088](https://github.com/CPMpy/cpmpy/pull/1088)
+* Fixes to XCSP3 tools [#1068](https://github.com/CPMpy/cpmpy/pull/1068)
+* Marker inheritance and non-parametrised tests with solver dependency [#961](https://github.com/CPMpy/cpmpy/pull/961)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v1.0.0...v1.1.0
+
 ## 1.0.0 :partying_face:
 
 ### Added
