@@ -23,6 +23,7 @@
 
 ### Changed
 
+* Switch to `model.add()` in README [#1113](https://github.com/CPMpy/cpmpy/pull/1113)
 * Account for transformation time in `Model.solve()` [#803](https://github.com/CPMpy/cpmpy/pull/803)
 * Following modern Numpy ndarray subclassing with ufunc [#1062](https://github.com/CPMpy/cpmpy/pull/1062)
 Account for transformation time in `model.solve()` [#803](https://github.com/CPMpy/cpmpy/pull/803)
@@ -31,6 +32,7 @@ Account for transformation time in `model.solve()` [#803](https://github.com/CPM
 
 ### Fixed
 
+* Flatten multidimension args to globals [#1112](https://github.com/CPMpy/cpmpy/pull/1112)
 * Analyzing XCSP3 benchmark csvs with empty time metrics [#923](https://github.com/CPMpy/cpmpy/pull/923)
 * Typos in docstrings, comments and error messages [#1097](https://github.com/CPMpy/cpmpy/pull/1097)
 * NoOverlap non-strict semantics for zero duration tasks [#1105](https://github.com/CPMpy/cpmpy/pull/1105)
