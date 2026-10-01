@@ -498,6 +498,7 @@ m = cp.Model(cp.AllDifferent(xs), maximize=cp.sum(xs))
 
 hassol = m.solve()
 print("Status:", m.status())  # Status: ExitStatus.OPTIMAL (0.03033301 seconds)
+print(m.status().runtime, m.status().solve_time)  # total runtime, solver time
 if hassol:
     print(m.objective_value(), xs.value())  # 27 [10  9  8]
 else:
@@ -509,6 +510,10 @@ The status of solve-call can be the following:
 3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
 4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
 5. `ExitStatus.NOT_RUN`: The solver is not run yet (default when initializing a solver)
+
+The status object also contains timing information:
+1. `runtime`: The total wallclock time of the `solve()` call, including the time spent transforming and posting the constraints.
+2. `solve_time`: The time spent by the solver itself solving the problem.
 
 ## Finding all solutions
 
@@ -1030,7 +1035,7 @@ import cpmpy as cp
 def time_solver(model, solver, param_dict):
     s = cp.SolverLookup.get(solver, model)
     s.solve(**param_dict)
-    return s.status().runtime
+    return s.status().solve_time
 
 space = {
     'cp_model_probing_level': hp.choice('cp_model_probing_level', [0, 1, 2, 3]),

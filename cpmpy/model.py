@@ -252,7 +252,8 @@ class Model(object):
         """
             Returns the status of the latest solver run on this model
 
-            Status information includes exit status (optimality) and runtime.
+            Status information includes exit status (optimality), total runtime
+            (including transformation time) and solve time (time spent in the solver itself).
 
             Returns:
                 an object of :class:`SolverStatus`
