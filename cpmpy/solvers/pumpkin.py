@@ -156,7 +156,7 @@ class CPM_pumpkin(SolverInterface):
     def _unsat_at_rootlevel(self):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        self.cpm_status.solve_time = 0 # TODO: use post-time instead?
+        self.cpm_status.solve_time = 0.0 # TODO: use post-time instead?
 
         for var in self.user_vars:
             var._value = None

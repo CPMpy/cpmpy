@@ -207,7 +207,7 @@ class CPM_z3(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         st = self.z3_solver.statistics()
         if 'time' not in st.keys():
-            self.cpm_status.solve_time = 0
+            self.cpm_status.solve_time = 0.0
         else:
             self.cpm_status.solve_time = st.get_key_value('time')
 
