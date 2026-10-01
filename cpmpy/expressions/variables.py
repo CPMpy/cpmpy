@@ -666,7 +666,7 @@ class NDVarArray(np.ndarray):
         return cpm_array(np.apply_along_axis(cp.all, axis=axis, arr=self))
 
     def get_bounds(self) -> tuple[np.ndarray, np.ndarray]:
-        if self.size == 0:  # believe it or not, this does happen... e.g. in test_int2bool and an exmaple
+        if self.size == 0:  # believe it or not, this does happen... e.g. in test_int2bool and an example
             z = np.empty(self.shape, dtype=np.int64)
             return z, z
 

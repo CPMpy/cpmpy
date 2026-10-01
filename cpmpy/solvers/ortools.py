@@ -383,7 +383,7 @@ class CPM_ortools(SolverInterface):
             self.user_vars.update(vs)  # save user variables
             ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vs), ws) + const
         else:
-            # save user varables
+            # save user variables
             get_variables(expr, self.user_vars)
 
             # transform objective
@@ -677,6 +677,10 @@ class CPM_ortools(SolverInterface):
                 # make interval variables
                 tasks, task_cons = self._get_ort_intervals(start, dur, end)
                 self.add(task_cons)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # OR-Tools has strict semantics for NoOverlap, post as Cumulative instead
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
             elif cpm_expr.name == "no_overlap_optional":
@@ -692,11 +696,15 @@ class CPM_ortools(SolverInterface):
                 # make interval variables   
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # OR-Tools has strict semantics, see 'no_overlap'
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
-                # when using an objective over arcs, using these vars direclty is recommended
+                # when using an objective over arcs, using these vars directly is recommended
                 # (see PCTSP-path model in the future)
                 x = cpm_expr.args
                 N = len(x)
