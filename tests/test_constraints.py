@@ -25,7 +25,7 @@ NUM_GLOBAL = {
     "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
     "Table", 'NegativeTable', "ShortTable", "Regular", "MDD",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
-    "Precedence", "Cumulative", "Reservoir", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
+    "Precedence", "Cumulative", "Reservoir", "ReservoirOptional", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "NDElement", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
@@ -211,6 +211,16 @@ def global_constraints(solver):
             yield cp.all(cp.Reservoir(s, demand, -1, 2).decompose(how="time")[0])
             yield cp.all(cp.Reservoir(s, demand, -1, 2).decompose(how="task")[0])
             yield cp.Reservoir(s, cp.intvar(-2, 2, shape=2, name="demand"), -3, 3)
+            continue
+
+        elif name == "ReservoirOptional":
+            # the demand of 3 cannot be present: together with the fixed +2 it exceeds the maximum
+            s = cp.intvar(0, 5, shape=3, name="start")
+            demand = [3, -1, 2]
+            is_present = [cp.boolvar(), cp.boolvar(), True]
+            yield cp.ReservoirOptional(s, demand, -1, 2, is_present)
+            yield cp.all(cp.ReservoirOptional(s, demand, -1, 2, is_present).decompose(how="time")[0])
+            yield cp.all(cp.ReservoirOptional(s, demand, -1, 2, is_present).decompose(how="task")[0])
             continue
 
         elif name == "CumulativeOptional":

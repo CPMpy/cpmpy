@@ -1238,6 +1238,57 @@ class TestGlobal:
         assert b.value() is False
         assert reif.value() is False
 
+    def test_reservoir_optional_value(self):
+        start = cp.intvar(0, 5, shape=2, name="start")
+        present = cp.boolvar(shape=2, name="present")
+        cons = cp.ReservoirOptional(start, [3, -1], -1, 2, present)
+
+        # only the withdrawal happens
+        start[0]._value, start[1]._value = 0, 1
+        present[0]._value, present[1]._value = False, True
+        assert cons.value() is True
+
+        # both present at the same time: 3 and -1 net to 2
+        start[0]._value = start[1]._value = 0
+        present[0]._value = present[1]._value = True
+        assert cons.value() is True
+
+        # +3 alone exceeds the maximum
+        present[1]._value = False
+        assert cons.value() is False
+
+        pytest.raises(ValueError, cp.ReservoirOptional, [], [], -1, 1, [])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, 1, True)
+        pytest.raises(ValueError, cp.ReservoirOptional, [1, 2], [1], -1, 1, [True])
+
+    def test_reservoir_optional(self, solver):
+        start = cp.intvar(0, 3, shape=2, name="start")
+        present = cp.boolvar(shape=2, name="present")
+        # a demand of 4 never fits, so that event has to be absent
+        cons = cp.ReservoirOptional(start, [4, -1], -1, 2, present)
+
+        assert cp.Model(cons).solve(solver=solver)
+        assert cons.value() is True
+        assert present[0].value() is False
+
+        assert cp.Model(cons, present[0]).solve(solver=solver) is False
+        assert cp.Model(cons.decompose(how="time"), present[0]).solve(solver=solver) is False
+        assert cp.Model(cons.decompose(how="task"), present[0]).solve(solver=solver) is False
+
+        # an absent withdrawal is ignored; a present one before the refill is not
+        ordered = cp.ReservoirOptional(start, [2, -2], 0, 2, present)
+        assert cp.Model(ordered, present[1], ~present[0]).solve(solver=solver) is False
+        assert cp.Model(ordered, present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+        assert ordered.value() is True
+        assert cp.Model(ordered.decompose(how="time"), present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+        assert cp.Model(ordered.decompose(how="task"), present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+
+        # constant presence, including an event that is fixed absent
+        fixed = cp.ReservoirOptional(start, [4, -1], -1, 2, [False, True])
+        assert cp.Model(fixed).solve(solver=solver)
+        assert fixed.value() is True
+        assert cp.Model(cp.ReservoirOptional(start, [4, -1], -1, 2, [True, True])).solve(solver=solver) is False
+
     @pytest.mark.xfail(reason="Bug in Pumpkin Cumulative, issue at: https://github.com/ConSol-Lab/Pumpkin/issues/577")
     def test_cumulative_zero_duration_pumpkin(self):
         if not cp.SolverLookup.lookup("pumpkin").supported():
