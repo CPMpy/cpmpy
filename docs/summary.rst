@@ -99,6 +99,7 @@ Global Constraints
         Xor
         Cumulative
         Reservoir
+        ReservoirOptional
         Precedence
         NoOverlap
         GlobalCardinalityCount

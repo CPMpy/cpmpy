@@ -328,7 +328,7 @@ However, a solver that has specialised datastructures for this constraint specif
 
 #### Global constraints
 
-Many global constraints are available in CPMpy. Some include `Xor(), AllDifferent(), AllDifferentExcept0(), Table(), Circuit(), Cumulative(), Reservoir(), GlobalCardinalityCount()`.   
+Many global constraints are available in CPMpy. Some include `Xor(), AllDifferent(), AllDifferentExcept0(), Table(), Circuit(), Cumulative(), Reservoir(), ReservoirOptional(), GlobalCardinalityCount()`.   
 
 For a complete list of global constraints, their meaning and more information on how to define your own, see [the API documentation on global constraints](./api/expressions/globalconstraints.rst). 
 
