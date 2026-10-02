@@ -85,7 +85,7 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
+    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "reservoir", "circuit",
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
@@ -644,7 +644,16 @@ class CPM_ortools(SolverInterface):
                 self.add(task_cons)
 
                 return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
-            
+
+            elif cpm_expr.name == "reservoir":
+                start, demand, min_cap, max_cap = cpm_expr.args
+                if is_int(min_cap) and is_int(max_cap):
+                    return self.ort_model.AddReservoirConstraint(
+                        self.solver_vars(start), self.solver_vars(demand), int(min_cap), int(max_cap))
+                for con in self.transform(cpm_expr.decompose()[0]):
+                    self._post_constraint(con)
+                return None
+
             elif cpm_expr.name == "cumulative_optional":
                 if len(cpm_expr.args) == 5:
                     start, dur, demand, cap, is_present = cpm_expr.args
