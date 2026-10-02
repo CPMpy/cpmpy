@@ -16,7 +16,6 @@
       ~Model.__init__
       ~Model.add
       ~Model.copy
-      ~Model.deepcopy
       ~Model.from_file
       ~Model.has_objective
       ~Model.maximize

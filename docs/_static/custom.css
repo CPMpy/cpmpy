@@ -1,39 +1,16 @@
 
-/* Sphinx Immaterial theme - Increase sidebar section spacing */
-.md-nav__item {
-    margin-bottom: 0.5rem !important;
+/* Header logo: keep the icon a readable size in the navbar */
+.navbar-brand img {
+    height: 2.75rem;
+    width: auto;
 }
 
-/* .md-nav__item--nested > .md-nav__link {
-    margin-bottom: 0.75rem !important;
-} */
-
-/* Add more spacing between top-level sections */
-/* .md-nav--primary .md-nav__item {
-    margin-bottom: 1rem !important;
-} */
-
-/* Add separator between main sections */
-.md-nav--primary {
-    content: "";
-    display: block;
-    height: 1px;
-    background-color: var(--md-default-fg-color--lightest);
-    margin: 0.5rem 0;
-}
-.md-nav--primary .md-nav__item::after {
-    content: "";
-    height: 1px;
-    background-color: var(--md-default-fg-color--lightest);
-    margin: 0.5rem 0;
+.navbar-brand .logo__title {
+    font-size: 1.25rem;
 }
 
-/* Change navigation link colors */
-.md-nav__sticky {
-    color: #131313 !important;
+/* Breathing room between the sidebar's top-level sections (Getting started,
+   Advanced guides, API documentation, Examples) */
+nav.bd-links p.caption {
+    margin-top: 1.25rem;
 }
-
-/* .md-nav__sticky:hover {
-    color: #131313  !important;
-} */
-

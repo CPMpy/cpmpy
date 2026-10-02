@@ -33,7 +33,15 @@ release = '0.9.24'
 # variables to be accessed from html
 html_context = {
     'release': release,
-    'webpage':  f'https://{project}.readthedocs.io/'
+    'webpage':  f'https://{project}.readthedocs.io/',
+    # Pages nested under docs.rst, used by _templates/navbar-nav.html to
+    # highlight the "Docs" top-nav tab as active (api/* is matched by prefix
+    # instead, since there are too many pages to list here).
+    'docs_pages': {
+        'docs', 'modeling', 'summary', 'upgrading_to_v1', 'how_to_debug',
+        'multiple_solutions', 'unsat_core_extraction', 'developers',
+        'adding_solver', 'testing',
+    },
 }
 
 # -- General configuration ---------------------------------------------------
@@ -47,19 +55,12 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'myst_parser',
-    'sphinx_rtd_theme',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.autosectionlabel',
-    "sphinx_immaterial",
-    # "sphinx_immaterial.theme_result",
-    # "sphinx_immaterial.kbd_keys",
-    # "sphinx_immaterial.apidoc.format_signatures",
-    # "sphinx_immaterial.apidoc.json.domain",
-    # "sphinx_immaterial.apidoc.python.apigen",
-    # "sphinx_immaterial.graphviz",
+    'sphinx_copybutton',
     'sphinx_gallery.gen_gallery',
     # "nbsphinx",
     # "myst_nb"
@@ -89,6 +90,10 @@ napoleon_use_rtype = True
 
 todo_include_todos = True
 
+# Strip shell prompts and Python REPL prompts from copied code snippets.
+copybutton_prompt_text = r">>> |\.\.\. |\$ "
+copybutton_prompt_is_regexp = True
+
 source_suffix =  ['.rst', '.md']
 # source_suffix =  '.rst'
 
@@ -113,11 +118,8 @@ autodoc_default_flags = ['members', 'special-members']
 # a list of builtin themes.
 #
 # html_theme = 'sphinx_book_theme'
-html_theme = "sphinx_immaterial"
-html_logo = "CPMpy_Logo__Vertical_White.png"
-html_theme_options = {
-    "logo_only": True,  # logo already includes the CPMpy wordmark
-}
+html_theme = "pydata_sphinx_theme"
+html_favicon = "../logo/CPMpy_Icon_Blue.svg"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -132,80 +134,30 @@ html_js_files = [
     'custom.js',
 ]
 
-templates_path = ["_templates"]
-
 html_theme_options = {
-    "repository_url": "https://github.com/CPMpy/cpmpy",
-    "use_repository_button": True,
-    "site_url": "https://cpmpy.readthedocs.io/",
-    "repo_url": "https://github.com/CPMpy/cpmpy",
-    # "edit_uri": "blob/main/docs",
-    "features": [
-        "navigation.expand",
-        # "navigation.tabs",
-        # "navigation.tabs.sticky",
-        # "toc.integrate",
-        "navigation.sections",
-        # "navigation.instant",
-        # "header.autohide",
-        "navigation.top",
-        # "navigation.footer",
-        # "navigation.tracking",
-        # "search.highlight",
-        "search.share",
-        "search.suggest",
-        "toc.follow",
-        "toc.sticky",
-        "content.tabs.link",
-        "content.code.copy",
-        "content.action.edit",
-        "content.action.view",
-        "content.tooltips",
-        "announce.dismiss",
-    ],
-    "palette": [
+    "logo": {
+        "image_light": "../logo/CPMpy_Icon_Blue.svg",
+        "image_dark": "../logo/CPMpy_Icon_Blue.svg",
+        "text": "CPMpy",
+    },
+    "github_url": "https://github.com/CPMpy/cpmpy",
+    "icon_links": [
         {
-            "media": "(prefers-color-scheme)",
-            # "toggle": {
-            #     "icon": "material/brightness-auto",
-            #     "name": "Switch to light mode",
-            # },
-        },
-        {
-            "media": "(prefers-color-scheme: light)",
-            "scheme": "default",
-            "primary": "white",
-            "accent": "light-blue",
-            "toggle": {
-                "icon": "material/lightbulb",
-                "name": "Switch to dark mode",
-            },
-        },
-        {
-            "media": "(prefers-color-scheme: dark)",
-            "scheme": "slate",
-            "primary": "deep-orange",
-            "accent": "lime",
-            "toggle": {
-                "icon": "material/lightbulb-outline",
-                "name": "Switch to system preference",
-            },
+            "name": "PyPI",
+            "url": "https://pypi.org/project/cpmpy/",
+            "icon": "fa-brands fa-python",
         },
     ],
-    "toc_title_is_page_title": False,
-
-    "social": [
-        {
-            "icon": "fontawesome/brands/github",
-            "link": "https://github.com/CPMpy/cpmpy",
-            "name": "Source on github.com",
-        },
-        {
-            "icon": "fontawesome/brands/python",
-            "link": "https://pypi.org/project/cpmpy/",
-        },
-    ]
-    
+    # Top navbar shows "Docs" and "Examples" (index.rst's own toctree has
+    # just those 2 entries) - add more top-level sections (e.g. "Playground")
+    # by adding another entry to that toctree.
+    "navbar_start": ["navbar-logo"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    "collapse_navigation": False,
+    "navigation_depth": 4,
+    "show_nav_level": 2,
+    "show_toc_level": 2,
+    "secondary_sidebar_items": ["page-toc"],
 }
 
 # Prepare galleries before sphinx-gallery processes them

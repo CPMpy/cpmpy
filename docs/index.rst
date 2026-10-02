@@ -6,12 +6,11 @@ Source code and issue tracker: https://github.com/CPMpy/cpmpy
 CPMpy is ideal for solving combinatorial problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Getting started:
+   :hidden:
+   :maxdepth: 2
 
-   modeling
-   summary
-   upgrading_to_v1
+   docs
+   examples
 
 .. note::
    CPMpy v1.0.0 contains a number of breaking changes. If you are upgrading from an
@@ -133,17 +132,6 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
 
 
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Advanced guides:
-
-   how_to_debug
-   multiple_solutions
-   unsat_core_extraction
-   developers
-   adding_solver
-   testing
-
 Open Source
 -----------
 
@@ -153,23 +141,3 @@ CPMpy is open source (`Apache 2.0 license <https://github.com/cpmpy/cpmpy/blob/m
 
 
 Are you a solver developer? We are keen to `integrate solvers <adding_solver.html>`_ that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: API documentation:
-
-   api/model
-   api/expressions
-   api/transformations
-   api/solvers
-   api/tools
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Examples:
-
-   auto_examples/basic/index
-   auto_examples/csplib/index
-   auto_examples/tutorial_ijcai22/index
