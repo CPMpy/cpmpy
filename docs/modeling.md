@@ -297,8 +297,7 @@ M.T            # transpose
 np.dot(x, w)   # dot-product
 ```
 
-Binary operators follow NumPy broadcasting: the other operand is broadcast to the shape of the CPMpy array. So `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. One limitation compared to plain NumPy is that the result always keeps the shape of the CPMpy array — e.g. a `(3,1)` array plus a length-3 vector does not expand to `(3,3)`.
-
+Numpy broadcasting is also supported on CPMpy arrays: e.g., `M + w` with `M.shape==(2,3)` and `w.shape==(3,)` works, while incompatible shapes raise a `ValueError`. 
 What does **not** work are operations whose result depends on the (still unknown) values of the decision variables. In particular, you cannot use Boolean decision variables as a mask, because the length of the result would depend on how many are `True`:
 
 ```python
@@ -309,7 +308,7 @@ b = cp.boolvar(shape=10)
 # np.arange(10)[b]  # IndexError
 ```
 
-Because of our overloading of `+,-,*,//` some NumPy functions like `np.sum(x)` will also create a CPMpy expression. This is not guaranteed for all NumPy functions though — `np.equal(x, y)` for example returns a plain Boolean array, not constraints. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `x.sum()`, `.min()`, `.max()`, `.any()` and `.all()` (including the `axis=` argument), so these are safe to use.
+Element-wise NumPy ufuncs that map to Python operators — including `np.add`, `np.equal`, `np.logical_and`, `np.absolute`, … — result in the same array of expressions as using plain `+`, `==`, `&`, `abs`... . Unsupported functions (e.g. `np.sin`, `np.maximum`, `np.where`) raise a `TypeError`. To **avoid surprises**, prefer the Python operators and the CPMpy functions `cp.sum()`, `cp.max()` etc. when in doubt.
 
 Also note that `np.concatenate` / `stack` / `hstack` / `vstack` return a plain `ndarray`, so wrap the result with `cp.cpm_array(...)` before doing further CPMpy operations on it.
 
@@ -356,7 +355,7 @@ Coming back to the Python-builtin functions `min(),max(),abs()`, these are a bit
 
 However, CPMpy also wishes to support the expressions `min(xs) > v` as well as `v + min(xs) != 4` and other nested expressions.
 
-In CPMpy we do this by instantiating min/max/abs as **global functions**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the global function is used within a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` ([link](./api/expressions/globalfunctions.rst#cpmpy.expressions.globalfunctions.Abs.decompose_comparison)) on the global function.
+In CPMpy we do this by instantiating min/max/abs as **global functions**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarily nested expressions, such that the global function is used within a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` ([link](./api/expressions/globalfunctions.rst#cpmpy.expressions.globalfunctions.Abs.decompose_comparison)) on the global function.
 
 A non-exhaustive list of **numeric global constraints** that are available in CPMpy is: `Minimum(), Maximum(), Count(), Element()`.   
 
@@ -498,6 +497,7 @@ m = cp.Model(cp.AllDifferent(xs), maximize=cp.sum(xs))
 
 hassol = m.solve()
 print("Status:", m.status())  # Status: ExitStatus.OPTIMAL (0.03033301 seconds)
+print(m.status().runtime, m.status().solve_time)  # total runtime, solver time
 if hassol:
     print(m.objective_value(), xs.value())  # 27 [10  9  8]
 else:
@@ -509,6 +509,10 @@ The status of solve-call can be the following:
 3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
 4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
 5. `ExitStatus.NOT_RUN`: The solver is not run yet (default when initializing a solver)
+
+The status object also contains timing information:
+1. `runtime`: The total wallclock time of the `solve()` call, including the time spent transforming and posting the constraints.
+2. `solve_time`: The time spent by the solver itself solving the problem.
 
 ## Finding all solutions
 
@@ -1030,7 +1034,7 @@ import cpmpy as cp
 def time_solver(model, solver, param_dict):
     s = cp.SolverLookup.get(solver, model)
     s.solve(**param_dict)
-    return s.status().runtime
+    return s.status().solve_time
 
 space = {
     'cp_model_probing_level': hp.choice('cp_model_probing_level', [0, 1, 2, 3]),

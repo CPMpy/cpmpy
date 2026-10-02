@@ -236,7 +236,7 @@ class CPM_cpo(SolverInterface):
         # new status, translate runtime
         self.cpo_status = self.cpo_result.get_solve_status()
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.cpo_result.get_solve_time() # wallclock time in (float) seconds
+        self.cpm_status.solve_time = self.cpo_result.get_solve_time() # wallclock time in (float) seconds
 
         # translate solver exit status to CPMpy exit status
         if self.cpo_status == "Feasible":
@@ -335,11 +335,11 @@ class CPM_cpo(SolverInterface):
             self.cpo_model.add(docp.modeler.forbidden_assignments(solvars, [vals]))
 
             if time_limit is not None: # update remaining time
-                time_limit -= self.status().runtime
+                time_limit -= self.status().solve_time
         end = time.time()
 
         # update solver status
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
         if solution_count:
             if solution_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -598,11 +598,11 @@ class CPM_cpo(SolverInterface):
                         continue
                     else:
                         task_demand = dom.pulse(task, get_bounds(h))
+                        # a zero-duration task occupies no resource, set as non-active
+                        active = dom.size_of(task) > 0
                         if is_present is not None:
-                            cons += [dom.if_then(self._cpo_expr(is_present[i], boolexpr=True),
-                                                 self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
-                        else:
-                            cons += [self._cpo_expr(h) == dom.height_at_start(task, task_demand)]
+                            active = dom.logical_and(active, self._cpo_expr(is_present[i], boolexpr=True))
+                        cons += [dom.if_then(active, self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
                         total_usage.append(task_demand)
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
@@ -613,6 +613,11 @@ class CPM_cpo(SolverInterface):
                     end = None
                 else:
                     start, dur, end = cpm_con.args
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # CPO has strict semantics for NoOverlap, post as Cumulative instead
+                    return self._cpo_expr(Cumulative(start, dur, end, demand=1, capacity=1))
+
                 tasks, cons = self._make_tasks(start, dur, end, None)
                 return cons + [dom.no_overlap(tasks)]
             
@@ -622,6 +627,10 @@ class CPM_cpo(SolverInterface):
                     end = None
                 else:
                     start, dur, end, is_present = cpm_con.args
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # CPO has strict semantics, see 'no_overlap'
+                    return self._cpo_expr(CumulativeOptional(start, dur, end, demand=1, capacity=1, is_present=is_present))
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
                 return cons + [dom.no_overlap(tasks)]
@@ -718,6 +727,58 @@ class CPM_cpo(SolverInterface):
             if is_optional: # enforce presence of task
                 extra_cons += [dom.presence_of(task) == self._cpo_expr(is_present, boolexpr=True)]
             return task, extra_cons
+
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using CP Optimizer's native conflict refiner.
+
+        CP Optimizer refines conflicts over native constraints. A CPMpy soft
+        constraint may expand to several native ones. In that case we post them
+        as one ``logical_and``, which the refiner treats as a single member.
+        CP Optimizer does not actually support hard constraints so the parameter can not be used.
+
+        For more information see the actual documentation of CPO: 
+        https://www.ibm.com/docs/en/cofz/12.10.0?topic=concepts-conflict-refiner-in-cp-optimizer
+        """
+        soft_cons = toplevel_list(soft, merge_and=False)
+        s = cls()
+        dom = s.get_docp().modeler
+
+        # Check that there are no hard constraints
+        if len(hard) != 0:
+            raise ValueError("CP Optimizer does not support hard constraints for MUS extraction. " \
+            "Please only use soft constraints or a different solver.")
+
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
+        s._csemap = None
+
+        native_to_soft_idx = {}
+        for i, soft_con in enumerate(soft_cons):
+            native_soft = []
+            for cpm_con in s.transform(soft_con):
+                cpo_expr = s._cpo_expr(cpm_con, boolexpr=True)
+                # Globals such as Cumulative may return a list of native exprs.
+                native_soft.extend(cpo_expr if is_any_list(cpo_expr) else [cpo_expr])
+
+            # Keep multi-native softs atomic: the refiner does not split &&.
+            soft_native = native_soft[0] if len(native_soft) == 1 else dom.logical_and(native_soft)
+            s.cpo_model.add(soft_native)
+            native_to_soft_idx[soft_native] = i
+
+        refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
+        assert refine_res.is_conflict(), "MUS: model must be UNSAT"
+
+        core = []
+        cpo_core = refine_res.get_member_constraints()
+
+        for cpo_con in cpo_core:
+            soft_idx = native_to_soft_idx[cpo_con]
+            core.append(soft_cons[soft_idx])
+
+        return core
 
 
 # solvers are optional, so this file should be interpretable

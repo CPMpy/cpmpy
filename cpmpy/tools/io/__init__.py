@@ -72,7 +72,7 @@ Use :func:`load_formats` and :func:`write_formats` to inspect the currently regi
     from cpmpy.tools.io import load_formats, write_formats
 
     print(load_formats()) 
-    >> ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'cnf', 'wcnf', 'opb', 'jsplib', 'rcpsp', 'nurserostering']
+    >> ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'cnf', 'wcnf', 'opb', 'jsplib', 'rcpsp', 'nurserostering', 'sudoku']
     print(write_formats())
     >> ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'cnf', 'wcnf', 'opb']
 
@@ -101,6 +101,7 @@ from .utils import get_extension, get_format
 from .jsplib import load_jsplib        
 from .nurserostering import load_nurserostering
 from .rcpsp import load_rcpsp
+from .sudoku import load_sudoku
 
 # Standard format loaders and writers
 from .opb import load_opb, write_opb
@@ -125,6 +126,7 @@ _all__ = [
     "load_jsplib",
     "load_rcpsp",
     "load_nurserostering",
+    "load_sudoku",
     "get_extension",
     "get_format",
 ]

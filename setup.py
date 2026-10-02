@@ -20,7 +20,7 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 
 
 solver_dependencies = {
-    "ortools": ["ortools>=9.3.10497,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
+    "ortools": ["ortools>=9.12"],
     "z3": ["z3-solver>=5.0.0"],
     "choco": ["pychoco>=0.2.1,<0.3.0"],  # 0.3.0 breaks CPMpy tests
     "exact": ["exact>=2.1.0"], # older versions (<2.2.1) are bugged on py3.13
@@ -60,7 +60,7 @@ setup(
     version=get_version("cpmpy/__init__.py"),
     author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
-    license='Apache 2.0',
+    license_expression='Apache-2.0',
     description='A numpy-based library for modeling constraint programming problems',
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -97,7 +97,6 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
-        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.10'

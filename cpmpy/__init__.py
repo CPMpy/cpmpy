@@ -9,12 +9,12 @@ Source code and bug reports at https://github.com/CPMpy/cpmpy
 The package consists of 4 modules:
 - `model`: a generic container for expressions (constraints and an objective), it can also search for an available solver and call it
 - `expressions`: all forms of expression objects that allow you to specify constraints and objectives over variables
-- `solvers`: CPMpy classes that translate a model into approriate calls of a solver's API
+- `solvers`: CPMpy classes that translate a model into appropriate calls of a solver's API
 - `transformations`: common methods for transforming expressions into other expressions, used by `solvers` modules to simplify/rewrite expressions
 """
 # Tias Guns, 2019-2026
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 from .expressions import __all__ as _expressions_all
