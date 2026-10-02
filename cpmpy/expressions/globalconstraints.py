@@ -1854,7 +1854,7 @@ class Reservoir(GlobalConstraint):
             return False
 
         # add same-time events together to get the level
-        change = {}
+        change : dict[int,int] = dict()
         for s, d in zip(start, demand):
             change[s] = change.get(s, 0) + d
 
@@ -1971,7 +1971,7 @@ class ReservoirOptional(GlobalConstraint):
             return False
         
         # add same-time events together to get the level
-        change = {}
+        change : dict[int,int] = dict()
         for s, d, p in zip(start, demand, is_present):
             if p:
                 change[s] = change.get(s, 0) + d
