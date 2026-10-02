@@ -85,7 +85,7 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "reservoir", "circuit",
+    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "reservoir", "reservoir_optional", "circuit",
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
@@ -645,15 +645,6 @@ class CPM_ortools(SolverInterface):
 
                 return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
 
-            elif cpm_expr.name == "reservoir":
-                start, demand, min_cap, max_cap = cpm_expr.args
-                if is_int(min_cap) and is_int(max_cap):
-                    return self.ort_model.AddReservoirConstraint(
-                        self.solver_vars(start), self.solver_vars(demand), int(min_cap), int(max_cap))
-                for con in self.transform(cpm_expr.decompose()[0]):
-                    self._post_constraint(con)
-                return None
-
             elif cpm_expr.name == "cumulative_optional":
                 if len(cpm_expr.args) == 5:
                     start, dur, demand, cap, is_present = cpm_expr.args
@@ -710,6 +701,23 @@ class CPM_ortools(SolverInterface):
                     # OR-Tools has strict semantics, see 'no_overlap'
                     return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
+
+            elif cpm_expr.name == "reservoir":
+                start, demand, min_cap, max_cap = cpm_expr.args
+                return self.ort_model.AddReservoirConstraint(
+                        self.solver_vars(start), self.solver_vars(demand), int(min_cap), int(max_cap))
+               
+            elif cpm_expr.name == "reservoir_optional":
+                start, demand, min_cap, max_cap, is_present = cpm_expr.args
+                ort_present = []
+                for p in is_present:
+                    if isinstance(p, BoolVal):
+                        ort_present.append(bool(p))
+                    else:
+                        ort_present.append(self.solver_var(p))
+ 
+                return self.ort_model.AddReservoirConstraintWithActive(
+                    self.solver_vars(start), self.solver_vars(demand), ort_present, int(min_cap), int(max_cap))
 
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
