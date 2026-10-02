@@ -31,6 +31,7 @@ SKIPPED_EXAMPLES = [
                     "sudoku_schrodingers_rat.py", # too slow on github actions
                     "lpcp21_p1_frog.py", # needs web resource
                     "hyperparameter_search.py", # too slow on github actions
+                    "vrp_lns.py", # too slow on github actions
                     ]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
