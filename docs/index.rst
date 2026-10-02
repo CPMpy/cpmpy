@@ -66,6 +66,11 @@ Supported solvers
      - SAT ASAT ISAT - OPT FLOBJ
      - pip
      - 
+   * - :doc:`cvc5 <api/solvers/cvc5>`
+     - SMT
+     - SAT ASAT ALLSAT - PROOF
+     - pip
+     -
    * - :doc:`Hexaly <api/solvers/hexaly>`
      - Global Opt.
      - SAT ISAT ALLSAT - OPT IOPT FLOBJ
