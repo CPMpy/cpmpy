@@ -120,6 +120,7 @@
         Xor
         Cumulative
         CumulativeOptional
+        Reservoir
         NoOverlap
         NoOverlapOptional
         Precedence
@@ -1747,6 +1748,122 @@ class Cumulative(GlobalConstraint):
                 return False
 
         return True
+
+
+class Reservoir(GlobalConstraint):
+    """
+    Enforces that a reservoir stays between a minimum and a maximum level.
+    The level is influenced by the demand of discrete events, which may contribute or subtract from the level.
+
+    Useful for modeling producer/consumer scheduling problems.
+    """
+
+    def __init__(self, start: ListLike[ExprLike], demand: ListLike[ExprLike], min_capacity: int, max_capacity: int):
+        """
+            Arguments:
+                start (ListLike[ExprLike]): Start times of the events
+                demand (ListLike[ExprLike]): Demand of each event, positive or negative
+                min_capacity (int): Minimum allowed level
+                max_capacity (int): Maximum allowed level
+        """
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(demand):
+            raise TypeError("demand should be a list")
+
+        start, demand = list(start), list(demand)
+        if len(start) != len(demand):
+            raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
+
+        if len(start) == 0:
+            raise ValueError("Need at least one event in a reservoir constraint")
+
+        super().__init__("reservoir", (start, demand, min_capacity, max_capacity))
+
+    def decompose(self, how: str = "auto") -> tuple[list[Expression], list[Expression]]:
+        """
+        Decompose the Reservoir constraint.
+        Supports a time-based or a task-based decomposition.
+        By default, the decomposition is chosen based on the number of events and the horizon.
+
+        Arguments:
+            how (str): how the reservoir constraint should be decomposed, can be "time", "task", or "auto" (default)
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        if how not in ["time", "task", "auto"]:
+            raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
+
+        start = self.args[0]
+        
+        lbs, ubs = get_bounds(start)
+        horizon = max(ubs) - min(lbs)
+        if (how == "time") or (how == "auto" and len(start) <= horizon):
+            return self._time_decomposition()
+        elif (how == "task") or (how == "auto" and len(start) > horizon):
+            return self._task_decomposition()
+        raise Exception # should not be reached
+
+    def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Task-based decomposition: the level only changes at event times, so it
+        is enough to check it at each event, after every event scheduled at
+        that same time.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, demand, min_capacity, max_capacity = self.args
+        cons: list[Expression] = [min_capacity <= 0, max_capacity >= 0]
+
+        for i in range(len(start)):
+            level = cp.sum(demand[j] * (start[j] <= start[i]) for j in range(len(start)))
+            cons.append(level >= min_capacity)
+            cons.append(level <= max_capacity)
+        return cons, []
+
+    def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Time-based decomposition: for every time point in the horizon, the
+        sum of demands of events that have already started stays within bounds.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, demand, min_capacity, max_capacity = self.args
+        cons: list[Expression] = [min_capacity <= 0, max_capacity >= 0]
+    
+        lbs, ubs = get_bounds(start)
+        for t in range(min(lbs), max(ubs) + 1):
+            level = cp.sum(d * (s <= t) for s, d in zip(start, demand))
+            cons.append(level >= min_capacity)
+            cons.append(level <= max_capacity)
+        return cons, []
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        start, demand, min_capacity, max_capacity = argvals(self.args)
+        if any(a is None for a in list(start) + list(demand) + [min_capacity, max_capacity]):
+            return None
+        if not min_capacity <= 0 <= max_capacity:
+            return False
+
+        # events at the same time are applied together
+        change = {}
+        for s, d in zip(start, demand):
+            change[s] = change.get(s, 0) + d
+
+        level = 0
+        for t in sorted(change):
+            level += change[t]
+            if level < min_capacity or level > max_capacity:
+                return False
+        return True
+
 
 class CumulativeOptional(GlobalConstraint):
     """
