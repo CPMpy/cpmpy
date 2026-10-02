@@ -157,7 +157,7 @@ html_theme_options = {
     "navigation_depth": 4,
     "show_nav_level": 2,
     "show_toc_level": 2,
-    "secondary_sidebar_items": ["page-toc"],
+    "secondary_sidebar_items": ["page-toc", "gallery-downloads"],
 }
 
 # Prepare galleries before sphinx-gallery processes them
@@ -203,3 +203,50 @@ html_title = "CPMpy documentation"
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'cpmpy'
+
+
+def _move_gallery_downloads_to_sidebar(app, pagename, templatename, context, doctree):
+    """Move sphinx-gallery's "go to the end to download" note and its
+    download-links footer out of the article body, into
+    context["sphx_glr_downloads"] for _templates/gallery-downloads.html to
+    render in the secondary (right) sidebar instead."""
+    from bs4 import BeautifulSoup
+
+    body = context.get("body")
+    if not body or "sphx-glr-footer" not in body:
+        return
+
+    soup = BeautifulSoup(body, "html.parser")
+
+    note = soup.find("div", class_="sphx-glr-download-link-note")
+    if note:
+        note.decompose()
+
+    footer = soup.find("div", class_="sphx-glr-footer")
+    if footer:
+        # Shorten "Download Jupyter notebook: foo.ipynb" to "Jupyter notebook"
+        # since the sidebar panel is narrow and already titled "Download".
+        labels = {
+            "sphx-glr-download-jupyter": "Jupyter notebook",
+            "sphx-glr-download-python": "Python source code",
+            "sphx-glr-download-zip": "Zip archive",
+        }
+        for css_class, label in labels.items():
+            link = footer.find("div", class_=css_class)
+            link = link.find("a") if link else None
+            if link:
+                link.string = label
+
+        signature = footer.find_next_sibling("p", class_="sphx-glr-signature")
+        downloads_html = str(footer)
+        if signature:
+            downloads_html += str(signature)
+            signature.decompose()
+        footer.decompose()
+        context["sphx_glr_downloads"] = downloads_html
+
+    context["body"] = str(soup)
+
+
+def setup(app):
+    app.connect("html-page-context", _move_gallery_downloads_to_sidebar)

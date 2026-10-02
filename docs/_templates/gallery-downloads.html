@@ -1,0 +1,10 @@
+{# Renders the sphinx-gallery download links (notebook/script/zip) that
+   conf.py's _move_gallery_downloads_to_sidebar() extracted out of the
+   article body, as a small panel in the secondary (right) sidebar instead
+   of a yellow button block in the main content. #}
+{%- if sphx_glr_downloads %}
+<div class="tocsection onthispage sphx-glr-downloads-sidebar-title">
+  <i class="fa-solid fa-download"></i> {{ _('Download this example') }}
+</div>
+{{ sphx_glr_downloads | safe }}
+{%- endif %}

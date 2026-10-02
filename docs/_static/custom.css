@@ -14,3 +14,57 @@
 nav.bd-links p.caption {
     margin-top: 1.25rem;
 }
+
+/* Sphinx-gallery example pages: the download links (notebook/script/zip)
+   are relocated into the right sidebar by conf.py (see
+   _move_gallery_downloads_to_sidebar and _templates/gallery-downloads.html),
+   so restyle them as a plain, compact link list instead of sphinx-gallery's
+   default yellow buttons. */
+.sphx-glr-downloads-sidebar-title {
+    margin-top: 1.5rem;
+}
+
+div.sphx-glr-footer {
+    text-align: left;
+}
+
+div.sphx-glr-footer p {
+    margin: 0;
+}
+
+div.sphx-glr-download {
+    margin: 0;
+}
+
+div.sphx-glr-download a {
+    display: block;
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0.2rem 0;
+    font-weight: 400;
+    color: var(--pst-color-link);
+    text-align: left;
+}
+
+div.sphx-glr-download a:hover {
+    box-shadow: none;
+    background: none;
+    text-decoration: underline;
+}
+
+div.sphx-glr-download code.download {
+    font-family: inherit;
+}
+
+p.sphx-glr-signature {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+p.sphx-glr-signature a.reference.external {
+    padding: 0;
+    font-size: inherit;
+}
+
