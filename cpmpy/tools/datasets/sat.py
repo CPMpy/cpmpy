@@ -58,7 +58,6 @@ class SATDataset(FileDataset):
         """
         Constructor for the SAT competition dataset.
         """
-        self.root = pathlib.Path(root)
         self.year = year
         self.track = track
         self.context = context
@@ -68,9 +67,8 @@ class SATDataset(FileDataset):
         if not track:
             raise ValueError("Track must be specified, e.g. main, submissions, ...")
 
-        dataset_dir = self.root / self.name / str(year) / track / context
         super().__init__(
-            dataset_dir=dataset_dir,
+            root=root, subdirs=(str(year), track, context),
             transform=transform,
             target_transform=target_transform,
             download=download,

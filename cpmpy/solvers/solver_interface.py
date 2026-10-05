@@ -65,7 +65,7 @@ class SolverInterface(object):
 
     def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """
-            Initalize solver interface
+            Initialize solver interface
 
             - name: str: name of this solver
             - subsolver: string: not used/allowed here
@@ -141,6 +141,8 @@ class SolverInterface(object):
         raise NotImplementedError("Solver does not support objective functions")
 
     def status(self):
+        if self.cpm_status.runtime is None: # solver set solve_time, copy to runtime for backwards compatibility
+            self.cpm_status.runtime = self.cpm_status.solve_time
         return self.cpm_status
 
     def solve(self,time_limit:Optional[float]=None):
@@ -312,11 +314,11 @@ class SolverInterface(object):
             self.add(any([v != v.value() for v in self.user_vars if v.value() is not None]))
 
             if time_limit is not None: # update remaining time
-                time_limit -= self.status().runtime
+                time_limit -= self.status().solve_time
         end = time.time()
 
         # update solver status
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
         if solution_count:
             if solution_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -368,6 +370,14 @@ class SolverInterface(object):
         """
         raise NotSupportedError("Solver does not support MUS extraction")
 
+    def get_proof_files(self):
+        """
+        For use when solving using proof-logging.
+        Returns a list of filenames where the proof was stored.
+
+        Depending on the proof-format used, a solver may use multiple proof files for a single solve-call
+        """
+        raise NotSupportedError("Solver does not support proof logging")
 
     # shared helper functions
 
@@ -404,7 +414,7 @@ class ExitStatus(Enum):
 
         `UNSATISFIABLE`: No satisfying solution exists
 
-        `ERROR`: Some error occured (solver should have thrown Exception)
+        `ERROR`: Some error occurred (solver should have thrown Exception)
 
         `UNKNOWN`: Outcome unknown, for example when timeout is reached
     """
@@ -419,14 +429,22 @@ class ExitStatus(Enum):
 class SolverStatus(object):
     """
         Status and statistics of a solver run
+
+        Attributes:
+            exitstatus: ExitStatus, the exit status of the solver
+            runtime: float, the wallclock time of a solve call (including transformation time)
+            solve_time: float, the time taken by the solver to solve the problem
     """
     exitstatus: ExitStatus
     runtime: Optional[float]
+    solve_time: Optional[float]
 
     def __init__(self, name):
         self.solver_name = name
         self.exitstatus = ExitStatus.NOT_RUN
         self.runtime = None
+        self.solve_time = None
+        
 
     def __repr__(self):
         return "{} ({} seconds)".format(self.exitstatus, self.runtime)

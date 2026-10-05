@@ -234,7 +234,7 @@ class CPM_exact(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         self.objective_value_ = None
         # translate exit status
@@ -318,7 +318,7 @@ class CPM_exact(SolverInterface):
                 self._fillVars(has_solution=False) # erases the solution
                 # update exit status
                 self.cpm_status = SolverStatus(self.name)
-                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.solve_time = total_end - total_start
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
                 # early exit
                 return 0
@@ -328,7 +328,7 @@ class CPM_exact(SolverInterface):
                 total_end = time.time()
                 # update exit status
                 self.cpm_status = SolverStatus(self.name)
-                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.solve_time = total_end - total_start
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
                 # early exit
                 return 0
@@ -366,7 +366,7 @@ class CPM_exact(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = total_end - total_start
+        self.cpm_status.solve_time = total_end - total_start
 
         if solsfound: # found some solutions
             if solsfound == solution_limit: # matched solution limit

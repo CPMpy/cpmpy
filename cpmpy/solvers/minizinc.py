@@ -97,7 +97,7 @@ class CPM_minizinc(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
+                                              "inverse", "ite", "xor", "table", "indomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
@@ -349,7 +349,7 @@ class CPM_minizinc(SolverInterface):
             =======================  ===========             
             
             
-            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by omitting the '-' (e.g. 'f' instead of '-f')?
             
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
@@ -424,13 +424,13 @@ class CPM_minizinc(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         runtime = 0
         if 'time' in mzn_result.statistics:
-            self.cpm_status.runtime = self.mzn_time_to_seconds(mzn_result.statistics.get("time"))
+            self.cpm_status.solve_time = self.mzn_time_to_seconds(mzn_result.statistics.get("time"))
         else:
             runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("flatTime", 0))
             runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("initTime", 0))
             runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("solveTime", 0))
             if runtime != 0:
-                self.cpm_status.runtime = runtime
+                self.cpm_status.solve_time = runtime
             else:
                 raise NotImplementedError  # Please report on github, minizinc probably changed their time names/types
 
@@ -906,7 +906,7 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "mul":
             assert isinstance(expr, Multiplication)
             if expr.is_lhs_num:
-                return "{}*({})".format(args_str[1], args_str[0])
+                return "({})*({})".format(args_str[1], args_str[0])
             else:
                 return "({}) * ({})".format(args_str[1], args_str[0])
 
@@ -922,7 +922,7 @@ class CPM_minizinc(SolverInterface):
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
 
-        elif expr.name == "InDomain":
+        elif expr.name == "indomain":
             # InDomain(expr, domain_list) - convert domain_list to a set
             arg0_str = self._convert_expression(expr.args[0])
             domain = expr.args[1]
