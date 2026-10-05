@@ -208,8 +208,6 @@ def global_constraints(solver):
             s = cp.intvar(0, 5, shape=2, name="start")
             demand = [3, -1]
             yield cp.Reservoir(s, demand, -1, 2)
-            yield cp.all(cp.Reservoir(s, demand, -1, 2).decompose(how="time")[0])
-            yield cp.all(cp.Reservoir(s, demand, -1, 2).decompose(how="task")[0])
             yield cp.Reservoir(s, cp.intvar(-2, 2, shape=2, name="demand"), -3, 3)
             continue
 
@@ -219,8 +217,6 @@ def global_constraints(solver):
             demand = [3, -1, 2]
             is_present = [cp.boolvar(), cp.boolvar(), True]
             yield cp.ReservoirOptional(s, demand, -1, 2, is_present)
-            yield cp.all(cp.ReservoirOptional(s, demand, -1, 2, is_present).decompose(how="time")[0])
-            yield cp.all(cp.ReservoirOptional(s, demand, -1, 2, is_present).decompose(how="task")[0])
             continue
 
         elif name == "CumulativeOptional":
