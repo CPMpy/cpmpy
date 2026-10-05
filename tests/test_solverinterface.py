@@ -150,8 +150,9 @@ def test_solve_infeasible_ivs(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_minimize(solver):
     """Test minimize functionality"""
-    solver_class = SolverLookup.lookup(solver)
-    solver = solver_class() if solver != "z3" else solver_class(subsolver="opt")
+    solver_name = solver
+    solver_class = SolverLookup.lookup(solver_name)
+    solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
 
     assert solver.objective_value() is None
 
@@ -167,7 +168,7 @@ def test_minimize(solver):
     assert solver.objective_value() == 1
     assert solver.status().exitstatus == ExitStatus.OPTIMAL
 
-    if solver == "choco":
+    if solver_name == "choco":
         # pychoco crashes on a second find_optimal_solution (empty Solution / get_int_val).
         # Upstream: https://github.com/chocoteam/pychoco/issues/44
         pytest.skip("pychoco crashes when re-solving an optimisation problem")
