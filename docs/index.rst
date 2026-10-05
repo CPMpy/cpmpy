@@ -56,6 +56,11 @@ Supported solvers
      - SAT - OPT - PAR
      - pip + local + (aca.) license
      - 
+   * - :doc:`Optal <api/solvers/optal>`
+     - CP
+     - SAT ALLSAT - OPT - PAR
+     - pip + local + (aca.) license
+     - Scheduling-oriented CP solver
    * - :doc:`MiniZinc <api/solvers/minizinc>`
      - CP
      - SAT - OPT FLOBJ
