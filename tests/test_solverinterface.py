@@ -167,6 +167,11 @@ def test_minimize(solver):
     assert solver.objective_value() == 1
     assert solver.status().exitstatus == ExitStatus.OPTIMAL
 
+    if solver == "choco":
+        # pychoco crashes on a second find_optimal_solution (empty Solution / get_int_val).
+        # Upstream: https://github.com/chocoteam/pychoco/issues/44
+        pytest.skip("pychoco crashes when re-solving an optimisation problem")
+
     solver += ivar > 20
 
     assert solver.solve() is False
