@@ -1,5 +1,21 @@
 # Change log
 
+## Unreleased
+
+<!-- One bullet per pull request, with a link to the pull request. See dev/README.md. -->
+
+### Added
+
+### Breaking changes
+
+### Changed
+
+### Fixed
+
+### Removed
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v1.1.0...vX.Y.Z
+
 ## 1.1.0
 
 ### Added
