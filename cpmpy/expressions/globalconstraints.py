@@ -148,7 +148,7 @@ import cpmpy as cp
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray, _NumVarImpl
-from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
+from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_int, is_boolexpr, implies, argval
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -1756,7 +1756,21 @@ class Reservoir(GlobalConstraint):
     Enforces that a reservoir stays between a minimum and a maximum level.
     The level is influenced by the demand of discrete events, which may contribute or subtract from the level.
 
+    Same-time events are added simultaneously, so increasing the level while decreasing
+    it at the same time step with the same amount never exceeds the level.
+
     Useful for modeling producer/consumer scheduling problems.
+
+    Example with ``start=[1, 3, 5]``, ``demand=[+2, -1, -1]``, ``min_capacity=0``, ``max_capacity=2``:
+
+    .. code-block:: text
+
+        2 |    ----
+        1 |        ----
+        0 |----        ----
+          +----+--+----+------> time
+               1  3    5
+              +2 -1   -1
     """
 
     def __init__(self, start: ListLike[ExprLike], demand: ListLike[ExprLike], min_capacity: int, max_capacity: int):
@@ -1771,15 +1785,25 @@ class Reservoir(GlobalConstraint):
             raise TypeError("start should be a list")
         if not is_any_list(demand):
             raise TypeError("demand should be a list")
+        if not is_int(min_capacity):
+            raise TypeError(f"min_capacity should be an integer, but got {min_capacity}")
+        if not is_int(max_capacity):
+            raise TypeError(f"max_capacity should be an integer, but got {max_capacity}")
 
         start, demand = list(start), list(demand)
         if len(start) != len(demand):
             raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
-
         if len(start) == 0:
             raise ValueError("Need at least one event in a reservoir constraint")
+        if not min_capacity <= 0 <= max_capacity:
+            raise ValueError(f"Allowed capacity should include 0, got min_capacity {min_capacity} and max_capacity {max_capacity}")
 
         super().__init__("reservoir", (start, demand, min_capacity, max_capacity))
+
+    @property
+    def args(self) -> tuple[list[ExprLike], list[ExprLike], int, int]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self, how: str = "auto") -> tuple[list[Expression], list[Expression]]:
         """
@@ -1816,7 +1840,7 @@ class Reservoir(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, demand, min_capacity, max_capacity = self.args
-        cons: list[Expression] = [min_capacity <= 0, max_capacity >= 0]
+        cons: list[Expression] = []
 
         for i in range(len(start)):
             level = cp.sum(demand[j] * (start[j] <= start[i]) for j in range(len(start)))
@@ -1833,7 +1857,7 @@ class Reservoir(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, demand, min_capacity, max_capacity = self.args
-        cons: list[Expression] = [min_capacity <= 0, max_capacity >= 0]
+        cons: list[Expression] = []
     
         lbs, ubs = get_bounds(start)
         for t in range(min(lbs), max(ubs) + 1):
@@ -1872,7 +1896,22 @@ class ReservoirOptional(GlobalConstraint):
     Enforces that a reservoir stays between a minimum and a maximum level.
     The level is influenced by the demand of optional discrete events, which may contribute or subtract from the level.
 
+    Same-time events are added simultaneously, so increasing the level while decreasing
+    it at the same time step with the same amount never exceeds the level.
+
     Useful for modeling producer/consumer scheduling problems.
+
+    Example with ``start=[1, 3, 5]``, ``demand=[+2, 4, -1]``, ``is_present=[True, False, True]``,
+    ``min_capacity=0``, ``max_capacity=2`` (middle event is inactive):
+
+    .. code-block:: text
+
+        2 |    --------
+        1 |            ----
+        0 |----
+          +----+--+----+------> time
+               1  3    5
+              +2  x   -1
     """
 
     def __init__(self, start: ListLike[ExprLike], demand: ListLike[ExprLike], min_capacity: int, max_capacity: int, is_present: ListLike[BoolExprLike]):
@@ -1890,6 +1929,10 @@ class ReservoirOptional(GlobalConstraint):
             raise TypeError("demand should be a list")
         if not is_any_list(is_present):
             raise TypeError("is_present should be a list")
+        if not is_int(min_capacity):
+            raise TypeError(f"min_capacity should be an integer, but got {min_capacity}")
+        if not is_int(max_capacity):
+            raise TypeError(f"max_capacity should be an integer, but got {max_capacity}")
 
         start, demand, is_present = list(start), list(demand), list(is_present)
         if len(start) != len(demand):
@@ -1898,8 +1941,15 @@ class ReservoirOptional(GlobalConstraint):
             raise ValueError(f"Start and is_present should have equal length, but got {len(start)} and {len(is_present)}")
         if len(start) == 0:
             raise ValueError("Need at least one event in a reservoir constraint")
+        if not min_capacity <= 0 <= max_capacity:
+            raise ValueError(f"Allowed capacity should include 0, got min_capacity {min_capacity} and max_capacity {max_capacity}")
 
         super().__init__("reservoir_optional", (start, demand, min_capacity, max_capacity, is_present))
+
+    @ property
+    def args(self) -> tuple[list[ExprLike], list[ExprLike], int, int, list[BoolExprLike]]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self, how: str = "auto") -> tuple[list[Expression], list[Expression]]:
         """
@@ -1935,11 +1985,11 @@ class ReservoirOptional(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, demand, min_capacity, max_capacity, is_present = self.args
-        cons: list[Expression] = [min_capacity <= 0, max_capacity >= 0]
+        cons: list[Expression] = []
         for i in range(len(start)):
             level = cp.sum(demand[j] * (is_present[j] & (start[j] <= start[i])) for j in range(len(start)))
-            cons.append(implies(is_present[i], level >= min_capacity))
-            cons.append(implies(is_present[i], level <= max_capacity))
+            cons.append(level >= min_capacity)
+            cons.append(level <= max_capacity)
         return cons, []
 
     def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
@@ -1951,7 +2001,7 @@ class ReservoirOptional(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, demand, min_capacity, max_capacity, is_present = self.args
-        cons: list[Expression] = [min_capacity <= 0, max_capacity >= 0]
+        cons: list[Expression] = []
         lbs, ubs = get_bounds(start)
         for t in range(min(lbs), max(ubs) + 1):
             level = cp.sum(d * (p & (s <= t)) for s, d, p in zip(start, demand, is_present))
