@@ -1198,6 +1198,13 @@ class TestGlobal:
         pytest.raises(TypeError, cp.Reservoir, 1, [1], -1, 1)
         pytest.raises(TypeError, cp.Reservoir, [1], 1, -1, 1)
         pytest.raises(ValueError, cp.Reservoir, [1, 2], [1], -1, 1)
+        # capacity bounds must include the initial level 0
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], 1, 2)
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], -2, -1)
+        # capacities must be integer constants, not expressions
+        capa = cp.intvar(-2, 2, name="capa")
+        pytest.raises(TypeError, cp.Reservoir, [1], [1], capa, 2)
+        pytest.raises(TypeError, cp.Reservoir, [1], [1], -1, capa)
         pytest.raises(ValueError, lambda: cons.decompose(how="nope"))
 
     def test_reservoir(self, solver):
@@ -1260,6 +1267,13 @@ class TestGlobal:
         pytest.raises(ValueError, cp.ReservoirOptional, [], [], -1, 1, [])
         pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, 1, True)
         pytest.raises(ValueError, cp.ReservoirOptional, [1, 2], [1], -1, 1, [True])
+        # capacity bounds must include the initial level 0
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], 1, 2, [True])
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], -2, -1, [True])
+        # capacities must be integer constants, not expressions
+        capa = cp.intvar(-2, 2, name="capa")
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], capa, 2, [True])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, capa, [True])
 
     def test_reservoir_optional(self, solver):
         start = cp.intvar(0, 3, shape=2, name="start")
