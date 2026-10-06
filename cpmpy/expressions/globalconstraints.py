@@ -1790,7 +1790,12 @@ class Reservoir(GlobalConstraint):
         if not is_int(max_capacity):
             raise TypeError(f"max_capacity should be an integer, but got {max_capacity}")
 
+        if isinstance(start, np.ndarray):
+            start = list(start.flat)
+        if isinstance(demand, np.ndarray):
+            demand = list(demand.flat)
         start, demand = list(start), list(demand)
+
         if len(start) != len(demand):
             raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
         if len(start) == 0:
@@ -1934,7 +1939,14 @@ class ReservoirOptional(GlobalConstraint):
         if not is_int(max_capacity):
             raise TypeError(f"max_capacity should be an integer, but got {max_capacity}")
 
+        if isinstance(start, np.ndarray):
+            start = list(start.flat)
+        if isinstance(demand, np.ndarray):
+            demand = list(demand.flat)
+        if isinstance(is_present, np.ndarray):
+            is_present = list(is_present.flat)
         start, demand, is_present = list(start), list(demand), list(is_present)
+
         if len(start) != len(demand):
             raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
         if len(start) != len(is_present):
