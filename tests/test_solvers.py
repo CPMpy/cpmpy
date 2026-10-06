@@ -839,7 +839,7 @@ class TestSupportedSolvers:
         assert m.solve(solver=solver, time_limit=1)
 
         try:
-            m.solve(solver=solver, time_limit=-1)
+            cp.SolverLookup.get(solver, m).solve(time_limit=-1)
             assert False
         except ValueError:
             pass
@@ -1153,11 +1153,48 @@ class TestSupportedSolvers:
         # normally, should not be able to solve within 1s...
         assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
+        s = cp.SolverLookup.get(solver, m)
+        s.solve(time_limit=1)
+        # normally, should not be able to solve within 1s, ensure status is set by solver interface here
+        assert s.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
+
         # now trivally unsat
         m += cp.sum(bv) <= 0
         m.solve(solver=solver)
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
+
+    def test_status_runtime(self, solver):
+        
+        n = 500
+        seed = 42
+        np.random.seed(seed)
+
+        bv = cp.boolvar(shape=n)
+        model = cp.Model()
+        for _ in range(round(4.26 * n)):
+            lits = [x if np.random.random() < 0.5 else ~x for x in np.random.choice(bv, size=3)]
+            model += cp.any(lits)
+
+        model.solve(solver=solver, time_limit=3) # enough to not time-out the transformations
+        assert model.status().runtime is not None
+        assert model.status().runtime > 0
+
+        assert model.status().solve_time is not None
+        assert model.status().solve_time > 0
+        
+        assert model.status().runtime > model.status().solve_time # model overrides runttime with wallclock time
+
+        # test via solver interface
+        s = cp.SolverLookup.get(solver, model)
+        s.solve(time_limit=1)
+        assert s.status().runtime is not None
+        assert s.status().runtime > 0
+
+        assert s.status().solve_time is not None
+        assert s.status().solve_time > 0
+        
+        assert s.status().runtime == s.status().solve_time # solver interfce patches runtime to solve time for backwards compatibility
 
 
 
@@ -1336,6 +1373,30 @@ def test_scip_special_cardinality():
     assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
     assert s.solve()
     assert bvs.value().sum() <= 3
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_cumulative_native():
+    if not hasattr(CPM_scip().scip_model, "addConsCumulative"):
+        pytest.skip("PySCIPOpt without addConsCumulative")
+
+    start = cp.intvar(0, 10, shape=3)
+    model = cp.Model(cp.Cumulative(start, [3, 2, 2], demand=[2, 3, 1], capacity=3))
+    s = cp.SolverLookup.get("scip", model)
+    assert any(c.getConshdlrName() == "cumulative" for c in s.scip_model.getConss())
+    assert s.solve()
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_no_overlap_native():
+    if not hasattr(CPM_scip().scip_model, "addConsCumulative"):
+        pytest.skip("PySCIPOpt without addConsCumulative")
+
+    start = cp.intvar(0, 10, shape=3)
+    model = cp.Model(cp.NoOverlap(start, [2, 1, 1]))
+    s = cp.SolverLookup.get("scip", model)
+    assert any(c.getConshdlrName() == "cumulative" for c in s.scip_model.getConss())
+    assert s.solve()
 
 
 @pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")

@@ -1,5 +1,55 @@
 # Change log
 
+## 1.1.0
+
+### Added
+
+* **New Dataset** Sudoku [#1067](https://github.com/CPMpy/cpmpy/pull/1067)
+* Native MUS for CPO [#987](https://github.com/CPMpy/cpmpy/pull/987)
+* Native MUS for CPLEX [#986](https://github.com/CPMpy/cpmpy/pull/986)
+* Unified prooflogging [#862](https://github.com/CPMpy/cpmpy/pull/862)
+* PySCIPOpt's native `cumulative` [#998](https://github.com/CPMpy/cpmpy/pull/998)
+* Typing of `abs` and `mult` [#1075](https://github.com/CPMpy/cpmpy/pull/1075)
+
+### Breaking changes
+
+* `Model.solve(time_limit=...)` now includes transformation time; returns `False` (`ExitStatus.UNKNOWN`) if the limit runs out before solving. `model.status().runtime` now includes transformation time, separate solver time is in the new `status().solve_time`. Custom solver interfaces should set `cpm_status.solve_time` instead of `runtime` [#803](https://github.com/CPMpy/cpmpy/pull/803)
+* `NDVarArray` uses NumPy's `__array_ufunc__`: `np.equal(x, y)` etc. now return constraints instead of Booleans. Ufuncs without a Python operator equivalent (`np.square`, `np.maximum`, `np.matmul`/`@`, ...), ufunc methods (`np.add.reduce`, `np.mean`, ...) and `out=`/`dtype=`/`keepdims=` arguments raise an error; use Python operators, `np.dot` or `cp.*` functions instead [#1062](https://github.com/CPMpy/cpmpy/pull/1062)
+* `InDomain` has expression name `"indomain"` instead of `"InDomain"` [#1087](https://github.com/CPMpy/cpmpy/pull/1087)
+* Proof logging is standardised across solvers: the proof file is passed to the constructor (`SolverLookup.get(solver, model, proof="path/to/proof")`) and checked with `s.verify()`. For GCS, the `prove=`, `proof_name=`, `proof_location=`, `verify=`, ... arguments of `solve()`/`solveAll()` are removed, `verify()` now returns `True` if valid (previously VeriPB's exit code) and `GCSVerificationException` is removed [#862](https://github.com/CPMpy/cpmpy/pull/862)
+* Zero-duration tasks never overlap in `NoOverlap(Optional)` [#1105](https://github.com/CPMpy/cpmpy/pull/1105) and consume no resources in `Cumulative(Optional)` [#1102](https://github.com/CPMpy/cpmpy/pull/1102)
+* OR-Tools lower version increased to 9.12 [#1074](https://github.com/CPMpy/cpmpy/pull/1074)
+* Models pickled with an earlier version are not guaranteed to work correctly (e.g. `InDomain` keeps its old name making it always decompose, `model.status()` lacks `solve_time`); regenerate your pickle files with v1.1.0
+
+### Changed
+
+* Switch to `model.add()` in README [#1113](https://github.com/CPMpy/cpmpy/pull/1113)
+* Account for transformation time in `Model.solve()` [#803](https://github.com/CPMpy/cpmpy/pull/803)
+* Following modern Numpy ndarray subclassing with ufunc [#1062](https://github.com/CPMpy/cpmpy/pull/1062)
+Account for transformation time in `model.solve()` [#803](https://github.com/CPMpy/cpmpy/pull/803)
+* Increase OR-Tools lower bound to 9.12 [#1074](https://github.com/CPMpy/cpmpy/pull/1074)
+* Modernise hyperparameter search example [#960](https://github.com/CPMpy/cpmpy/pull/960)
+
+### Fixed
+
+* Flatten multidimension args to globals [#1112](https://github.com/CPMpy/cpmpy/pull/1112)
+* Analyzing XCSP3 benchmark csvs with empty time metrics [#923](https://github.com/CPMpy/cpmpy/pull/923)
+* Typos in docstrings, comments and error messages [#1097](https://github.com/CPMpy/cpmpy/pull/1097)
+* NoOverlap non-strict semantics for zero duration tasks [#1105](https://github.com/CPMpy/cpmpy/pull/1105)
+* Cumulative no demand when duration is zero [#1102](https://github.com/CPMpy/cpmpy/pull/1102)
+* Logo image link for PyPI [#1104](https://github.com/CPMpy/cpmpy/pull/1104)
+* Fix MUS tests [#1095](https://github.com/CPMpy/cpmpy/pull/1095)
+* Fix linearize when trivially unsat comparison [#1101](https://github.com/CPMpy/cpmpy/pull/1101)
+* Support trivial arities of `And` and `Or` [#1080](https://github.com/CPMpy/cpmpy/pull/1080)
+* Docs: small typo [#1092](https://github.com/CPMpy/cpmpy/pull/1092)
+* Small fixes to Hexaly [#983](https://github.com/CPMpy/cpmpy/pull/983)
+* Rename `InDomain` to `indomain` [#1087](https://github.com/CPMpy/cpmpy/pull/1087)
+* Typo csemap OR-Tools [#1088](https://github.com/CPMpy/cpmpy/pull/1088)
+* Fixes to XCSP3 tools [#1068](https://github.com/CPMpy/cpmpy/pull/1068)
+* Marker inheritance and non-parametrised tests with solver dependency [#961](https://github.com/CPMpy/cpmpy/pull/961)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v1.0.0...v1.1.0
+
 ## 1.0.0 :partying_face:
 
 ### Added
