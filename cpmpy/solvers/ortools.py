@@ -704,16 +704,18 @@ class CPM_ortools(SolverInterface):
 
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
-                # when using an objective over arcs, using these vars directly is recommended
-                # (see PCTSP-path model in the future)
+                arc_vars = dict()
+                extra_cons = []
                 x = cpm_expr.args
-                N = len(x)
-                arcvars = boolvar(shape=(N,N))
-                # post channeling constraints from int to bool
-                self.add([b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)])
-                # post the global constraint
-                # when posting arcs on diagonal (i==j), it would do subcircuit
-                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
+                for i in range(len(cpm_expr.args)):
+                    for j in range(len(cpm_expr.args)):
+                        if i == j: # otherwise allows for subcircuits
+                            continue
+                        bv, cons = get_or_make_var(x[i] == j, csemap=self._csemap)
+                        arc_vars[(i,j)] = bv
+                        extra_cons.append(cons)
+                self.add(extra_cons)
+                ort_arcs = [(i,j, self.solver_var(b)) for (i,j), b in arc_vars.items()]
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
