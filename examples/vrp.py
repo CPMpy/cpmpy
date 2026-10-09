@@ -2,10 +2,11 @@
 Vehicle Routing Problem (VRP) in CPMpy.
 
 The goal is to find a set of routes of minimal total length for a fleet of
-vehicles visiting a set of locations, starting at a cental depot.
+vehicles visiting a set of locations, starting at a central depot.
 
 Modeled with a Circuit constraint and dummy depots (one per vehicle).
-Following the circuit, each edge between two depot nodes terminates a vehicle's route.
+Following the circuit, each start at a depot means the tour of a new vehicle has started.
+Edges between two depots mean the vehicle is not used.
 """
 import cpmpy as cp
 import numpy as np

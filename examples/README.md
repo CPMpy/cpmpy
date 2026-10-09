@@ -33,7 +33,7 @@ Another classic constraint satisfaction problem, N-queens (with visualisation an
 
 ---
 
-### `vehicle_routing.ipynb`
+### `vrp.ipynb`
 
 Exact vehicle routing model, with nice visualisation on real world map.
 
@@ -83,7 +83,7 @@ A 2D rectangular packing problem, with visualisation.
 
 ---
 
-### `tsp.ipynb`
+### `tsp_leuven.ipynb`
 
 The Traveling Salesman Problem, just a simple `circuit` global constraint for CP.
 
