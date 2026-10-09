@@ -208,7 +208,6 @@ def global_constraints(solver):
             s = cp.intvar(0, 5, shape=2, name="start")
             demand = [3, -1]
             yield cp.Reservoir(s, demand, -1, 2)
-            yield cp.Reservoir(s, cp.intvar(-2, 2, shape=2, name="demand"), -3, 3)
             continue
 
         elif name == "ReservoirOptional":

@@ -1201,10 +1201,12 @@ class TestGlobal:
         # capacity bounds must include the initial level 0
         pytest.raises(ValueError, cp.Reservoir, [1], [1], 1, 2)
         pytest.raises(ValueError, cp.Reservoir, [1], [1], -2, -1)
-        # capacities must be integer constants, not expressions
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], 1, -1)
+        # capacities and demands must be integer constants, not expressions
         capa = cp.intvar(-2, 2, name="capa")
         pytest.raises(TypeError, cp.Reservoir, [1], [1], capa, 2)
         pytest.raises(TypeError, cp.Reservoir, [1], [1], -1, capa)
+        pytest.raises(TypeError, cp.Reservoir, [1], [cp.intvar(-1, 1)], -1, 1)
         pytest.raises(ValueError, lambda: cons.decompose(how="nope"))
 
     def test_reservoir(self, solver):
@@ -1231,12 +1233,6 @@ class TestGlobal:
         assert cp.Model(together, start[0] == start[1]).solve(solver=solver)
         assert together.value() is True
         assert cp.Model(together, start[0] < start[1]).solve(solver=solver) is False
-
-        # variable demands
-        demand = cp.intvar(-2, 2, shape=2, name="demand")
-        var_cons = cp.Reservoir(start, demand, -1, 2)
-        assert cp.Model(var_cons, demand == [2, -1], start[0] <= start[1]).solve(solver=solver)
-        assert var_cons.value() is True
 
         # reified: the reservoir itself is unsatisfiable, so the Boolean is false
         b = cp.boolvar(name="b")
@@ -1270,10 +1266,12 @@ class TestGlobal:
         # capacity bounds must include the initial level 0
         pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], 1, 2, [True])
         pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], -2, -1, [True])
-        # capacities must be integer constants, not expressions
+        pytest.raises(ValueError, cp.ReservoirOptional, [1, 2], [1], 1, -1, [True])
+        # capacities and demands must be integer constants, not expressions
         capa = cp.intvar(-2, 2, name="capa")
         pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], capa, 2, [True])
         pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, capa, [True])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [cp.intvar(-1, 1)], -1, 1, [True])
 
     def test_reservoir_optional(self, solver):
         start = cp.intvar(0, 3, shape=2, name="start")
