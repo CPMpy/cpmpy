@@ -1773,11 +1773,11 @@ class Reservoir(GlobalConstraint):
               +2 -1 -1
     """
 
-    def __init__(self, start: ListLike[ExprLike], demand: ListLike[ExprLike], min_capacity: int, max_capacity: int):
+    def __init__(self, start: ListLike[ExprLike], demand: ListLike[int|np.integer], min_capacity: int, max_capacity: int):
         """
             Arguments:
                 start (ListLike[ExprLike]): Start times of the events
-                demand (ListLike[ExprLike]): Demand of each event, positive or negative
+                demand (ListLike[int]): Demand of each event, positive or negative
                 min_capacity (int): Minimum allowed level
                 max_capacity (int): Maximum allowed level
         """
@@ -1796,6 +1796,9 @@ class Reservoir(GlobalConstraint):
             demand = list(demand.flat)
         start, demand = list(start), list(demand)
 
+        if any(not is_int(d) for d in demand):
+            raise TypeError("demand should be a list of integer constants.")
+
         if len(start) != len(demand):
             raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
         if len(start) == 0:
@@ -1806,7 +1809,7 @@ class Reservoir(GlobalConstraint):
         super().__init__("reservoir", (start, demand, min_capacity, max_capacity))
 
     @property
-    def args(self) -> tuple[list[ExprLike], list[ExprLike], int, int]:
+    def args(self) -> tuple[list[ExprLike], list[int|np.integer], int, int]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
@@ -1917,7 +1920,7 @@ class ReservoirOptional(GlobalConstraint):
               +2  x -1
     """
 
-    def __init__(self, start: ListLike[ExprLike], demand: ListLike[ExprLike], min_capacity: int, max_capacity: int, is_present: ListLike[BoolExprLike]):
+    def __init__(self, start: ListLike[ExprLike], demand: ListLike[int|np.integer], min_capacity: int, max_capacity: int, is_present: ListLike[BoolExprLike]):
         """
             Arguments:
                 start (ListLike[ExprLike]): Start times of the events
@@ -1945,6 +1948,9 @@ class ReservoirOptional(GlobalConstraint):
             is_present = list(is_present.flat)
         start, demand, is_present = list(start), list(demand), list(is_present)
 
+        if any(not is_int(d) for d in demand):
+            raise TypeError("demand should be a list of integer constants.")
+
         if len(start) != len(demand):
             raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
         if len(start) != len(is_present):
@@ -1957,7 +1963,7 @@ class ReservoirOptional(GlobalConstraint):
         super().__init__("reservoir_optional", (start, demand, min_capacity, max_capacity, is_present))
 
     @ property
-    def args(self) -> tuple[list[ExprLike], list[ExprLike], int, int, list[BoolExprLike]]:
+    def args(self) -> tuple[list[ExprLike], list[int|np.integer], int, int, list[BoolExprLike]]:
         """ READ-ONLY, well-typed argument of this global function"""
         return self._args
 
