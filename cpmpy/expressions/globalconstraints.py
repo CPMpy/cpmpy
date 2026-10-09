@@ -1766,11 +1766,11 @@ class Reservoir(GlobalConstraint):
     .. code-block:: text
 
         2 |    ----
-        1 |        ----
-        0 |----        ----
-          +----+--+----+------> time
-               1  3    5
-              +2 -1   -1
+        1 |        ---
+        0 |----       ----
+          +----+--+--+------> time
+               1  3  5
+              +2 -1 -1
     """
 
     def __init__(self, start: ListLike[ExprLike], demand: ListLike[ExprLike], min_capacity: int, max_capacity: int):
@@ -1911,12 +1911,12 @@ class ReservoirOptional(GlobalConstraint):
 
     .. code-block:: text
 
-        2 |    --------
-        1 |            ----
+        2 |    ------
+        1 |          ----
         0 |----
-          +----+--+----+------> time
-               1  3    5
-              +2  x   -1
+          +----+--+--+------> time
+               1  3  5
+              +2  x -1
     """
 
     def __init__(self, start: ListLike[ExprLike], demand: ListLike[ExprLike], min_capacity: int, max_capacity: int, is_present: ListLike[BoolExprLike]):
