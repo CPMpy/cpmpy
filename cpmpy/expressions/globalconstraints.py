@@ -1879,8 +1879,6 @@ class Reservoir(GlobalConstraint):
         start, demand, min_capacity, max_capacity = argvals(self.args)
         if any(a is None for a in list(start) + list(demand) + [min_capacity, max_capacity]):
             return None
-        if not min_capacity <= 0 <= max_capacity:
-            return False
 
         # add same-time events together to get the level
         change : dict[int,int] = dict()
@@ -2029,8 +2027,6 @@ class ReservoirOptional(GlobalConstraint):
         start, demand, min_capacity, max_capacity, is_present = argvals(self.args)
         if any(a is None for a in list(start) + list(demand) + list(is_present) + [min_capacity, max_capacity]):
             return None
-        if not min_capacity <= 0 <= max_capacity:
-            return False
         
         # add same-time events together to get the level
         change : dict[int,int] = dict()
