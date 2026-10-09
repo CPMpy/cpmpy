@@ -1170,8 +1170,136 @@ class TestGlobal:
         assert cp.Model(cons.decompose(how="task"), active == True).solve(solver=solver)
         assert cp.Model(cons.decompose(how="time"), active == True).solve(solver=solver)
 
+    def test_reservoir_value(self):
+        start = cp.intvar(0, 5, shape=3, name="start")
+        cons = cp.Reservoir(start, [2, -1, -3], -3, 2)
 
+        # +2, then -1, then -3: levels 2, 1, -2
+        for var, val in zip(start, [0, 1, 2]):
+            var._value = val
+        assert cons.value() is True
 
+        # -3 first: level -3, then -1 makes -4, then +2 makes -2. -4 is below the minimum
+        for var, val in zip(start, [2, 1, 0]):
+            var._value = val
+        assert cons.value() is False
+
+        # -1 first, then -3, then +2: level -1, -4, -2
+        for var, val in zip(start, [2, 0, 1]):
+            var._value = val
+        assert cons.value() is False
+
+        # simultaneous events are applied together: +2 and -2 net to 0
+        same = cp.Reservoir(start[:2], [2, -2], 0, 0)
+        start[0]._value = start[1]._value = 3
+        assert same.value() is True
+
+        pytest.raises(ValueError, cp.Reservoir, [], [], -1, 4)
+        pytest.raises(TypeError, cp.Reservoir, 1, [1], -1, 1)
+        pytest.raises(TypeError, cp.Reservoir, [1], 1, -1, 1)
+        pytest.raises(ValueError, cp.Reservoir, [1, 2], [1], -1, 1)
+        # capacity bounds must include the initial level 0
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], 1, 2)
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], -2, -1)
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], 1, -1)
+        # capacities and demands must be integer constants, not expressions
+        capa = cp.intvar(-2, 2, name="capa")
+        pytest.raises(TypeError, cp.Reservoir, [1], [1], capa, 2)
+        pytest.raises(TypeError, cp.Reservoir, [1], [1], -1, capa)
+        pytest.raises(TypeError, cp.Reservoir, [1], [cp.intvar(-1, 1)], -1, 1)
+        pytest.raises(ValueError, lambda: cons.decompose(how="nope"))
+
+    def test_reservoir(self, solver):
+        start = cp.intvar(0, 3, shape=2, name="start")
+        cons = cp.Reservoir(start, [2, -3], -3, 2)
+
+        assert cp.Model(cons).solve(solver=solver)
+        assert cons.value() is True
+
+        # a single withdrawal of 4 cannot fit in [-1, 2]
+        tight = cp.Reservoir(start[:1], [4], -1, 2)
+        assert cp.Model(tight).solve(solver=solver) is False
+        assert cp.Model(tight.decompose(how="time")).solve(solver=solver) is False
+        assert cp.Model(tight.decompose(how="task")).solve(solver=solver) is False
+
+        # emptying before filling drops the level below 0
+        ordered = cp.Reservoir(start, [2, -2], 0, 2)
+        assert cp.Model(ordered, start[1] < start[0]).solve(solver=solver) is False
+        assert cp.Model(ordered, start[0] <= start[1]).solve(solver=solver)
+        assert ordered.value() is True
+
+        # same start time: the intermediate level is not checked
+        together = cp.Reservoir(start, [3, -3], 0, 0)
+        assert cp.Model(together, start[0] == start[1]).solve(solver=solver)
+        assert together.value() is True
+        assert cp.Model(together, start[0] < start[1]).solve(solver=solver) is False
+
+        # reified: the reservoir itself is unsatisfiable, so the Boolean is false
+        b = cp.boolvar(name="b")
+        reif = cp.Reservoir([start[0]], [5], -1, 1)
+        assert cp.Model(b == reif).solve(solver=solver)
+        assert b.value() is False
+        assert reif.value() is False
+
+    def test_reservoir_optional_value(self):
+        start = cp.intvar(0, 5, shape=2, name="start")
+        present = cp.boolvar(shape=2, name="present")
+        cons = cp.ReservoirOptional(start, [3, -1], -1, 2, present)
+
+        # only the withdrawal happens
+        start[0]._value, start[1]._value = 0, 1
+        present[0]._value, present[1]._value = False, True
+        assert cons.value() is True
+
+        # both present at the same time: 3 and -1 net to 2
+        start[0]._value = start[1]._value = 0
+        present[0]._value = present[1]._value = True
+        assert cons.value() is True
+
+        # +3 alone exceeds the maximum
+        present[1]._value = False
+        assert cons.value() is False
+
+        pytest.raises(ValueError, cp.ReservoirOptional, [], [], -1, 1, [])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, 1, True)
+        pytest.raises(ValueError, cp.ReservoirOptional, [1, 2], [1], -1, 1, [True])
+        # capacity bounds must include the initial level 0
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], 1, 2, [True])
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], -2, -1, [True])
+        pytest.raises(ValueError, cp.ReservoirOptional, [1, 2], [1], 1, -1, [True])
+        # capacities and demands must be integer constants, not expressions
+        capa = cp.intvar(-2, 2, name="capa")
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], capa, 2, [True])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, capa, [True])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [cp.intvar(-1, 1)], -1, 1, [True])
+
+    def test_reservoir_optional(self, solver):
+        start = cp.intvar(0, 3, shape=2, name="start")
+        present = cp.boolvar(shape=2, name="present")
+        # a demand of 4 never fits, so that event has to be absent
+        cons = cp.ReservoirOptional(start, [4, -1], -1, 2, present)
+
+        assert cp.Model(cons).solve(solver=solver)
+        assert cons.value() is True
+        assert present[0].value() is False
+
+        assert cp.Model(cons, present[0]).solve(solver=solver) is False
+        assert cp.Model(cons.decompose(how="time"), present[0]).solve(solver=solver) is False
+        assert cp.Model(cons.decompose(how="task"), present[0]).solve(solver=solver) is False
+
+        # an absent withdrawal is ignored; a present one before the refill is not
+        ordered = cp.ReservoirOptional(start, [2, -2], 0, 2, present)
+        assert cp.Model(ordered, present[1], ~present[0]).solve(solver=solver) is False
+        assert cp.Model(ordered, present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+        assert ordered.value() is True
+        assert cp.Model(ordered.decompose(how="time"), present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+        assert cp.Model(ordered.decompose(how="task"), present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+
+        # constant presence, including an event that is fixed absent
+        fixed = cp.ReservoirOptional(start, [4, -1], -1, 2, [False, True])
+        assert cp.Model(fixed).solve(solver=solver)
+        assert fixed.value() is True
+        assert cp.Model(cp.ReservoirOptional(start, [4, -1], -1, 2, [True, True])).solve(solver=solver) is False
 
     @pytest.mark.xfail(reason="Bug in Pumpkin Cumulative, issue at: https://github.com/ConSol-Lab/Pumpkin/issues/577")
     def test_cumulative_zero_duration_pumpkin(self):

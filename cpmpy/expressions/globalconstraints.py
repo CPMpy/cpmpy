@@ -120,6 +120,8 @@
         Xor
         Cumulative
         CumulativeOptional
+        Reservoir
+        ReservoirOptional
         NoOverlap
         NoOverlapOptional
         Precedence
@@ -146,7 +148,7 @@ import cpmpy as cp
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray, _NumVarImpl
-from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
+from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_int, is_boolexpr, implies, argval
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -1747,6 +1749,304 @@ class Cumulative(GlobalConstraint):
                 return False
 
         return True
+
+
+class Reservoir(GlobalConstraint):
+    """
+    Enforces that a reservoir stays between a minimum and a maximum level.
+    The level is influenced by the demand of discrete events, which may contribute or subtract from the level.
+
+    Same-time events are added simultaneously, so increasing the level while decreasing
+    it at the same time step with the same amount never exceeds the level.
+
+    Useful for modeling producer/consumer scheduling problems.
+
+    Example with ``start=[1, 3, 5]``, ``demand=[+2, -1, -1]``, ``min_capacity=0``, ``max_capacity=2``:
+
+    .. code-block:: text
+
+        2 |    ----
+        1 |        ---
+        0 |----       ----
+          +----+--+--+------> time
+               1  3  5
+              +2 -1 -1
+    """
+
+    def __init__(self, start: ListLike[ExprLike], demand: ListLike[int|np.integer], min_capacity: int, max_capacity: int):
+        """
+            Arguments:
+                start (ListLike[ExprLike]): Start times of the events
+                demand (ListLike[int]): Demand of each event, positive or negative
+                min_capacity (int): Minimum allowed level
+                max_capacity (int): Maximum allowed level
+        """
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(demand):
+            raise TypeError("demand should be a list")
+        if not is_int(min_capacity):
+            raise TypeError(f"min_capacity should be an integer, but got {min_capacity}")
+        if not is_int(max_capacity):
+            raise TypeError(f"max_capacity should be an integer, but got {max_capacity}")
+
+        if isinstance(start, np.ndarray):
+            start = list(start.flat)
+        if isinstance(demand, np.ndarray):
+            demand = list(demand.flat)
+        start, demand = list(start), list(demand)
+
+        if any(not is_int(d) for d in demand):
+            raise TypeError("demand should be a list of integer constants.")
+
+        if len(start) != len(demand):
+            raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
+        if len(start) == 0:
+            raise ValueError("Need at least one event in a reservoir constraint")
+        if not min_capacity <= 0 <= max_capacity:
+            raise ValueError(f"Allowed capacity should include 0, got min_capacity {min_capacity} and max_capacity {max_capacity}")
+
+        super().__init__("reservoir", (start, demand, min_capacity, max_capacity))
+
+    @property
+    def args(self) -> tuple[list[ExprLike], list[int|np.integer], int, int]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
+    def decompose(self, how: str = "auto") -> tuple[list[Expression], list[Expression]]:
+        """
+        Decompose the Reservoir constraint.
+        Supports a time-based or a task-based decomposition.
+        By default, the decomposition is chosen based on the number of events and the horizon.
+
+        Arguments:
+            how (str): how the reservoir constraint should be decomposed, can be "time", "task", or "auto" (default)
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        if how not in ["time", "task", "auto"]:
+            raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
+
+        start = self.args[0]
+        
+        lbs, ubs = get_bounds(start)
+        horizon = max(ubs) - min(lbs)
+        if (how == "time") or (how == "auto" and len(start) <= horizon):
+            return self._time_decomposition()
+        elif (how == "task") or (how == "auto" and len(start) > horizon):
+            return self._task_decomposition()
+        raise Exception # should not be reached
+
+    def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Task-based decomposition: the level only changes at event times, so it
+        is enough to check it at each event, after every event scheduled at
+        that same time.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, demand, min_capacity, max_capacity = self.args
+        cons: list[Expression] = []
+
+        for i in range(len(start)):
+            level = cp.sum(demand[j] * (start[j] <= start[i]) for j in range(len(start)))
+            cons.append(level >= min_capacity)
+            cons.append(level <= max_capacity)
+        return cons, []
+
+    def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Time-based decomposition: for every time point in the horizon, the
+        sum of demands of events that have already started stays within bounds.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, demand, min_capacity, max_capacity = self.args
+        cons: list[Expression] = []
+    
+        lbs, ubs = get_bounds(start)
+        for t in range(min(lbs), max(ubs) + 1):
+            level = cp.sum(d * (s <= t) for s, d in zip(start, demand))
+            cons.append(level >= min_capacity)
+            cons.append(level <= max_capacity)
+        return cons, []
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        start, demand, min_capacity, max_capacity = argvals(self.args)
+        if any(a is None for a in list(start) + list(demand) + [min_capacity, max_capacity]):
+            return None
+
+        # add same-time events together to get the level
+        change : dict[int,int] = dict()
+        for s, d in zip(start, demand):
+            change[s] = change.get(s, 0) + d
+
+        level = 0
+        for t in sorted(change):
+            level += change[t]
+            if level < min_capacity or level > max_capacity:
+                return False
+        return True
+
+
+class ReservoirOptional(GlobalConstraint):
+    """
+    Optional version of :class:`~cpmpy.expressions.globalconstraints.Reservoir`.
+    Enforces that a reservoir stays between a minimum and a maximum level.
+    The level is influenced by the demand of optional discrete events, which may contribute or subtract from the level.
+
+    Same-time events are added simultaneously, so increasing the level while decreasing
+    it at the same time step with the same amount never exceeds the level.
+
+    Useful for modeling producer/consumer scheduling problems.
+
+    Example with ``start=[1, 3, 5]``, ``demand=[+2, 4, -1]``, ``is_present=[True, False, True]``,
+    ``min_capacity=0``, ``max_capacity=2`` (middle event is inactive):
+
+    .. code-block:: text
+
+        2 |    ------
+        1 |          ----
+        0 |----
+          +----+--+--+------> time
+               1  3  5
+              +2  x -1
+    """
+
+    def __init__(self, start: ListLike[ExprLike], demand: ListLike[int|np.integer], min_capacity: int, max_capacity: int, is_present: ListLike[BoolExprLike]):
+        """
+            Arguments:
+                start (ListLike[ExprLike]): Start times of the events
+                demand (ListLike[ExprLike]): Demand of each event, positive or negative
+                min_capacity (int): Minimum allowed level
+                max_capacity (int): Maximum allowed level
+                is_present (ListLike[BoolExprLike]): Whether each event takes place
+        """
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(demand):
+            raise TypeError("demand should be a list")
+        if not is_any_list(is_present):
+            raise TypeError("is_present should be a list")
+        if not is_int(min_capacity):
+            raise TypeError(f"min_capacity should be an integer, but got {min_capacity}")
+        if not is_int(max_capacity):
+            raise TypeError(f"max_capacity should be an integer, but got {max_capacity}")
+
+        if isinstance(start, np.ndarray):
+            start = list(start.flat)
+        if isinstance(demand, np.ndarray):
+            demand = list(demand.flat)
+        if isinstance(is_present, np.ndarray):
+            is_present = list(is_present.flat)
+        start, demand, is_present = list(start), list(demand), list(is_present)
+
+        if any(not is_int(d) for d in demand):
+            raise TypeError("demand should be a list of integer constants.")
+
+        if len(start) != len(demand):
+            raise ValueError(f"Start and demand should have equal length, but got {len(start)} and {len(demand)}")
+        if len(start) != len(is_present):
+            raise ValueError(f"Start and is_present should have equal length, but got {len(start)} and {len(is_present)}")
+        if len(start) == 0:
+            raise ValueError("Need at least one event in a reservoir constraint")
+        if not min_capacity <= 0 <= max_capacity:
+            raise ValueError(f"Allowed capacity should include 0, got min_capacity {min_capacity} and max_capacity {max_capacity}")
+
+        super().__init__("reservoir_optional", (start, demand, min_capacity, max_capacity, is_present))
+
+    @ property
+    def args(self) -> tuple[list[ExprLike], list[int|np.integer], int, int, list[BoolExprLike]]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
+
+    def decompose(self, how: str = "auto") -> tuple[list[Expression], list[Expression]]:
+        """
+        Decompose the optional Reservoir constraint.
+        Supports a time-based or a task-based decomposition.
+        By default, the decomposition is chosen based on the number of events and the horizon.
+
+        Arguments:
+            how (str): how the reservoir constraint should be decomposed, can be "time", "task", or "auto" (default)
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        if how not in ["time", "task", "auto"]:
+            raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
+
+        start = self.args[0]
+        lbs, ubs = get_bounds(start)
+        horizon = max(ubs) - min(lbs)
+        if (how == "time") or (how == "auto" and len(start) <= horizon):
+            return self._time_decomposition()
+        elif (how == "task") or (how == "auto" and len(start) > horizon):
+            return self._task_decomposition()
+        raise Exception # should not be reached
+
+    def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Task-based decomposition. The level only changes when a present event
+        starts, so it is checked at each present event after every other
+        present event at that same time.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, demand, min_capacity, max_capacity, is_present = self.args
+        cons: list[Expression] = []
+        for i in range(len(start)):
+            level = cp.sum(demand[j] * (is_present[j] & (start[j] <= start[i])) for j in range(len(start)))
+            cons.append(level >= min_capacity)
+            cons.append(level <= max_capacity)
+        return cons, []
+
+    def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Time-based decomposition: at every time point, the sum of demands of
+        present events that have already started stays within bounds.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, demand, min_capacity, max_capacity, is_present = self.args
+        cons: list[Expression] = []
+        lbs, ubs = get_bounds(start)
+        for t in range(min(lbs), max(ubs) + 1):
+            level = cp.sum(d * (p & (s <= t)) for s, d, p in zip(start, demand, is_present))
+            cons.append(level >= min_capacity)
+            cons.append(level <= max_capacity)
+        return cons, []
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        start, demand, min_capacity, max_capacity, is_present = argvals(self.args)
+        if any(a is None for a in list(start) + list(demand) + list(is_present) + [min_capacity, max_capacity]):
+            return None
+        
+        # add same-time events together to get the level
+        change : dict[int,int] = dict()
+        for s, d, p in zip(start, demand, is_present):
+            if p:
+                change[s] = change.get(s, 0) + d
+
+        level = 0
+        for t in sorted(change):
+            level += change[t]
+            if level < min_capacity or level > max_capacity:
+                return False
+        return True
+
 
 class CumulativeOptional(GlobalConstraint):
     """
