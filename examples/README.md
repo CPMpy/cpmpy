@@ -35,9 +35,9 @@ Another classic constraint satisfaction problem, N-queens (with visualisation an
 
 ### `vrp.ipynb`
 
-Exact vehicle routing model, with nice visualisation on real world map.
+Exact vehicle routing model, using a single `circuit` global constraint.
 
-<a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/vehicle_routing.ipynb">
+<a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/vrp.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
@@ -85,9 +85,9 @@ A 2D rectangular packing problem, with visualisation.
 
 ### `tsp_leuven.ipynb`
 
-The Traveling Salesman Problem, just a simple `circuit` global constraint for CP.
+The Traveling Salesman Problem over landmarks in Leuven, just a simple `circuit` global constraint for CP, with nice visualisation on a real map of Leuven.
 
-<a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/tsp.ipynb">
+<a target="_blank" href="https://colab.research.google.com/github/CPMpy/cpmpy/blob/master/examples/tsp_leuven.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
