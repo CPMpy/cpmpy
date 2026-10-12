@@ -168,7 +168,19 @@ class CPM_choco(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds 
-                kwargs:                         any keyword argument, sets parameters of solver object
+            
+            Choco supports setting limits on the search process and various logging options.
+            Examples include:
+
+            =============================   ============
+            Keyword argument                Description
+            =============================   ============
+            ``node_limit``          Number of nodes limit for search
+            ``backtrack_limit``     Number of backtracks limit for search
+            ``show_statistics``     Configure the solver to show statistics after solving is done
+            ``show_decisions``      Configure the solver to show decisions during solving
+            =============================   ============
+
 
         """
         # ensure all vars are known to solver
@@ -176,6 +188,13 @@ class CPM_choco(SolverInterface):
 
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
+
+        choco_kwargs = dict()
+        for arg, value in kwargs.items():
+            if hasattr(self.chc_solver, arg) and value is True:
+                getattr(self.chc_solver, arg)() # e.g., show_statistics()
+            else:
+                choco_kwargs[arg] = value # passed to solve call
 
         start = time.time()
         
@@ -188,7 +207,7 @@ class CPM_choco(SolverInterface):
         if self.has_objective():
             sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
                                                         objective=self.solver_var(self.obj),
-                                                        **kwargs)
+                                                        **choco_kwargs)
         else:
             sol = self.chc_solver.find_solution()
         end = time.time()
