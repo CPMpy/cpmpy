@@ -216,25 +216,27 @@ class CPM_choco(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.solve_time = end - start
 
+        search_state = self.chc_solver.get_search_state()
         # translate exit status
         # A) Found a solution
         if sol is not None:
             # COP
             if self.has_objective():
-                if time_limit is None or self.cpm_status.solve_time < time_limit: # solved to optimality
+                if search_state == "TERMINATED":
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-                else: # solved, but optimality not proven
+                elif search_state == "STOPPED":
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            # CSP
+                else:
+                    raise ValueError(f"Unexpected search state: {search_state}")
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        # B) Found unsat
-        elif time_limit is None or self.cpm_status.solve_time < time_limit: # proven unsat
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        # C) Timeout
-        else:
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN  # can happen when timeout is reached...
-
+        else: # B) no solution found
+            if search_state == "TERMINATED":
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE # proven
+            elif search_state == "STOPPED":
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN # not proven unsat
+            else:
+                raise ValueError(f"Unexpected search state: {state}")
 
         # True/False depending on self.chc_status
         has_sol = sol is not None
