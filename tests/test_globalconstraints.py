@@ -218,6 +218,20 @@ class TestGlobal:
         assert not model.solve()
         assert not cp.Circuit(x).value()
 
+    def test_ort_circuit_cse(self):
+
+        x = cp.intvar(0,10, shape=5, name="x")
+
+        model = cp.Model(
+            cp.Circuit(x),
+            (x[0] == 1).implies(x[1] == 2) # enforce some nested constraint
+        )
+        solver = cp.SolverLookup.get("ortools", model)
+
+        # variables should be: x1..x5 and 20x bv[i,j]
+        vars_except_neg = set(var.replace("~","") for var in solver._varmap)
+        assert len(vars_except_neg) == 25
+
 
     def test_not_circuit(self):
         x = cp.intvar(lb=-1, ub=5, shape=4)
