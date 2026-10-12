@@ -100,9 +100,9 @@ class CPM_choco(SolverInterface):
             import pychoco as chc
             chc_version = CPM_choco.version()
             # check it's the correct version
-            # CPMPy uses features only available from 0.2.1
-            if Version(chc_version) < Version("0.2.1"):
-                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+            # CPMPy uses features only available from 0.3.0
+            if Version(chc_version) < Version("0.3.0"):
+                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.3.0, "
                               f"but you have version {chc_version}.")
                 return False
             return True
@@ -637,7 +637,7 @@ class CPM_choco(SolverInterface):
                 # take value lower than anything else
                 chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
-                return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
+                return self.chc_model.table(self.solver_vars(array), chc_table, uvalue=chc_star)
             elif cpm_expr.name == "regular":
                 from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
                 array, transitions, start, accepting = cpm_expr.args
