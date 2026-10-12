@@ -1633,9 +1633,9 @@ class Cumulative(GlobalConstraint):
 
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
-        if (how == "time") or (how == "auto" and len(start) <= horizon):
+        if (how == "time") or (how == "auto" and len(start) >= horizon):
             return self._time_decomposition()
-        elif (how == "task") or (how == "auto" and len(start) > horizon):
+        elif (how == "task") or (how == "auto" and len(start) < horizon):
             return self._task_decomposition()
         raise Exception # should not be reached
 
@@ -1832,9 +1832,9 @@ class Reservoir(GlobalConstraint):
         
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
-        if (how == "time") or (how == "auto" and len(start) <= horizon):
+        if (how == "time") or (how == "auto" and len(start) >= horizon):
             return self._time_decomposition()
-        elif (how == "task") or (how == "auto" and len(start) > horizon):
+        elif (how == "task") or (how == "auto" and len(start) < horizon):
             return self._task_decomposition()
         raise Exception # should not be reached
 
@@ -1985,9 +1985,9 @@ class ReservoirOptional(GlobalConstraint):
         start = self.args[0]
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
-        if (how == "time") or (how == "auto" and len(start) <= horizon):
+        if (how == "time") or (how == "auto" and len(start) >= horizon):
             return self._time_decomposition()
-        elif (how == "task") or (how == "auto" and len(start) > horizon):
+        elif (how == "task") or (how == "auto" and len(start) < horizon):
             return self._task_decomposition()
         raise Exception # should not be reached
 
@@ -2135,9 +2135,9 @@ class CumulativeOptional(GlobalConstraint):
 
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
-        if (how == "time") or (how == "auto" and len(start) <= horizon):
+        if (how == "time") or (how == "auto" and len(start) >= horizon):
             return self._time_decomposition()
-        elif (how == "task") or (how == "auto" and len(start) > horizon):
+        elif (how == "task") or (how == "auto" and len(start) < horizon):
             return self._task_decomposition()
         raise Exception # should not be reached
 
