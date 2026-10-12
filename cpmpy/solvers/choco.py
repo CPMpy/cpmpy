@@ -236,7 +236,7 @@ class CPM_choco(SolverInterface):
             elif search_state == "STOPPED":
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN # not proven unsat
             else:
-                raise ValueError(f"Unexpected search state: {state}")
+                raise ValueError(f"Unexpected search state: {search_state}")
 
         # True/False depending on self.chc_status
         has_sol = sol is not None
