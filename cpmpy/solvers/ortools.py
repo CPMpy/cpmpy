@@ -705,7 +705,7 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == "reservoir":
                 start, demand, min_cap, max_cap = cpm_expr.args
                 return self.ort_model.AddReservoirConstraint(
-                        self.solver_vars(start), self.solver_vars(demand), int(min_cap), int(max_cap))
+                        self.solver_vars(start), [int(d) for d in demand], int(min_cap), int(max_cap))
                
             elif cpm_expr.name == "reservoir_optional":
                 start, demand, min_cap, max_cap, is_present = cpm_expr.args
@@ -717,7 +717,7 @@ class CPM_ortools(SolverInterface):
                         ort_present.append(self.solver_var(p))
  
                 return self.ort_model.AddReservoirConstraintWithActive(
-                    self.solver_vars(start), self.solver_vars(demand), ort_present, int(min_cap), int(max_cap))
+                    self.solver_vars(start), [int(d) for d in demand], ort_present, int(min_cap), int(max_cap))
 
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these

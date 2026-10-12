@@ -1266,7 +1266,7 @@ class TestGlobal:
         # capacity bounds must include the initial level 0
         pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], 1, 2, [True])
         pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], -2, -1, [True])
-        pytest.raises(ValueError, cp.ReservoirOptional, [1, 2], [1], 1, -1, [True])
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], 1, -1, [True])
         # capacities and demands must be integer constants, not expressions
         capa = cp.intvar(-2, 2, name="capa")
         pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], capa, 2, [True])

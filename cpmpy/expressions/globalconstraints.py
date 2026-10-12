@@ -1765,9 +1765,9 @@ class Reservoir(GlobalConstraint):
 
     .. code-block:: text
 
-        2 |    ----
-        1 |        ---
-        0 |----       ----
+        2 |    ---
+        1 |       ---
+        0 |----      ----
           +----+--+--+------> time
                1  3  5
               +2 -1 -1
