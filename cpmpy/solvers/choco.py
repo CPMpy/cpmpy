@@ -172,15 +172,14 @@ class CPM_choco(SolverInterface):
             Choco supports setting limits on the search process and various logging options.
             Examples include:
 
-            =============================   ============
-            Keyword argument                Description
-            =============================   ============
-            ``node_limit``          Number of nodes limit for search
-            ``backtrack_limit``     Number of backtracks limit for search
-            ``show_statistics``     Configure the solver to show statistics after solving is done
-            ``show_decisions``      Configure the solver to show decisions during solving
-            =============================   ============
-
+            =============================   =======================================================
+            Argument                        Description
+            =============================   =======================================================
+            ``node_limit``                  Number of nodes limit for search
+            ``backtrack_limit``             Number of backtracks limit for search
+            ``show_statistics=True``        Show statistics after solving is done
+            ``show_decisions=True``         Show decisions during solving
+            =============================   =======================================================
 
         """
         # ensure all vars are known to solver
@@ -205,7 +204,7 @@ class CPM_choco(SolverInterface):
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
-            sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
+            sol = self.chc_solver.find_optimal_solution(maximize=not self.minimize_obj,
                                                         objective=self.solver_var(self.obj),
                                                         **choco_kwargs)
         else:
