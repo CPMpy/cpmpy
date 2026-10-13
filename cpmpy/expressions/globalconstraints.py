@@ -2544,7 +2544,12 @@ class GlobalCardinalityCount(GlobalConstraint):
         counts = [cp.Count(vars, v) for v in vals]
         constraints = [cnt == o for cnt, o in zip(counts, occ)]
         if self.closed:
-            constraints.extend([InDomain(v, vals) for v in vars])
+            for var in vars:
+                if isinstance(var, Expression):
+                    constraints.append(InDomain(var, vals))
+                else: # constant
+                    constraints.append(cp.BoolVal(var in vals))
+
             # redundant constraint
             constraints.append(cp.sum(counts) == len(vars))
         else:
@@ -2563,8 +2568,8 @@ class GlobalCardinalityCount(GlobalConstraint):
         if any(x is None for x in vars + occ):
             return None
 
-        vals = np.array(vals)
-        for val, cnt in zip(vals, occ):
+        vals_np = np.array(vals)
+        for val, cnt in zip(vals_np, occ):
             if sum(vars == val) != cnt:
                 return False
         
