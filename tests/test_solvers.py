@@ -1335,6 +1335,9 @@ class TestSupportedSolvers:
 @pytest.mark.flaky(reruns=3)
 def test_objective_numexprs(solver, constraint):
 
+    if constraint.name.startswith("reservoir") and solver == "z3":
+        pytest.skip("Decomposition of reservoir triggers upstream z3 bug: https://github.com/Z3Prover/z3/issues/11024")
+
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     lb, ub = constraint.get_bounds()
     try:
