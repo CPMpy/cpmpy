@@ -2507,11 +2507,15 @@ class GlobalCardinalityCount(GlobalConstraint):
         """
         if isinstance(vars, np.ndarray):
             vars_lst = list(vars.flat)
+        elif isinstance(vars, list):
+            vars_lst = vars
         else:
             vars_lst = list(vars)
 
         if isinstance(vals, np.ndarray):
             vals_lst = list(vals.flat)
+        elif isinstance(vals, list):
+            vals_lst = vals
         else:
             vals_lst = list(vals)
         if not all(is_int(v) for v in vals_lst):
@@ -2519,6 +2523,8 @@ class GlobalCardinalityCount(GlobalConstraint):
 
         if isinstance(occ, np.ndarray):
             occ_lst = list(occ.flat)
+        elif isinstance(occ, list):
+            occ_lst = occ
         else:
             occ_lst = list(occ)
 
