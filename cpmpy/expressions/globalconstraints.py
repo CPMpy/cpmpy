@@ -1810,7 +1810,7 @@ class Reservoir(GlobalConstraint):
 
     @property
     def args(self) -> tuple[list[ExprLike], list[int|np.integer], int, int]:
-        """ READ-ONLY, well-typed argument of this global function"""
+        """ READ-ONLY, well-typed argument of this global constraint"""
         return self._args
 
     def decompose(self, how: str = "auto") -> tuple[list[Expression], list[Expression]]:
@@ -2505,16 +2505,32 @@ class GlobalCardinalityCount(GlobalConstraint):
             occ (ListLike[ExprLike]): List of expressions or constants representing the number of occurrences of each value
             closed (bool): Whether the constraint is closed, if true, `vars` can only take values in `vals`
         """
-        if not is_any_list(vars):
-            raise TypeError("GlobalCardinalityCount expects a list of variables, but got", vars)
-        if not is_any_list(vals) or not all(is_num(v) for v in vals):
-            raise TypeError("GlobalCardinalityCount expects a list of values, but got", vals)
-        if not is_any_list(occ):
-            raise TypeError("GlobalCardinalityCount expects a list of variables as occurrences, but got", occ)
-        if len(vals) != len(occ):
+        if isinstance(vars, np.ndarray):
+            vars_lst = list(vars.flat)
+        else:
+            vars_lst = list(vars)
+
+        if isinstance(vals, np.ndarray):
+            vals_lst = list(vals.flat)
+        else:
+            vals_lst = list(vals)
+        if not is_any_list(vals_lst) or not all(is_int(v) for v in vals_lst):
+            raise TypeError("GlobalCardinalityCount expects a list of integer constants, but got", vals_lst)
+
+        if isinstance(occ, np.ndarray):
+            occ_lst = list(occ.flat)
+        else:
+            occ_lst = list(occ)
+
+        if len(vals_lst) != len(occ_lst):
             raise ValueError(f"Number of values and occurrences must be equal, but got {len(vals)} and {len(occ)}")
-        super().__init__("gcc", (list(vars), list(vals), list(occ)))
+        super().__init__("gcc", (vars_lst, vals_lst, occ_lst))
         self.closed = closed
+
+    @property
+    def args(self) -> tuple[list[ExprLike], list[int|np.integer], list[ExprLike]]:
+        """ READ-ONLY, well-typed argument of this global function"""
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
