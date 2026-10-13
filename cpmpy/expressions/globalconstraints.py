@@ -2514,7 +2514,7 @@ class GlobalCardinalityCount(GlobalConstraint):
             vals_lst = list(vals.flat)
         else:
             vals_lst = list(vals)
-        if not is_any_list(vals_lst) or not all(is_int(v) for v in vals_lst):
+        if not all(is_int(v) for v in vals_lst):
             raise TypeError("GlobalCardinalityCount expects a list of integer constants, but got", vals_lst)
 
         if isinstance(occ, np.ndarray):
@@ -2556,7 +2556,7 @@ class GlobalCardinalityCount(GlobalConstraint):
         else:
             # redundant constraint
             constraints.append(cp.sum(counts) <= len(vars))
-            
+
         return constraints, []
 
     def value(self) -> Optional[bool]:
