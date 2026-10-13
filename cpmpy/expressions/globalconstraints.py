@@ -2543,12 +2543,13 @@ class GlobalCardinalityCount(GlobalConstraint):
         vars, vals, occ = self.args
         counts = [cp.Count(vars, v) for v in vals]
         constraints = [cnt == o for cnt, o in zip(counts, occ)]
+        int_vals = [int(val) for val in vals]
         if self.closed:
             for var in vars:
                 if isinstance(var, Expression):
-                    constraints.append(InDomain(var, vals))
+                    constraints.append(InDomain(var, int_vals))
                 else: # constant
-                    constraints.append(cp.BoolVal(var in vals))
+                    constraints.append(cp.BoolVal(var in int_vals))
 
             # redundant constraint
             constraints.append(cp.sum(counts) == len(vars))
