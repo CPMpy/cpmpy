@@ -56,7 +56,7 @@
     Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import re
-from typing import Optional, cast
+from typing import Optional
 import warnings
 import sys
 import os
@@ -72,7 +72,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal, Nested
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, MDD, Regular
-from ..expressions.globalfunctions import Multiplication, FloatSum, Count
+from ..expressions.globalfunctions import Multiplication, FloatSum
 from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
