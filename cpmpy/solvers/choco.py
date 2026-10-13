@@ -208,7 +208,7 @@ class CPM_choco(SolverInterface):
                                                         objective=self.solver_var(self.obj),
                                                         **choco_kwargs)
         else:
-            sol = self.chc_solver.find_solution()
+            sol = self.chc_solver.find_solution(**choco_kwargs)
         end = time.time()
 
         # new status, get runtime
