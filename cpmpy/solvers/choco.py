@@ -597,8 +597,8 @@ class CPM_choco(SolverInterface):
 
             # but not all
             elif cpm_expr.name == 'alldifferent_except_0':
-                assert (len(cpm_expr.args) == 2) # args = [array, 0]
-                assert (cpm_expr.args[1] == 0)
+                assert (len(cpm_expr.args) == 2) # args = [array, [0]]
+                assert (cpm_expr.args[1] == [0])
                 return self.chc_model.all_different_except_0(self._to_vars(cpm_expr.args[0]))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
