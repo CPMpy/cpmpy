@@ -887,14 +887,14 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "gcc":
             assert isinstance(expr, GlobalCardinalityCount)  # typecheck that it has a .closed()
             vars, vals, occ = expr.args
-            vars = self._convert_expression(vars)
-            vals = self._convert_expression(vals)
-            occ = self._convert_expression(occ)
+            vars_str = self._convert_expression(vars)
+            vals_str = self._convert_expression(vals)
+            occ_str = self._convert_expression(occ)
             if expr.closed is False:
                 name = "global_cardinality"
             else:
                 name = "global_cardinality_closed"
-            return "{}({},{},{})".format(name, vars, vals, occ)
+            return "{}({},{},{})".format(name, vars_str, vals_str, occ_str)
 
         elif expr.name == "div":
             return "{} div {}".format(*args_str)
@@ -917,15 +917,15 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "count":
             vars, val = expr.args
-            vars = self._convert_expression(vars)
-            val = self._convert_expression(val)
-            return "count({},{})".format(vars, val)
+            vars_str = self._convert_expression(vars)
+            val_str = self._convert_expression(val)
+            return "count({},{})".format(vars_str, val_str)
 
         elif expr.name == "among":
             vars, vals = expr.args
-            vars = self._convert_expression(vars)
-            vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
-            return "among({},{})".format(vars, vals)
+            vars_str = self._convert_expression(vars)
+            vals_str = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
+            return "among({},{})".format(vars_str, vals_str)
 
         elif expr.name == "indomain":
             # InDomain(expr, domain_list) - convert domain_list to a set
