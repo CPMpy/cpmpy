@@ -96,7 +96,7 @@ class CPM_minizinc(SolverInterface):
     https://minizinc-python.readthedocs.io/
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "alldifferent_except_n", "allequal",
                                               "inverse", "ite", "xor", "table", "indomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
@@ -720,9 +720,14 @@ class CPM_minizinc(SolverInterface):
             str_rev = zero_based(expr.args[1])
             return "inverse({}, {})".format(str_fwd, str_rev)
 
-        if expr.name == "alldifferent_except0":
-            args_str = [self._convert_expression(e) for e in expr.args]
-            return "alldifferent_except_0([{}])".format(",".join(args_str))
+        if expr.name == "alldifferent_except_0":
+            return "alldifferent_except_0({})".format(self._convert_expression(expr.args[0]))
+
+        if expr.name == "alldifferent_except_n":
+            arr, n = expr.args
+            arr_str = self._convert_expression(arr)
+            str_n = "{" + ",".join(self._convert_expression(v) for v in n) + "}"
+            return "alldifferent_except({}, {})".format(arr_str, str_n)
 
         if expr.name in ["lex_lesseq", "lex_less"]:
             X = [self._convert_expression(e) for e in expr.args[0]]

@@ -330,7 +330,8 @@ class AllDifferentExcept0(AllDifferentExceptN):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to 0
         """
-        super().__init__(flatlist(args), 0)
+        super().__init__(flatlist(args), [0])
+        self.name = "alldifferent_except_0"
 
 class AllEqual(GlobalConstraint):
     """
