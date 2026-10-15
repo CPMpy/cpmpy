@@ -161,7 +161,7 @@ def _add_constraint(model: cp.Model, line: str, vars: dict[str, Any]):
     cons = _parse_constraint(line, vars)
     assert isinstance(cons, Comparison), cons
     lhs, rhs = cons.args
-    assert isinstance(lhs, Operator) and lhs.name == "wsum" or lhs.name == "sum", lhs
+    assert isinstance(lhs, Operator) and (lhs.name == "wsum" or lhs.name == "sum"), lhs
     assert isinstance(rhs, int), rhs
     model.add(cons)
 

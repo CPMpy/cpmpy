@@ -462,7 +462,7 @@ class CPM_exact(SolverInterface):
         # TODO: make this a custom transformation?
         newcfvrs = []
         for c,v in xct_cfvars:
-            if is_num(v):
+            if is_int(v):
                 xct_rhs += c*v
             else:
                 newcfvrs.append((c,v))
@@ -485,12 +485,12 @@ class CPM_exact(SolverInterface):
         xcfvars = []
         xrhs = 0
         
-        assert is_num(rhs), "RHS of inequality should be numeric after transformations: {}".format(rhs)
+        assert is_int(rhs), "RHS of inequality should be numeric after transformations: {}".format(rhs)
         xrhs += rhs
 
-        if is_num(lhs):
+        if is_int(lhs):
             xrhs -= lhs
-        elif isinstance(lhs, _NumVarImpl):
+        elif isinstance(lhs, _IntVarImpl):
             xcfvars = [(1,self.solver_var(lhs))]
         elif lhs.name == "sum":
             xcfvars = [(1,x) for x in self.solver_vars(lhs.args)]
@@ -581,8 +581,9 @@ class CPM_exact(SolverInterface):
                 lhs, rhs = con.args
                 if con.name == "==":
                     # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
+                    assert isinstance(lhs, Expression)  # typing doesn't know its normalized
                     if lhs.name == "mul":
-                        if is_num(rhs): # make dummy var
+                        if isinstance(rhs, int):  # make dummy var
                             rhs = intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
@@ -613,7 +614,7 @@ class CPM_exact(SolverInterface):
                 assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
 
                 if sub_expr.name not in ["==", ">=", "<="]:
-                    raise NotImplementedError("Constraint not supported by Exact '{}' {}".format(lhs.name, con))
+                    raise NotImplementedError("Constraint not supported by Exact '{}' {}".format(sub_expr.name, con))
 
                 lhs, rhs = sub_expr.args
                 xct_cfvars, xct_rhs = self._make_numexpr(lhs,rhs)
