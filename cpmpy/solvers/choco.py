@@ -100,9 +100,9 @@ class CPM_choco(SolverInterface):
             import pychoco as chc
             chc_version = CPM_choco.version()
             # check it's the correct version
-            # CPMPy uses features only available from 0.2.1
-            if Version(chc_version) < Version("0.2.1"):
-                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+            # CPMPy uses features only available from 0.3.0
+            if Version(chc_version) < Version("0.3.0"):
+                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.3.0, "
                               f"but you have version {chc_version}.")
                 return False
             return True
@@ -168,7 +168,18 @@ class CPM_choco(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds 
-                kwargs:                         any keyword argument, sets parameters of solver object
+            
+            Choco supports setting limits on the search process and various logging options.
+            Examples include:
+
+            =============================   =======================================================
+            Argument                        Description
+            =============================   =======================================================
+            ``node_limit``                  Number of nodes limit for search
+            ``backtrack_limit``             Number of backtracks limit for search
+            ``show_statistics=True``        Show statistics after solving is done
+            ``show_decisions=True``         Show decisions during solving
+            =============================   =======================================================
 
         """
         # ensure all vars are known to solver
@@ -176,6 +187,13 @@ class CPM_choco(SolverInterface):
 
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
+
+        choco_kwargs = dict()
+        for arg, value in kwargs.items():
+            if hasattr(self.chc_solver, arg) and value is True:
+                getattr(self.chc_solver, arg)() # e.g., show_statistics()
+            else:
+                choco_kwargs[arg] = value # passed to solve call
 
         start = time.time()
         
@@ -186,36 +204,38 @@ class CPM_choco(SolverInterface):
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
-            sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
+            sol = self.chc_solver.find_optimal_solution(maximize=not self.minimize_obj,
                                                         objective=self.solver_var(self.obj),
-                                                        **kwargs)
+                                                        **choco_kwargs)
         else:
-            sol = self.chc_solver.find_solution()
+            sol = self.chc_solver.find_solution(**choco_kwargs)
         end = time.time()
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.solve_time = end - start
 
+        search_state = self.chc_solver.get_search_state()
         # translate exit status
         # A) Found a solution
         if sol is not None:
             # COP
             if self.has_objective():
-                if time_limit is None or self.cpm_status.solve_time < time_limit: # solved to optimality
+                if search_state == "TERMINATED":
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-                else: # solved, but optimality not proven
+                elif search_state == "STOPPED":
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            # CSP
+                else:
+                    raise ValueError(f"Unexpected search state: {search_state}")
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        # B) Found unsat
-        elif time_limit is None or self.cpm_status.solve_time < time_limit: # proven unsat
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        # C) Timeout
-        else:
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN  # can happen when timeout is reached...
-
+        else: # B) no solution found
+            if search_state == "TERMINATED":
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE # proven
+            elif search_state == "STOPPED":
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN # not proven unsat
+            else:
+                raise ValueError(f"Unexpected search state: {search_state}")
 
         # True/False depending on self.chc_status
         has_sol = sol is not None
@@ -618,7 +638,7 @@ class CPM_choco(SolverInterface):
                 # take value lower than anything else
                 chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
-                return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
+                return self.chc_model.table(self.solver_vars(array), chc_table, uvalue=chc_star)
             elif cpm_expr.name == "regular":
                 from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
                 array, transitions, start, accepting = cpm_expr.args
