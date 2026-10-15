@@ -101,6 +101,11 @@ Supported solvers
      - OPT
      - pip
      - 
+   * - :doc:`Hermax <api/solvers/hermax>`
+     - MaxSAT
+     - SAT ASAT ISAT - OPT
+     - pip
+     - CP-level modeling API over MaxSAT backends
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - SAT
      - SAT ASAT ISAT
