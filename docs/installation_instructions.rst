@@ -43,9 +43,17 @@ CPMpy supports a multitude of solvers of different technologies to be used as ba
 .. code-block:: bash
 
     # Choose any subset of solvers to install
-    $ pip install cpmpy[choco, cpo, exact, gcs, gurobi, minizinc, pysat, pysdd, z3, scip, highs]
+    $ pip install cpmpy[choco, cpo, exact, gcs, gurobi, minizinc, pysat, pysdd, z3, scip, highs, nlipsat]
 
 Some solvers require additional steps (like acquiring a (aca.) license). Have a look at :ref:`this <supported-solvers>` overview.
+
+NLIPSat is one of those exceptions. Its package loads encoders from the repository checkout (``codes/``), which a normal ``pip install`` of the git URL does not ship. Install that checkout editable so the import can construct an ``EncodingConfig``:
+
+.. code-block:: console
+
+    $ pip install -e "git+https://github.com/ZhenglingYangli/NLIPSat-Toolkit.git#egg=nlipsat"
+
+The ``cpmpy[nlipsat]`` extra installs the same git URL plus PySAT and ``z3-solver``. Follow it with the editable command above; otherwise the package imports and then fails to find ``codes/``.
 
 
 .. warning::
