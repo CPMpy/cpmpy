@@ -30,6 +30,9 @@ jobs:
           - solver: pumpkin
           - solver: scip
           - solver: highs
+          - solver: nlipsat
+            install_commands: |
+              pip install -e "git+https://github.com/ZhenglingYangli/NLIPSat-Toolkit.git#egg=nlipsat"
     uses: ./.github/workflows/test-solver.yml
     with:
       solver: ${{ matrix.solver }}

@@ -101,6 +101,11 @@ Supported solvers
      - OPT
      - pip
      - 
+   * - :doc:`NLIPSat <api/solvers/nlipsat>`
+     - MaxSAT (NLIP)
+     - SAT ALLSAT - OPT
+     - pip (editable git install)
+     - encodes polynomial integer programs 
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - SAT
      - SAT ASAT ISAT

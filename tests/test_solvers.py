@@ -23,6 +23,7 @@ from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
 from cpmpy.solvers.highs import CPM_highs
+from cpmpy.solvers.nlipsat import CPM_nlipsat
 from cpmpy import SolverLookup
 
 from test_constraints import numexprs
@@ -1400,6 +1401,23 @@ def test_scip_no_overlap_native():
     s = cp.SolverLookup.get("scip", model)
     assert any(c.getConshdlrName() == "cumulative" for c in s.scip_model.getConss())
     assert s.solve()
+
+
+@pytest.mark.skipif(not CPM_nlipsat.supported(), reason="NLIPSat is not installed")
+def test_nlipsat_quadratic():
+    # toolkit example: max X1*X2 s.t. X1+X2 <= 3, domains 0..2, optimum 2
+    x = cp.intvar(0, 2, name="X1")
+    y = cp.intvar(0, 2, name="X2")
+    m = cp.Model(x + y <= 3, maximize=x * y)
+    assert m.solve(solver="nlipsat")
+    assert m.objective_value() == 2
+    assert x.value() * y.value() == 2
+
+
+@pytest.mark.skipif(not CPM_nlipsat.supported(), reason="NLIPSat is not installed")
+def test_nlipsat_unsat():
+    x = cp.boolvar()
+    assert cp.Model([x, ~x]).solve(solver="nlipsat") is False
 
 
 @pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")

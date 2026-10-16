@@ -35,7 +35,13 @@ solver_dependencies = {
     "pindakaas": ["pindakaas>=0.5.0,<0.6.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
     "scip": ["pyscipopt>=6.1"],
-    "rc2": ["python-sat>=1.9.dev5", "pypblib"]
+    "rc2": ["python-sat>=1.9.dev5", "pypblib"],
+    # The git install does not ship codes/; CI and the docs follow it with an editable checkout.
+    "nlipsat": [
+        "nlipsat @ git+https://github.com/ZhenglingYangli/NLIPSat-Toolkit.git",
+        "python-sat>=1.8",
+        "z3-solver",
+    ],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 

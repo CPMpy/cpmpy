@@ -4,6 +4,7 @@
 
 ### Added
 
+* NLIPSat solver interface (`solver="nlipsat"`)
 * **New Global** `Reservoir` [#1115](https://github.com/CPMpy/cpmpy/pull/1115)
 * CSE for OR-Tools circuit's arc vars [#1118](https://github.com/CPMpy/cpmpy/pull/1118)
 
