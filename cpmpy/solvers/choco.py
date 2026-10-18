@@ -181,6 +181,8 @@ class CPM_choco(SolverInterface):
             ``show_decisions=True``         Show decisions during solving
             =============================   =======================================================
 
+            More information at https://choco-solver.org/docs/solving/limits/ and https://choco-solver.org/docs/solving/statistics/
+
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
