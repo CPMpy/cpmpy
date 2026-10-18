@@ -1,5 +1,24 @@
 # Change log
 
+## 1.1.1
+
+### Added
+
+* **New Global** `Reservoir` [#1115](https://github.com/CPMpy/cpmpy/pull/1115)
+* CSE for OR-Tools circuit's arc vars [#1118](https://github.com/CPMpy/cpmpy/pull/1118)
+
+### Changed
+
+* Updates to routing examples [#1111](https://github.com/CPMpy/cpmpy/pull/1111)
+
+### Fixed
+
+* Flattening of `GCC` arguments [#1123](https://github.com/CPMpy/cpmpy/pull/1123)
+* Fix naming and solver interfaces for `AllDifferentExceptN` and `AllDifferentExcept0` [#1122](https://github.com/CPMpy/cpmpy/pull/1122)
+* Temporary pindakaas upper version limit due to excessive memory usage [#1124](https://github.com/CPMpy/cpmpy/pull/1124)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v1.1.0...v1.1.1
+
 ## 1.1.0
 
 ### Added
