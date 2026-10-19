@@ -73,8 +73,7 @@ def write_gdimacs(
     the model constraints (soft) and optional hard constraints into grouped CNF.
 
     Each constraint in ``model.constraints`` is treated as soft and assigned to a
-    separate group after transformation to CNF. The resulting "value" clauses are grouped
-    by the soft constraint that they belong to, while the resulting defining clauses are considered hard and placed in group ``{0}``. 
+    separate group after transformation to CNF. 
     Optionally an additional list of ``hard`` constraints can be provided to be placed in group ``{0}``.
 
     .. note::
