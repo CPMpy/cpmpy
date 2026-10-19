@@ -29,7 +29,7 @@ from .cse import CSEMap
 from ..expressions.core import Expression, BoolVal, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import NDVarArray, cpm_array, _BoolVarImpl, boolvar
+from ..expressions.variables import NDVarArray, cpm_array, _BoolVarImpl
 from ..expressions.python_builtins import all as cpm_all
 from ..transformations.negation import recurse_negation
 
@@ -155,35 +155,28 @@ def decompose_in_tree(lst_of_expr: list[Expression],
         elif expr.has_subexpr():
             # first, special case for positive reified
             decomposed_positive = False
-            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name in supported_half_reified \
-                    and expr.args[1].name not in supported_reified:
-                # supported half-reified global, keep it and only decompose the condition and the global's arguments
+            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
                 cond, subexpr = expr.args
-                cond_changed, cond_newargs, cond_toplevel = _decompose_in_tree_args((cond,), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-                glob_changed, glob_newargs, glob_toplevel = _decompose_in_tree_args(subexpr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-                todolist.extend(cond_toplevel + glob_toplevel)
-                cond = cond_newargs[0]
-                if not isinstance(cond, _BoolVarImpl):
-                    # flattening would reify the global instead, so make the condition a variable: BV == cond, BV -> Global
-                    if csemap is not None:
-                        cond, cond_def = csemap.get_or_make_var(cond)
-                    else:
-                        cond_var = boolvar()
-                        cond, cond_def = cond_var, (cond == cond_var)
-                    if cond_def is not None:
-                        todolist.append(cond_def)
-                if cond is not expr.args[0] or glob_changed:
-                    changed = True
-                    if glob_changed:
+                if subexpr.name in supported_half_reified:
+                    # supported half-reified global, keep it and only decompose its arguments
+                    args_changed, glob_newargs, glob_toplevel = _decompose_in_tree_args(subexpr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    todolist.extend(glob_toplevel)
+                    if args_changed:
                         subexpr = copy.copy(subexpr)
                         subexpr.update_args(glob_newargs)
-                    expr = Operator("->", [cond, subexpr])
-                newlist.append(expr)
-                continue
+                    if not isinstance(cond, _BoolVarImpl):
+                        # flattening would reify the global instead, so make the condition a variable: BV -> Global, cond == BV
+                        # (the condition itself is decomposed in the next round)
+                        cond, cond_def = (csemap if csemap is not None else CSEMap()).get_or_make_var(cond)
+                        if cond_def is not None:
+                            todolist.append(cond_def)
+                    if args_changed or cond is not expr.args[0]:
+                        changed = True
+                        expr = Operator("->", [cond, subexpr])
+                    newlist.append(expr)
+                    continue
 
-            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
                 changed = True
-                subexpr = expr.args[1]
                 if decompose_custom_positive is not None and subexpr.name in decompose_custom_positive:
                     exprs, toplevel_exprs = decompose_custom_positive[subexpr.name](subexpr)
                 elif decompose_custom is not None and subexpr.name in decompose_custom:
