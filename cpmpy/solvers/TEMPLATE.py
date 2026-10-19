@@ -85,8 +85,7 @@ class CPM_template(SolverInterface):
     # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
     #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
-    # [GUIDELINE] list global constraints your solver supports half-reified (`b -> AllDifferent(X)`) but cannot
-    #           fully reify or negate; pass them to `decompose_in_tree` as `supported_half_reified`
+    # [GUIDELINE] list global constraints your solver supports half-reified (e.g., `b -> AllDifferent(X)`), but not fully reified
     supported_half_reified_global_constraints = frozenset()
 
     @staticmethod

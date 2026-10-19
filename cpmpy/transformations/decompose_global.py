@@ -62,8 +62,6 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
     :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
     :param supported_half_reified: a set of names of global constraints that are supported when half-reified at the toplevel, i.e. ``BE -> Global``.
-        Use this for solvers that support ``BE -> Global`` but not ``BE == Global`` or ``~Global``; those are still decomposed.
-        Any global in `supported_reified` is also supported half-reified.
 
     To decompose a global constraint in positive context:
     1. Check `decompose_positive_custom`
