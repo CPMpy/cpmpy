@@ -705,13 +705,13 @@ class CPM_exact(SolverInterface):
         return {
             'ca-multweaken': [0, 1],
             'ca-cancelingunknowns': [0, 1],
-            'ca-weakenfully': [0, 1],
-            'ca-subsetsum': [0, 10000, 1000000],
+            # 'ca-weakenfully': [0, 1], # not released yet
+            # 'ca-subsetsum': [0, 10000, 1000000], # not released yet
             'inp-purelits': [0, 1],
             'inp-dombreaking': [-1, 0, 100, 10000],
             'inp-probing': [0, 1],
             'inp-atmostone': [0, 0.1, 0.5, 1],
-            'inp-liftsymb': [0, 1, 2] 
+            # 'inp-liftsymb': [0, 1, 2] 
 
         }
 
@@ -720,11 +720,11 @@ class CPM_exact(SolverInterface):
         return {
             'ca-multweaken': 1,
             'ca-cancelingunknowns': 0,
-            'ca-weakenfully': 0,
-            'ca-subsetsum': 1000000,
+            # 'ca-weakenfully': 0, # not released yet
+            # 'ca-subsetsum': 1000000, # not released yet
             'inp-purelits': 1,
-            'inp-dombreaking': -1,
+            'inp-dombreaklim': -1,
             'inp-probing': 1,
             'inp-atmostone': 0.1,
-            'inp-liftsymb': 2
+            # 'inp-liftsymb': 2 # not released yet
         }
