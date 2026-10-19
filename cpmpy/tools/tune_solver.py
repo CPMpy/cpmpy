@@ -60,11 +60,7 @@ class ParameterTuner:
         # Init solver
         if verbose >= 1:
             print(f"Running {self.solvername} with default parameters")
-        if not isinstance(self.model, list):
-            solver = SolverLookup.get(self.solvername, self.model)
-        else:
-            solver = MultiSolver(self.solvername, self.model)
-        solver.solve(**self.best_params, time_limit=time_limit)
+        solver = _run_solver(self.solvername, self.model, self.best_params, time_limit)
         if not _has_finished(solver):
             raise TimeoutError("Time's up before solving init solver call")
 
@@ -87,11 +83,6 @@ class ParameterTuner:
         if max_tries is None:
             max_tries = len(combos_np)
         while len(combos_np) and i < max_tries:
-            # Make new solver
-            if not isinstance(self.model, list):
-                solver = SolverLookup.get(self.solvername, self.model)
-            else:
-                solver = MultiSolver(self.solvername, self.model)
             # Apply scoring to all combos
             scores = self._get_score(combos_np)
             max_idx = np.where(scores == scores.min())[0][0]
@@ -115,7 +106,7 @@ class ParameterTuner:
             if verbose >= 1:
                 print(f"Starting trial {i+1}/{max_tries}, cap: {timeout:.1f}s  -- remaining configs: {len(combos_np)}" + f" budget: {time_limit-(time.time()-start_time):.1f}s" if time_limit else "")
             # run solver
-            solver.solve(**params_dict, time_limit=timeout)
+            solver = _run_solver(self.solvername, self.model, params_dict, timeout)
             if _has_finished(solver):
                 self.best_runtime = solver.status().solve_time
                 # update surrogate
@@ -181,11 +172,7 @@ class GridSearchTuner(ParameterTuner):
         # Init solver
         if verbose >= 1:
             print(f"Running {self.solvername} with default parameters")
-        if not isinstance(self.model, list):
-            solver = SolverLookup.get(self.solvername, self.model)
-        else:
-            solver = MultiSolver(self.solvername, self.model)
-        solver.solve(**self.best_params,time_limit=time_limit)
+        solver = _run_solver(self.solvername, self.model, self.best_params, time_limit)
         if not _has_finished(solver):
             raise TimeoutError("Time's up before solving init solver call")
 
@@ -202,11 +189,6 @@ class GridSearchTuner(ParameterTuner):
             combos = combos[:max_tries]
 
         for i, params_dict in enumerate(combos):
-            # Make new solver
-            if not isinstance(self.model, list):
-                solver = SolverLookup.get(self.solvername, self.model)
-            else:
-                solver = MultiSolver(self.solvername, self.model)
             # set fixed params
             params_dict.update(fix_params)
             timeout = self.best_runtime
@@ -221,7 +203,7 @@ class GridSearchTuner(ParameterTuner):
             if verbose >= 1:
                 print(f"Starting trial {i+1}/{len(combos)}, cap: {timeout:.1f}s" + f" budget: {time_limit-(time.time()-start_time):.1f}s" if time_limit else "")
             # run solver
-            solver.solve(**params_dict, time_limit=timeout)
+            solver = _run_solver(self.solvername, self.model, params_dict, timeout)
             if _has_finished(solver):
                 self.best_runtime = solver.status().solve_time
                 # update surrogate
@@ -238,6 +220,30 @@ class GridSearchTuner(ParameterTuner):
             print(f"Best runtime: {self.best_runtime:.1f} for params {self.best_params}")
 
         return self.best_params
+
+# solvers that only accept parameters at initialisation, not in solve()
+_INIT_PARAM_SOLVERS = {"exact"}
+
+def _run_solver(solvername, model, params, time_limit):
+    """
+        Create a fresh solver for `model` and solve it with the given parameters.
+        Parameters are passed at initialisation for solvers in `_INIT_PARAM_SOLVERS`, and to `solve()` otherwise.
+
+        Returns
+        -------
+        SolverInterface
+            The solver after solving, to inspect its status.
+    """
+    if isinstance(model, list):
+        solver = MultiSolver(solvername, model)
+        solver.solve(**params, time_limit=time_limit)
+    elif solvername.split(":")[0] in _INIT_PARAM_SOLVERS:
+        solver = SolverLookup.get(solvername, model, **params)
+        solver.solve(time_limit=time_limit)
+    else:
+        solver = SolverLookup.get(solvername, model)
+        solver.solve(**params, time_limit=time_limit)
+    return solver
 
 def _has_finished(solver):
     """
