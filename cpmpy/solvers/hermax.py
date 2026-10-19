@@ -26,10 +26,8 @@
     https://hermax.readthedocs.io/
 
     .. note::
-        With a ``time_limit``, satisfaction problems (no objective) are solved
-        non-incrementally (one-shot SAT): Hermax's live incremental SAT backend
-        cannot interrupt. Optimization (MaxSAT) can stay incremental and may
-        return a feasible suboptimal solution when the limit is hit.
+        Solving with a ``time_limit`` stays incremental. Optimization (MaxSAT)
+        may return a feasible suboptimal solution when the limit is hit.
 
     The rest of this documentation is for advanced users.
 
@@ -44,6 +42,7 @@
 """
 import time
 import warnings
+from functools import lru_cache
 from typing import Optional
 
 from packaging.version import Version
@@ -69,6 +68,20 @@ from ..transformations.linearize import (
     linearize_reified_variables,
 )
 
+@lru_cache(maxsize=None)
+def _subsolver_available(subsolver: str) -> bool:
+    """
+        Whether a Hermax subsolver can be instantiated (e.g. MaxHS requires a build with CPLEX).
+    """
+    import hermax.non_incremental as her_ni
+    try:
+        solver = getattr(her_ni, subsolver)()
+    except Exception:
+        return False
+    solver.close()
+    return True
+
+
 class CPM_hermax(SolverInterface):
     """
     Interface to Hermax's modeling API (``hermax.model.Model``).
@@ -84,7 +97,7 @@ class CPM_hermax(SolverInterface):
 
     # CP-level globals Hermax encodes natively
     supported_global_constraints = frozenset({
-        "alldifferent", "cumulative", "increasing", "lex_less", "min", "max",
+        "alldifferent", "cumulative", "increasing", "lex_less", "table", "min", "max", "element",
     })
     supported_reified_global_constraints = frozenset()
 
@@ -93,8 +106,8 @@ class CPM_hermax(SolverInterface):
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.2.4"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.2.4 "
+            if her_version is None or Version(her_version) < Version("1.2.5"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.2.5 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -102,16 +115,46 @@ class CPM_hermax(SolverInterface):
             return False
 
     @staticmethod
-    def solvernames(**kwargs):
+    def solvernames(installed: bool = True):
         """
-            Returns solvers supported by Hermax on your system
+            Returns solvers supported by Hermax (on your system).
+
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those available on your system (default True)
+
+            Returns:
+                list of solver names
         """
         if CPM_hermax.supported():
             import hermax.non_incremental as her_ni
-            return list(her_ni.__all__)
+            names = list(her_ni.__all__)
+            if installed:
+                names = [n for n in names if _subsolver_available(n)]
+            return names
         else:
             warnings.warn("Hermax is not installed or not supported on this system.")
             return []
+
+    @staticmethod
+    def solverversion(subsolver: str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None
+
+        The subsolvers are compiled into the Hermax package, so this is the Hermax version.
+        """
+        if subsolver.startswith("hermax:"):
+            subsolver = subsolver[7:]  # strip 'hermax:'
+        if subsolver not in CPM_hermax.solvernames(installed=False):
+            raise ValueError(f"Unknown Hermax subsolver '{subsolver}', choose from {CPM_hermax.solvernames(installed=False)}")
+        if not _subsolver_available(subsolver):
+            return None
+        return CPM_hermax.version()
 
     @staticmethod
     def version() -> Optional[str]:
@@ -134,9 +177,9 @@ class CPM_hermax(SolverInterface):
         """
         if not self.supported():
             her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.2.4"):
+            if her_version is not None and Version(her_version) < Version("1.2.5"):
                 raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.4 "
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.5 "
                     f"but you have version {her_version}"
                 )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
@@ -152,8 +195,10 @@ class CPM_hermax(SolverInterface):
         else:
             if subsolver.startswith("hermax:"):
                 subsolver = subsolver[7:]  # strip 'hermax:'
-            if subsolver not in self.solvernames():
+            if subsolver not in self.solvernames(installed=False):
                 raise ValueError(f"Unknown Hermax subsolver '{subsolver}', choose from {self.solvernames()}")
+            if not _subsolver_available(subsolver):
+                raise NotSupportedError(f"Hermax subsolver '{subsolver}' is not available in your Hermax build, choose from {self.solvernames()}")
             her_solver = getattr(her_ni, subsolver)
             name = "hermax:" + subsolver
 
@@ -163,6 +208,7 @@ class CPM_hermax(SolverInterface):
         self._objective = None
         self._objective_posted = False
         self._assumption_map = {}  # dimacs lit -> CPMpy assumption expr
+        self._int_cache = {}  # constant or Boolean var name -> Hermax IntVar, see _int_var()
 
         # initialise everything else and post the constraints/objective
         super().__init__(name=name, cpm_model=cpm_model)
@@ -182,12 +228,8 @@ class CPM_hermax(SolverInterface):
             time_limit (float, optional): Maximum solve time in seconds.
                                           Must be positive when set.
 
-                                          Satisfaction problems (no objective) use a
-                                          non-incremental one-shot SAT solve under a
-                                          time limit, because Hermax's live incremental
-                                          SAT backend cannot interrupt. Optimization
-                                          (MaxSAT) can interrupt a live backend and may
-                                          return a feasible suboptimal solution
+                                          Optimization (MaxSAT) may return a feasible
+                                          suboptimal solution when interrupted
                                           (``interrupted_sat`` → FEASIBLE).
             assumptions:                  iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                           For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
@@ -200,23 +242,14 @@ class CPM_hermax(SolverInterface):
         - ``maxsat_backend``
         - ``incremental``
 
-        The MaxSAT subsolver itself is selected at construction time
-        (e.g. ``cp.SolverLookup.get("hermax:EvalMaxSAT")``), not via ``solve()``.
-
         See https://hermax.readthedocs.io/ for the full list.
         """
         if "solver" in kwargs:
-            raise ValueError("Hermax subsolver must be selected at construction (e.g. cp.SolverLookup.get('hermax:EvalMaxSAT')), not via solve(solver=...).")
+            raise ValueError("Select the Hermax subsolver via the solver name, e.g. model.solve(solver='hermax:EvalMaxSAT') or cp.SolverLookup.get('hermax:EvalMaxSAT'), not via solve(solver=...).")
 
         if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
-            # Live incremental SAT cannot interrupt; use one-shot timed SAT.
-            # Live MaxSAT can take time_limit on the bound backend.
-            if self.her_model._inc_state.mode == "sat":
-                self.her_model.close_incremental()
-            if self.her_model._inc_state.mode != "maxsat":
-                kwargs.setdefault("incremental", False)
 
         self.solver_vars(list(self.user_vars))
 
@@ -240,7 +273,7 @@ class CPM_hermax(SolverInterface):
         runtime = time.time() - start
 
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = runtime
+        self.cpm_status.solve_time = runtime
 
         # Hermax SolveResult.status is one of:
         # sat | unsat | optimum | interrupted_sat | interrupted | unknown | error
@@ -508,13 +541,30 @@ class CPM_hermax(SolverInterface):
         if isinstance(cpm_con, Comparison):
             lhs, rhs = cpm_con.args
         
-            # Global functions in equality form: min/max(...) == rhs
+            # Global functions in equality form: min/max/element(...) == rhs
             if isinstance(lhs, GlobalFunction):
                 assert cpm_con.name == "==", "Hermax: only equality comparisons are supported for global functions"
                 if lhs.name == "min":
-                    return self.her_model.min(self.solver_vars(lhs.args)) == self.solver_var(rhs)
+                    return self.her_model.min(self._int_vector(lhs.args)) == self._int_var(rhs)
                 if lhs.name == "max":
-                    return self.her_model.max(self.solver_vars(lhs.args)) == self.solver_var(rhs)
+                    return self.her_model.max(self._int_vector(lhs.args)) == self._int_var(rhs)
+                if lhs.name == "element":
+                    arr, idx = lhs.args
+                    if is_num(idx):
+                        return self._int_var(arr[idx]) == self._int_var(rhs)
+                    # Hermax requires the index domain to lie within the array bounds
+                    hm_idx = self.solver_var(idx)
+                    lb, ub = max(int(idx.lb), 0), min(int(idx.ub), len(arr) - 1)
+                    if lb > ub:
+                        return False
+                    if (lb, ub) != (idx.lb, idx.ub):
+                        key = (idx.name, lb, ub)
+                        if key not in self._int_cache:
+                            hm_inbounds = self.her_model.int(f"_cpm_idx_{idx.name}_{lb}_{ub}", lb, ub)
+                            self.her_model &= hm_inbounds == hm_idx
+                            self._int_cache[key] = hm_inbounds
+                        hm_idx = self._int_cache[key]
+                    return self._int_vector(arr)[hm_idx] == self._int_var(rhs)
                 raise NotImplementedError(f"Hermax: unsupported global function {lhs}")
 
             # Hermax rejects Literal != Literal; encode as XOR via PB sum
@@ -539,16 +589,16 @@ class CPM_hermax(SolverInterface):
 
         if isinstance(cpm_con, GlobalConstraint):
             if cpm_con.name == "alldifferent":
-                hm_vars = [self.solver_var(v) for v in cpm_con.args]
-                return self.her_model.vector(hm_vars).all_different()
+                return self._int_vector(cpm_con.args).all_different()
             if cpm_con.name == "increasing":
-                hm_vars = [self.solver_var(v) for v in cpm_con.args]
-                return self.her_model.vector(hm_vars).increasing()
+                return self._int_vector(cpm_con.args).increasing()
             if cpm_con.name == "lex_less":
                 x, y = cpm_con.args
-                hx = self.her_model.vector([self.solver_var(v) for v in x])
-                hy = self.her_model.vector([self.solver_var(v) for v in y])
-                return hx.lexicographic_less_than(hy)
+                return self._int_vector(x).lexicographic_less_than(self._int_vector(y))
+            if cpm_con.name == "table":
+                arr, table = cpm_con.args
+                allowed = [tuple(int(v) for v in row) for row in table]
+                return self.her_model.table([self._int_var(v) for v in arr], allowed=allowed)
             if cpm_con.name == "cumulative":
                 if len(cpm_con.args) == 4:
                     start, dur, demand, cap = cpm_con.args
@@ -564,7 +614,7 @@ class CPM_hermax(SolverInterface):
                 if not is_num(cap):
                     raise NotSupportedError("Hermax Cumulative only supports fixed capacity")
 
-                hm_starts = [self.solver_var(s) for s in start]
+                hm_starts = [self._int_var(s) for s in start]
                 self.her_model.cumulative(
                     hm_starts,
                     [int(d) for d in dur],
@@ -575,4 +625,31 @@ class CPM_hermax(SolverInterface):
             raise NotImplementedError(f"Hermax: unsupported global {cpm_con}")
 
         raise NotImplementedError(f"Hermax: unexpected constraint {cpm_con}")
+
+    def _int_var(self, cpm_arg):
+        """
+            Returns a Hermax IntVar for a CPMpy integer/Boolean variable or constant.
+
+            Hermax globals only take IntVars: constants become fixed IntVars and
+            Boolean variables are channeled to 0..1 IntVars (both cached).
+        """
+        if isinstance(cpm_arg, _NumVarImpl) and not cpm_arg.is_bool():
+            return self.solver_var(cpm_arg)
+
+        key = int(cpm_arg) if is_num(cpm_arg) else cpm_arg.name
+        hm_int = self._int_cache.get(key)
+        if hm_int is None:
+            if is_num(cpm_arg):
+                hm_int = self.her_model.int(f"_cpm_const_{key}", key, key)
+            else:
+                hm_int = self.her_model.int(f"_cpm_int_{key}", 0, 1)
+                self.her_model &= hm_int == self.solver_var(cpm_arg)
+            self._int_cache[key] = hm_int
+        return hm_int
+
+    def _int_vector(self, cpm_args):
+        """
+            Returns a Hermax IntVector for a list of CPMpy variables and/or constants.
+        """
+        return self.her_model.vector([self._int_var(a) for a in cpm_args])
 
