@@ -708,10 +708,10 @@ class CPM_exact(SolverInterface):
             # 'ca-weakenfully': [0, 1], # not released yet
             # 'ca-subsetsum': [0, 10000, 1000000], # not released yet
             'inp-purelits': [0, 1],
-            'inp-dombreaking': [-1, 0, 100, 10000],
+            'inp-dombreaklim': [-1, 0, 100, 10000],
             'inp-probing': [0, 1],
             'inp-atmostone': [0, 0.1, 0.5, 1],
-            # 'inp-liftsymb': [0, 1, 2] 
+            # 'inp-liftsymb': [0, 1, 2] # not released yet
 
         }
 
