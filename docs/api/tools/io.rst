@@ -63,6 +63,9 @@ Available formats
    * - ``rcpsp``
      - ✓
      -
+   * - ``sudoku``
+     - ✓
+     -
 
 
 Format-specific loaders and writers:
@@ -77,6 +80,7 @@ Format-specific loaders and writers:
     io/opb
     io/rcpsp
     io/scip
+    io/sudoku
     io/wcnf
     io/xcsp3
     

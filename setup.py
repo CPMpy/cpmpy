@@ -32,7 +32,7 @@ solver_dependencies = {
     "gcs": ["gcspy>=0.1.9"], # first version to pass all tests
     "cpo": ["docplex>=2.28.240"],
     "pumpkin": ["pumpkin-solver>=0.3.0"], # CPMpy requires features only available from Pumpkin version >=0.3.0
-    "pindakaas": ["pindakaas>=0.5.0"],
+    "pindakaas": ["pindakaas>=0.5.0,<0.6.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
     "scip": ["pyscipopt>=6.1"],
     "rc2": ["python-sat>=1.9.dev5", "pypblib"]
@@ -60,7 +60,7 @@ setup(
     version=get_version("cpmpy/__init__.py"),
     author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
-    license='Apache 2.0',
+    license_expression='Apache-2.0',
     description='A numpy-based library for modeling constraint programming problems',
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -97,7 +97,6 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
-        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.10'

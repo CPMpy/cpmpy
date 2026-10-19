@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/CPMpy_Logo__Vertical_Blue.png" alt="CPMpy logo" width="220">
+<img src="https://raw.githubusercontent.com/CPMpy/cpmpy/master/docs/CPMpy_Logo__Vertical_Blue.png" alt="CPMpy logo" width="220">
 
 ![Github Version](https://img.shields.io/github/v/release/CPMpy/cpmpy?label=Github%20Release&logo=github)
 ![PyPI version](https://img.shields.io/pypi/v/cpmpy?color=blue&label=Pypi%20version&logo=pypi&logoColor=white)
@@ -83,17 +83,17 @@ model = cp.Model()
 
 # Mandatory jobs: each job must be assigned to exactly one compatible machine
 for _, job_rows in df_data.groupby("job_id"):
-    model += cp.sum(active[job_rows.index]) == 1
+    model.add(cp.sum(active[job_rows.index]) == 1)
 
 # Machine capacity: each machine can only process one job at a time
 # also enforces Matching duration: the end time of a job is the start time + the duration on its assigned machine
 for _, mach_rows in df_data.groupby("machine_id", sort=True):
-    model += cp.NoOverlapOptional(
+    model.add(cp.NoOverlapOptional(
         start = start[mach_rows["job_id"]],
         end = end[mach_rows["job_id"]],
         duration = mach_rows["duration"].values,
         is_present = active[mach_rows.index],
-    )
+    ))
 
 # Metric Makespan: end time of the latest job
 makespan = cp.max(end)
