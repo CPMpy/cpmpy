@@ -696,3 +696,35 @@ class CPM_exact(SolverInterface):
         vals = flatlist(vals)
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
         self.xct_solver.setSolutionHints(list(zip(self.solver_vars(cpm_vars), vals)))
+
+    @classmethod
+    def tunable_params(cls):
+        """
+            Suggestion of tunable hyperparameters of the solver.
+        """
+        return {
+            'ca-multweaken': [0, 1],
+            'ca-cancelingunknowns': [0, 1],
+            'ca-weakenfully': [0, 1],
+            'ca-subsetsum': [0, 10000, 1000000],
+            'inp-purelits': [0, 1],
+            'inp-dombreaking': [-1, 0, 100, 10000],
+            'inp-probing': [0, 1],
+            'inp-atmostone': [0, 0.1, 0.5, 1],
+            'inp-liftsymb': [0, 1, 2] 
+
+        }
+
+    @classmethod
+    def default_params(cls):
+        return {
+            'ca-multweaken': 1,
+            'ca-cancelingunknowns': 0,
+            'ca-weakenfully': 0,
+            'ca-subsetsum': 1000000,
+            'inp-purelits': 1,
+            'inp-dombreaking': -1,
+            'inp-probing': 1,
+            'inp-atmostone': 0.1,
+            'inp-liftsymb': 2
+        }
