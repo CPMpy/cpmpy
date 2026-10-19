@@ -87,8 +87,7 @@ class CallbacksCPMPy(Callbacks):
         "le": (2, lambda x, y: x <= y),
         "ge": (2, lambda x, y: x >= y),
         "gt": (2, lambda x, y: x > y),
-        # ne is n-ary in XCSP3 (like eq): ne(x0,...,xn) is the logical negation of eq, i.e. "not allequal"
-        # (not the same as pairwise AllDifferent). Binary case stays a plain disequality.
+        # arity 0: XCSP3 allows n-ary eq/ne (all-equal / not-all-equal)
         "ne": (0, lambda x: x[0] != x[1] if len(x) == 2 else ~cp.AllEqual(x)),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
@@ -471,7 +470,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += (cp.Count(cpm_vars, value) == self.get_cpm_var(k))
 
     def ctr_among(self, lst: list[Variable], values: list[int], k: int | Variable):
-        self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
+        self.cpm_model += cp.Among(self.get_cpm_vars(lst), self.unroll(values)) == self.get_cpm_var(k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
         if excepting is None:
@@ -500,8 +499,8 @@ class CallbacksCPMPy(Callbacks):
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable],
                         occurs: list[int] | list[Variable] | list[range], closed: bool):
         self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
-                                                    self.get_cpm_exprs(values),
-                                                    self.get_cpm_exprs(occurs),
+                                                    self.unroll(values),
+                                                    self.get_cpm_occurs_exprs(occurs),
                                                     closed=closed)
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
@@ -807,7 +806,10 @@ class CallbacksCPMPy(Callbacks):
         return cpm_exprs
 
     def get_cpm_var(self, x):
-        return self.cpm_variables.get(x, x)
+        if isinstance(x, XVar) or x in self.cpm_variables:
+            return self.cpm_variables[x]
+        else:
+            return x  # constants
 
     def get_cpm_vars(self, lst):
         if isinstance(lst[0], (XVar, int)):
@@ -819,6 +821,18 @@ class CallbacksCPMPy(Callbacks):
         else:
             return self.vars_from_node(lst)
 
+    def get_cpm_occurs_exprs(self, occurs):
+        """Cardinality occurs list: constants and/or intvars for interval bounds."""
+        cpm_occurs = []
+        for occur in occurs:
+            if isinstance(occur, range):
+                cpm_occurs.append(cp.intvar(occur.start, occur.stop - 1))
+            elif isinstance(occur, XVar):
+                cpm_occurs.append(self.get_cpm_var(occur))
+            else:
+                cpm_occurs.append(self.intentionfromtree(occur))
+        return cpm_occurs
+
     def get_cpm_exprs(self, lst):
         # Guard against empty input;
         # use len() == 0 instead of `not lst` to also support numpy arrays
@@ -827,16 +841,12 @@ class CallbacksCPMPy(Callbacks):
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            # assert len(lst) == 1, f"Expected range here, but got list with multiple elements, what's the semantics???{lst}"
-
             if len(lst) == 1:
-                return list(lst[0])  # this should work without converting to str first
-            else:
-                return [cp.intvar(l.start, l.stop - 1) for l in lst]
-
-            # return list(eval(str(lst[0])))
-        else:
-            return self.exprs_from_node(lst)
+                return list(lst[0])
+            return self.get_cpm_occurs_exprs(lst)
+        if any(isinstance(x, range) for x in lst):
+            return self.get_cpm_occurs_exprs(lst)
+        return self.exprs_from_node(lst)
 
     def end_instance(self):
         pass

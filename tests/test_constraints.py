@@ -25,7 +25,7 @@ NUM_GLOBAL = {
     "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
     "Table", 'NegativeTable', "ShortTable", "Regular", "MDD",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
-    "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
+    "Precedence", "Cumulative", "Reservoir", "ReservoirOptional", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "NDElement", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
@@ -200,6 +200,22 @@ def global_constraints(solver):
             if solver not in ("pumpkin", "hermax"): # only supports with fixed durations
                 yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
                 yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+                yield cp.Cumulative(start=s, duration=cp.intvar(1, 5, shape=3), demand=demand, capacity=cap)
+            continue
+
+        elif name == "Reservoir":
+            # contingent: filling by 3 before the withdrawal of 1 exceeds the maximum
+            s = cp.intvar(0, 5, shape=2, name="start")
+            demand = [3, -1]
+            yield cp.Reservoir(s, demand, -1, 2)
+            continue
+
+        elif name == "ReservoirOptional":
+            # the demand of 3 cannot be present: together with the fixed +2 it exceeds the maximum
+            s = cp.intvar(0, 5, shape=3, name="start")
+            demand = [3, -1, 2]
+            is_present = [cp.boolvar(), cp.boolvar(), True]
+            yield cp.ReservoirOptional(s, demand, -1, 2, is_present)
             continue
 
         elif name == "CumulativeOptional":
@@ -210,6 +226,8 @@ def global_constraints(solver):
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
             cap = 10
             yield cls(s, dur, e, demand, cap, is_present)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield cls(start=s, duration=cp.intvar(1, 5, shape=4), demand=demand, capacity=cap, is_present=is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
@@ -231,6 +249,7 @@ def global_constraints(solver):
             yield cp.NoOverlap(s, dur)
             if solver != "pumpkin": # only supports with fixed durations
                 yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
+                yield cp.NoOverlap(s, cp.intvar(1, 5, shape=3))
             continue
         elif name == "NoOverlapOptional":
             s = cp.intvar(0, 10, shape=4, name="start")
@@ -238,6 +257,8 @@ def global_constraints(solver):
             dur = [1, 4, 3, 2]
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
             yield cls(s, dur, e, is_present)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield cls(start=s, duration=cp.intvar(1, 5, shape=4), is_present=is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)

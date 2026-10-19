@@ -132,7 +132,7 @@ def load_scip_format(instance: Union[str, os.PathLike, TextIO], open:Callable = 
                         warnings.warn(f"Continuous variable {name} has non-integer bounds {var.getLbOriginal()} - {var.getUbOriginal()}. CPMpy will assume it is integer.")
                     var_map[name] = cp.intvar(lb, ub, name=name)
                 else:
-                    raise ValueError(f"CPMpy does not support continious variables: {name}")
+                    raise ValueError(f"CPMpy does not support continuous variables: {name}")
             else:
                 raise ValueError(f"Unsupported variable type: {vtype}")
         

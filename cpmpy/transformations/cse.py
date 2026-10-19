@@ -83,6 +83,8 @@ class CSEMap:
             if expr.name in comps:
                 var, val = expr.args
                 if isinstance(var, _IntVarImpl) and is_int(val):
+                    if not isinstance(val, int):
+                        val = int(val)  # TODO: when Comparison stores typed intexpr, change the above is_int()
                     target = var_vals if expr.name == "==" else var_bounds
                     target.setdefault(var, []).append((val, bv))
 
