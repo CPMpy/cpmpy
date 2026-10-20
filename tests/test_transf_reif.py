@@ -6,6 +6,7 @@ from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_implies, reify_rewrite, only_bv_reifies
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
 class TestTransfReif:
@@ -32,6 +33,22 @@ class TestTransfReif:
         for (expr, strexpr) in cases:
             assert  str(only_implies(only_bv_reifies((expr,)))) == strexpr
             assert cp.Model(expr).solve()
+
+    def test_only_implies_supported(self):
+        a, b = [cp.boolvar(name=n) for n in "ab"]
+        x = cp.intvar(0, 2, shape=3, name="x")
+        alldiff = cp.AllDifferent(x)
+
+        # supported full reifications are kept
+        assert str(only_implies([a == alldiff], supported={"alldifferent"})) == "[(a) == (alldifferent(x[0],x[1],x[2]))]"
+        assert str(only_implies([(~a) == alldiff], supported={"alldifferent"})) == "[(~a) == (alldifferent(x[0],x[1],x[2]))]"
+        # others are still rewritten
+        assert str(only_implies([a == cp.Table(x, [[0, 1, 2]])], supported={"alldifferent"})) == \
+               "[(a) -> (table([x[0],x[1],x[2]],[0,1,2])), (~a) -> (negative_table([x[0],x[1],x[2]],[0,1,2]))]"
+        assert str(only_implies([a == b], supported={"alldifferent"})) == "[(a) -> (b), (b) -> (a)]"
+        # also when created by a retransformation
+        assert set(map(str, only_implies([a.implies(b == alldiff)], supported={"alldifferent"}, csemap=CSEMap()))) == \
+               {"(a) -> ((~b) or (BV0))", "(a) -> ((~BV0) or (b))", "(BV0) == (alldifferent(x[0],x[1],x[2]))"}
 
     def test_reif_element(self):
         bvs = cp.boolvar(shape=5, name="bvs")

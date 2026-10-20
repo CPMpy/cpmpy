@@ -52,7 +52,7 @@ def only_bv_reifies(constraints, csemap=None):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints, csemap=None):
+def only_implies(constraints, csemap=None, supported=frozenset()):
     """
         Transforms all reifications to ``BV -> BE`` form
 
@@ -67,6 +67,8 @@ def only_implies(constraints, csemap=None):
 
         Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
         AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
+
+        :param supported: a (frozen)set of names of global constraints that support full reification ``BV == Global``, these are kept
     """
     newcons = []
     retransform = []
@@ -96,6 +98,8 @@ def only_implies(constraints, csemap=None):
                 # if a rhs integer is involved with a lhs bool,
                 # then it is actually an integer expression, keep
                 newcons.append(cpm_expr)
+            elif isinstance(a1, GlobalConstraint) and a1.name in supported:
+                newcons.append(cpm_expr)
             else:
                 # BVar1 == BE0 :: BVar1 -> BE0, ~BVar1 -> ~BE0
                 # assume that if a0 == a1 was fine, that a0 -> a1 is too
@@ -123,7 +127,7 @@ def only_implies(constraints, csemap=None):
             newcons.append(cpm_expr)
     
     if len(retransform) != 0:
-        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform, csemap=csemap), csemap=csemap), csemap=csemap))
+        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform, csemap=csemap), csemap=csemap), csemap=csemap, supported=supported))
 
     return newcons
 
