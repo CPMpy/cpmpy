@@ -97,17 +97,17 @@ class CPM_hermax(SolverInterface):
 
     # CP-level globals Hermax encodes natively
     supported_global_constraints = frozenset({
-        "alldifferent", "cumulative", "increasing", "lex_less", "table", "min", "max", "element",
+        "alldifferent", "cumulative", "increasing", "lex_less", "table", "negative_table", "min", "max", "element",
     })
-    supported_reified_global_constraints = frozenset()
+    supported_reified_global_constraints = frozenset({"alldifferent", "table", "negative_table"})
 
     @staticmethod
     def supported():
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.2.5"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.2.5 "
+            if her_version is None or Version(her_version) < Version("1.2.8"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.2.8 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -177,9 +177,9 @@ class CPM_hermax(SolverInterface):
         """
         if not self.supported():
             her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.2.5"):
+            if her_version is not None and Version(her_version) < Version("1.2.8"):
                 raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.5 "
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.8 "
                     f"but you have version {her_version}"
                 )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
@@ -209,6 +209,7 @@ class CPM_hermax(SolverInterface):
         self._objective_posted = False
         self._assumption_map = {}  # dimacs lit -> CPMpy assumption expr
         self._int_cache = {}  # constant or Boolean var name -> Hermax IntVar, see _int_var()
+        self._false_lit = None  # see _hermax_false()
 
         # initialise everything else and post the constraints/objective
         super().__init__(name=name, cpm_model=cpm_model)
@@ -464,7 +465,7 @@ class CPM_hermax(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(
             cpm_cons,
-            supported=frozenset({"or", "sum", "wsum", "sub"}),
+            supported=frozenset({"or", "sum", "wsum", "sub"}) | self.supported_reified_global_constraints,
             csemap=self._csemap,
         )
         cpm_cons = only_numexpr_equality(
@@ -474,8 +475,15 @@ class CPM_hermax(SolverInterface):
         )
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        return cpm_cons
+        # reified globals are posted natively, only_implies would introduce their negation
+        reified_globals = [c for c in cpm_cons if self._is_reified_global(c)]
+        cpm_cons = only_implies([c for c in cpm_cons if not self._is_reified_global(c)], csemap=self._csemap)
+        return cpm_cons + reified_globals
+
+    def _is_reified_global(self, cpm_expr):
+        return (isinstance(cpm_expr, Comparison) and cpm_expr.name == "=="
+                and isinstance(cpm_expr.args[1], GlobalConstraint)
+                and cpm_expr.args[1].name in self.supported_reified_global_constraints)
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hermax":
         """
@@ -528,7 +536,9 @@ class CPM_hermax(SolverInterface):
                 elif isinstance(subexpr, Operator) and subexpr.name == "or":
                     # encode as bigger clause
                     return ~hm_bv | self._hermax_expr(subexpr)
-                if isinstance(subexpr, Comparison):
+                if isinstance(subexpr, GlobalConstraint) and subexpr.name == "negative_table":
+                    return self._hermax_table(subexpr).implies(~hm_bv)
+                if isinstance(subexpr, Comparison) or (isinstance(subexpr, GlobalConstraint) and subexpr.name in self.supported_reified_global_constraints):
                     hm_sub = self._hermax_expr(subexpr)
                     # Hermax may constant-fold a comparison to True/False once domains
                     # are fixed by earlier posts; literals have .only_if(), bools do not.
@@ -540,7 +550,13 @@ class CPM_hermax(SolverInterface):
 
         if isinstance(cpm_con, Comparison):
             lhs, rhs = cpm_con.args
-        
+
+            # reified global: BV == Global
+            if isinstance(rhs, GlobalConstraint):
+                if rhs.name == "negative_table":
+                    return self._hermax_table(rhs).iff(~self.solver_var(lhs))
+                return self._hermax_expr(rhs).iff(self.solver_var(lhs))
+
             # Global functions in equality form: min/max/element(...) == rhs
             if isinstance(lhs, GlobalFunction):
                 assert cpm_con.name == "==", "Hermax: only equality comparisons are supported for global functions"
@@ -596,9 +612,9 @@ class CPM_hermax(SolverInterface):
                 x, y = cpm_con.args
                 return self._int_vector(x).lexicographic_less_than(self._int_vector(y))
             if cpm_con.name == "table":
-                arr, table = cpm_con.args
-                allowed = [tuple(int(v) for v in row) for row in table]
-                return self.her_model.table([self._int_var(v) for v in arr], allowed=allowed)
+                return self._hermax_table(cpm_con)
+            if cpm_con.name == "negative_table":
+                return self._hermax_table(cpm_con).implies(self._hermax_false())
             if cpm_con.name == "cumulative":
                 if len(cpm_con.args) == 4:
                     start, dur, demand, cap = cpm_con.args
@@ -646,6 +662,23 @@ class CPM_hermax(SolverInterface):
                 self.her_model &= hm_int == self.solver_var(cpm_arg)
             self._int_cache[key] = hm_int
         return hm_int
+
+    def _hermax_table(self, cpm_con):
+        """
+            Returns the Hermax table for a CPMpy (negative) table, a negative table is its negation.
+        """
+        arr, table = cpm_con.args
+        allowed = [tuple(int(v) for v in row) for row in table]
+        return self.her_model.table([self._int_var(v) for v in arr], allowed=allowed)
+
+    def _hermax_false(self):
+        """
+            Returns a Hermax literal that is always false.
+        """
+        if self._false_lit is None:
+            self._false_lit = self.her_model.bool("_cpm_false")
+            self.her_model &= ~self._false_lit
+        return self._false_lit
 
     def _int_vector(self, cpm_args):
         """
