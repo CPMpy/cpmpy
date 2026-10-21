@@ -82,9 +82,12 @@ class CPM_template(SolverInterface):
     # [GUIDELINE] list all supported global constraints and global functions
     #           (e.g., 'alldifferent', 'max', 'element', ...)
     supported_global_constraints = frozenset({'alldifferent', 'max', 'element', 'div'})
-    # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
-    #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
+    # [GUIDELINE] list all global constraints supported in (fully) reified context
+    #           (e.g., 'alldifferent' if your solver supports `b == AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
+    # [GUIDELINE] list global constraints your solver supports half-reified 
+    #           (e.g., `b -> AllDifferent(X)`), but not fully reified
+    supported_half_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():

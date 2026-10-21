@@ -12,7 +12,7 @@ Implementing the template consists of the following parts:
   * `solver_var()` where you create new solver variables and map them to CPMpy decision variables.
   * `solve()` where you call the solver, get the status and `solve_time`, and reverse-map the variable values after solving.
   * `objective()` if your solver supports optimisation (optionally override `minimize`/`maximize`/`objective` with `Expression | FloatSum` type hints if your solver also supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives).
-  * `supported_global_constraints` and `supported_reified_global_constraints` where you declare which integer functions and global constraints should reach the solver interface directly instead of being decomposed first.
+  * `supported_global_constraints`, `supported_reified_global_constraints` and `supported_half_reified_global_constraints` where you declare which integer functions and global constraints should reach the solver interface directly instead of being decomposed first.
   * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports.
   * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver.
 
