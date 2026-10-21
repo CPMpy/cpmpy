@@ -466,7 +466,6 @@ class Circuit(GlobalConstraint):
         constraining.append(cp.AllDifferent(order))  # redundant constraint
         constraining.append(order[0] == 0)
 
-        defining: list[Expression] = []
         for i in range(n):
             for j in range(n):
                 if i == j:
@@ -474,9 +473,9 @@ class Circuit(GlobalConstraint):
                     constraining.append(succ[i] != j)
                 if j != 0:
                     # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
-                    defining.append((succ[i] == j) == (order[i] + 1 == order[j]))
+                    constraining.append((succ[i] == j).implies(order[i] + 1 == order[j]))
 
-        return constraining, defining
+        return constraining, []
 
     def value(self) -> Optional[bool]:
         """
