@@ -25,11 +25,11 @@ import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike
+from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.variables import _NumVarImpl
 from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
-from ..expressions.utils import is_any_list, argvals
+from ..expressions.utils import is_any_list, argvals, materialize_generators
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
@@ -219,7 +219,7 @@ class SolverInterface(object):
         """
         return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "SolverInterface":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -233,11 +233,14 @@ class SolverInterface(object):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
+
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
 
@@ -248,7 +251,7 @@ class SolverInterface(object):
         return self
     
     # needed here for subclasses that don't do the more direct `__add__ = add` in their class
-    def __add__(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
+    def __add__(self, cpm_expr: NestedBoolExprLikeOrGen) -> "SolverInterface":
         return self.add(cpm_expr)
 
 

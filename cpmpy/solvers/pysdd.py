@@ -48,10 +48,10 @@ from typing import Iterable, Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_bool, is_int, argvals, is_any_list
+from ..expressions.utils import is_bool, is_int, argvals, is_any_list, materialize_generators
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -313,7 +313,7 @@ class CPM_pysdd(SolverInterface):
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pysdd":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_pysdd":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -327,11 +327,13 @@ class CPM_pysdd(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
 
         newvars = get_variables(cpm_expr)
 

@@ -42,8 +42,8 @@ from datetime import timedelta
 from typing import Iterable, Optional, List, Any, Set
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, NestedBoolExprLike
-from ..expressions.utils import eval_comparison, is_int
+from ..expressions.core import Expression, BoolVal, Comparison, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from ..expressions.utils import eval_comparison, is_int, materialize_generators
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
@@ -288,7 +288,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pindakaas":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_pindakaas":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -302,11 +302,14 @@ class CPM_pindakaas(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
+
         import pindakaas as pdk
 
         if self.unsatisfiable:

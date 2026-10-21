@@ -54,9 +54,9 @@ import warnings
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_int, is_any_list, is_boolexpr, argvals
+from ..expressions.utils import is_num, is_int, is_any_list, is_boolexpr, argvals, materialize_generators
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
@@ -422,7 +422,7 @@ class CPM_template(SolverInterface):
         # ...
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_template":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_template":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -436,11 +436,13 @@ class CPM_template(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
 
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

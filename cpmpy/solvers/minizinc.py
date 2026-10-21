@@ -68,12 +68,12 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import MinizincNameException, MinizincBoundsException, MinizincPathException, NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, MDD, Regular
 from ..expressions.globalfunctions import Multiplication, FloatSum
-from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args, materialize_generators
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -631,7 +631,7 @@ class CPM_minizinc(SolverInterface):
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_minizinc":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_minizinc":
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
 
@@ -645,11 +645,14 @@ class CPM_minizinc(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
+
         get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):

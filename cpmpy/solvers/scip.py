@@ -34,11 +34,11 @@ from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
+from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
-from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst, get_nonneg_args
+from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst, get_nonneg_args, materialize_generators
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -336,7 +336,7 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_scip":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_scip":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -350,11 +350,14 @@ class CPM_scip(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
+
         get_variables(cpm_expr, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))

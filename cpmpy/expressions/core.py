@@ -93,7 +93,7 @@ from __future__ import annotations
 import copy
 import warnings
 from dataclasses import dataclass
-from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
+from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable, Generator
 import numpy as np
 import cpmpy as cp
 
@@ -106,6 +106,7 @@ ListLike: TypeAlias = Union[Sequence[T], np.ndarray]  # similar to is_any_list()
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
 BoolExprLike: TypeAlias = Union["Expression", bool, np.bool_]  # subtype of ExprLike (bool subtype int)
 NestedBoolExprLike: TypeAlias = Union[BoolExprLike, ListLike["NestedBoolExprLike"]]  # single or (nested) ListLike of BoolExprLike
+NestedBoolExprLikeOrGen: TypeAlias = Union[BoolExprLike, ListLike["NestedBoolExprLikeOrGen"], Generator["NestedBoolExprLikeOrGen", None, None]]  # as above, but (nested) generators also allowed, e.g. as input to `add()`
 
 class Expression(object):
     """
