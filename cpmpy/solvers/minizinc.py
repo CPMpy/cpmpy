@@ -898,10 +898,10 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name in ("div", "mod", "pow"):
             # wrap args that are a subexpression in ()
-            x, y = (f"({s})" if isinstance(a, Expression) else s for a, s in zip(expr.args, args_str))
+            lhs, rhs = (f"({s})" if isinstance(a, Expression) else s for a, s in zip(expr.args, args_str))
             if expr.name == "pow":
-                return f"{x}^{y}"
-            return f"{x} {expr.name} {y}"
+                return f"{lhs}^{rhs}"
+            return f"{lhs} {expr.name} {rhs}"
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
