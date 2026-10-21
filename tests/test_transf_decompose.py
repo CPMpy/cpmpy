@@ -406,9 +406,12 @@ class TestTransfDecomp:
             assert str(decompose_in_tree(cons, supported=supported, supported_half_reified=half_reified)) == \
                    str(decompose_in_tree(cons, supported=supported))
 
-        # supported_reified takes precedence
+        # supported_reified globals are also supported half-reified
         cons = [bv == alldiff]
-        assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified, supported_half_reified=half_reified)) == str(cons)
+        assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified)) == str(cons)
+        cons = [cp.AllEqual(ivs[:2]).implies(alldiff)]
+        assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified)) == \
+               "[(BV0) -> (alldifferent(x,y,z)), ((x) == (y)) == (BV0)]"
 
     def test_decompose_half_reified_args(self):
         x, y, z = [cp.intvar(1, 9, name=n) for n in "xyz"]

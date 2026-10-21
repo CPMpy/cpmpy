@@ -62,6 +62,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
     :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
     :param supported_half_reified: a set of names of global constraints that are supported when half-reified at the toplevel, i.e. ``BE -> Global``.
+        Globals in `supported_reified` are also supported half-reified.
 
     To decompose a global constraint in positive context:
     1. Check `decompose_positive_custom`
@@ -153,10 +154,10 @@ def decompose_in_tree(lst_of_expr: list[Expression],
         elif expr.has_subexpr():
             # first, special case for positive reified
             decomposed_positive = False
-            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
+            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint):
                 cond, subexpr = expr.args
-                if subexpr.name in supported_half_reified:
-                    # supported half-reified global, keep it and only decompose its arguments
+                if subexpr.name in supported_reified or subexpr.name in supported_half_reified:
+                    # supported (half-)reified global, keep it and only decompose its arguments
                     args_changed, glob_newargs, glob_toplevel = _decompose_in_tree_args(subexpr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
                     todolist.extend(glob_toplevel)
                     if args_changed:
