@@ -56,7 +56,7 @@ from packaging.version import Version
 from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
@@ -67,7 +67,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int, materialize_generators
 from ..exceptions import NotSupportedError
 
 import numpy as np
@@ -550,7 +550,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr):  # helper function (Multiplication is GlobalFunction name 'mul')
         return isinstance(cpm_expr, Multiplication)
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_exact":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_exact":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -564,11 +564,13 @@ class CPM_exact(SolverInterface):
             are auxiliary variables created by transformations.
 
         Arguments:
-            cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+            cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
         Returns:
             self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
 
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

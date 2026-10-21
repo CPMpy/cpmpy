@@ -64,6 +64,22 @@ def test_add_var(solver):
 
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
+def test_add_generator(solver):
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+
+    bvar = cp.boolvar(shape=4)
+
+    # generator expressions get materialized into lists
+    solver.add(x for x in bvar[:2])
+    solver += [bvar[2], (b for b in [bvar[3]])]
+    assert len(solver.user_vars) == 4
+    assert solver.solve()
+    assert all(bvar.value())
+
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
 def test_add_constraint(solver):
 
     solver_class = SolverLookup.lookup(solver)
