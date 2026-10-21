@@ -60,8 +60,8 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.negation import push_down_negation, push_down_negation_objective
-from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
+from ..transformations.negation import push_down_negation, push_down_negation_objective, recurse_negation
+from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.linearize import (
     decompose_linear,
     decompose_linear_objective,
@@ -106,8 +106,8 @@ class CPM_hermax(SolverInterface):
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.2.8"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.2.8 "
+            if her_version is None or Version(her_version) < Version("1.2.9"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.2.9 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -177,9 +177,9 @@ class CPM_hermax(SolverInterface):
         """
         if not self.supported():
             her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.2.8"):
+            if her_version is not None and Version(her_version) < Version("1.2.9"):
                 raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.8 "
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.9 "
                     f"but you have version {her_version}"
                 )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
@@ -475,15 +475,7 @@ class CPM_hermax(SolverInterface):
         )
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        # reified globals are posted natively, only_implies would introduce their negation
-        reified_globals = [c for c in cpm_cons if self._is_reified_global(c)]
-        cpm_cons = only_implies([c for c in cpm_cons if not self._is_reified_global(c)], csemap=self._csemap)
-        return cpm_cons + reified_globals
-
-    def _is_reified_global(self, cpm_expr):
-        return (isinstance(cpm_expr, Comparison) and cpm_expr.name == "=="
-                and isinstance(cpm_expr.args[1], GlobalConstraint)
-                and cpm_expr.args[1].name in self.supported_reified_global_constraints)
+        return cpm_cons
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hermax":
         """
@@ -551,11 +543,21 @@ class CPM_hermax(SolverInterface):
         if isinstance(cpm_con, Comparison):
             lhs, rhs = cpm_con.args
 
-            # reified global: BV == Global
-            if isinstance(rhs, GlobalConstraint):
+            # full reification: BV == BE
+            if cpm_con.name == "==" and is_boolexpr(lhs) and isinstance(rhs, Expression) and rhs.is_bool():
+                hm_bv = self.solver_var(lhs)
                 if rhs.name == "negative_table":
-                    return self._hermax_table(rhs).iff(~self.solver_var(lhs))
-                return self._hermax_expr(rhs).iff(self.solver_var(lhs))
+                    return self._hermax_table(rhs).iff(~hm_bv)
+                if rhs.name == "and":
+                    return self._hermax_expr(Operator("or", [~a for a in rhs.args])).iff(~hm_bv)
+                hm_sub = self._hermax_expr(rhs)
+                if isinstance(hm_sub, bool):
+                    return hm_bv if hm_sub else ~hm_bv
+                if not hasattr(hm_sub, "iff"):
+                    # not all Hermax comparisons are reifiable, post both implications
+                    self.add([lhs.implies(rhs), (~lhs).implies(recurse_negation(rhs))])
+                    return None
+                return hm_sub.iff(hm_bv)
 
             # Global functions in equality form: min/max/element(...) == rhs
             if isinstance(lhs, GlobalFunction):
