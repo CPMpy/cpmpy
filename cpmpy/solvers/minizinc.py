@@ -896,14 +896,12 @@ class CPM_minizinc(SolverInterface):
                 name = "global_cardinality_closed"
             return "{}({},{},{})".format(name, vars_str, vals_str, occ_str)
 
-        elif expr.name == "div":
-            return "{} div {}".format(*args_str)
-
-        elif expr.name == "mod":
-            return "{} mod {}".format(*args_str)
-
-        elif expr.name == "pow":
-            return "{}^{}".format(*args_str)
+        elif expr.name in ("div", "mod", "pow"):
+            # wrap args that are a subexpression in ()
+            x, y = (f"({s})" if isinstance(a, Expression) else s for a, s in zip(expr.args, args_str))
+            if expr.name == "pow":
+                return f"{x}^{y}"
+            return f"{x} {expr.name} {y}"
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
