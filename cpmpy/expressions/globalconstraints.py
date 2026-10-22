@@ -977,6 +977,11 @@ class Regular(GlobalConstraint):
             nodes_set.add(dst)
             values_set.add(value)
 
+        if complete:
+            # The sink node must also capture values in the domain of the array that do not occur in any transition
+            lbs, ubs = get_bounds(arr)
+            values_set.update(range(min(lbs), max(ubs) + 1))
+
         nodes = sorted(nodes_set)
         values = sorted(values_set)
 

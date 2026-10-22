@@ -723,6 +723,20 @@ class TestGlobal:
         assert cp.Model(cons + [~b, x == [0, 1, 1, 0]]).solve()
         assert cp.Model(cons + [~b, x == [0, 0, 0, 1]]).solve()
 
+    def test_regular_linear_values_outside_transitions(self):
+        x = cp.intvar(0, 2, shape=3, name="x")
+        b = cp.boolvar(name="b")
+        # automaton accepting 0*100*, value 2 is in the domain of x but does not occur in any transition
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "b"), ("b", 0, "c"), ("c", 0, "c")], "a", ["c"])
+
+        assert cp.Model(decompose_linear([~reg]) + [x == [0, 0, 2]]).solve()
+
+        cons = decompose_linear([b == reg])
+        assert cp.Model(cons + [b, x == [1, 0, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 0, 2]]).solve()
+        assert cp.Model(cons + [~b, x == [0, 0, 2]]).solve()
+        assert not cp.Model(cons + [~b, x == [1, 0, 0]]).solve()
+
     def test_mdd(self):
         x = cp.intvar(0, 3, shape=3)
 
