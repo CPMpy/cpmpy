@@ -12,6 +12,7 @@ from cpmpy.expressions.utils import STAR, argvals, argval
 from cpmpy.solvers import CPM_minizinc
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.safening import no_partial_functions
+from cpmpy.transformations.linearize import decompose_linear
 
 from utils import skip_on_missing_pblib, inclusive_range, lambda_assert
 
@@ -707,6 +708,20 @@ class TestGlobal:
 
         assert sat, "BUG: half-reified Regular is unsound for rejected strings"
 
+    def test_regular_linear_positive_reif(self):
+        x = cp.intvar(0, 1, shape=4, name="x")
+        b = cp.boolvar(name="b")
+        # automaton accepting 0*100*
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "b"), ("b", 0, "c"), ("c", 0, "c")], "a", ["c"])
+        cons = decompose_linear([b.implies(reg)])
+
+        assert cp.Model(cons + [b, x == [0, 1, 0, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 1, 1, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 0, 0, 1]]).solve()
+
+        # the array is unrestricted when the automaton is not enforced
+        assert cp.Model(cons + [~b, x == [0, 1, 1, 0]]).solve()
+        assert cp.Model(cons + [~b, x == [0, 0, 0, 1]]).solve()
 
     def test_mdd(self):
         x = cp.intvar(0, 3, shape=3)

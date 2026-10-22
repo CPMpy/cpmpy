@@ -1028,9 +1028,10 @@ class Regular(GlobalConstraint):
                 defining.append(cp.sum(s[0, j, q] for j in range(len(values))) == 0)
 
         # Enforce flow constraints: flow in = flow out
+        flow_cons = []
         for i in range(1, len(arr)):
             for q in range(len(nodes)):
-                defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
+                flow_cons.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
                 defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) <= 1) # redundant constraint
                 defining.append(cp.sum(s[i, j, q] for (j, _) in flow_out[q]) <= 1) # redundant constraint
 
@@ -1048,7 +1049,15 @@ class Regular(GlobalConstraint):
             for j in range(len(values)):
                 defining.append(cp.sum(s[i, j, q] for q in range(len(nodes))) == (arr[i] == values[j]))
 
-        return constraining, defining
+        if complete:
+            # With a flow from root to sink for every possible assignment, flow constraints can be defining
+            return constraining, defining + flow_cons
+        else:
+            # Without a flow from root to sink for every possible assignment, flow constraints must be constraining
+            return constraining + flow_cons, defining
+
+
+
 
 
     def value(self) -> Optional[bool]:
