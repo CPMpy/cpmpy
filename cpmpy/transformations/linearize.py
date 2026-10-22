@@ -664,7 +664,8 @@ def get_linear_positive_decompositions():
 def linearize_reified_variables(constraints:list[Expression], 
                                 min_values:int=3,
                                 csemap:Optional[CSEMap]=None,
-                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
+                                ivarmap:Optional[dict[str, IntVarEnc]] = None,
+                                channel:bool = False) -> list[Expression]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and
     reified (BV <-> (x >= val)) implications with order encoding when a variable
@@ -674,6 +675,8 @@ def linearize_reified_variables(constraints:list[Expression],
     If ivarmap is None, both consistency constraints and channeling constraints are posted.
     If ivarmap is not None, the encoding is added to ivarmap and only (the domain constraint) is posted; 
     the solver can then choose to eliminate the variables, or post the channeling constraints itself anyway.
+    If channel is True, the channeling constraints of newly encoded variables are posted too, so a persistent
+    ivarmap can be used to post each encoding only once over multiple calls.
 
     If both BV <-> (x == val) and BV <-> (x >= val) are present, choose the
     encoding type that occurs most often for that variable. Ties prefer the
@@ -723,7 +726,7 @@ def linearize_reified_variables(constraints:list[Expression],
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
-        if ivarmap is None:
+        if ivarmap is None or channel:
             # also post the var=wsum mapping
             terms, k = enc.encode_term()
             # var == wsum + k :: var - wsum == k

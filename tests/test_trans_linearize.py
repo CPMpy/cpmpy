@@ -752,7 +752,25 @@ class TestLinearizeReifiedVariablesThreshold:
         assert isinstance(self.ivarmap["a"], IntVarEncOrder)
         assert str(order_out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
         assert str(direct_out) == str(cpm_cons)
-    
+
+    def test_linearize_reified_variables_channel_once(self):
+        """With a persistent ivarmap and channel=True, the encoding is posted once, including channeling."""
+        out = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap, channel=True)
+        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1, sum([1, 0, -1, -2] * [a, BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+        cpm_cons = self.linearize(self.a >= 2)
+        assert linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap, channel=True) == cpm_cons
+
+    @pytest.mark.requires_solver("exact", "gurobi", "highs", "scip", "cplex")
+    def test_linearize_reified_variables_incremental(self, solver):
+        """Unrelated adds do not re-post the encodings of earlier encoded variables."""
+        x, y, z = cp.intvar(0, 3, shape=3, name=["x", "y", "z"])
+        s = cp.SolverLookup.get(solver)
+        s += cp.AllDifferent([x, z])
+        for cons in [z >= 1, y <= 2, cp.boolvar() | (x == 2), y >= 1]:
+            assert len(s.transform(cons)) == 1
+            s += cons
+        assert s.solve()
+
     # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
     
     def test_linearize_reified_inequalities_variations(self):
