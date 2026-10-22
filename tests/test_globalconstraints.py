@@ -910,6 +910,42 @@ class TestGlobal:
         assert cons.value()
         assert x.value()[a.value(), b.value(), 2] == 4
 
+    def test_element_slice(self):
+        bv = cp.boolvar(shape=(6,4), name="bv")
+        a = cp.intvar(0,5, name="a")
+        b = cp.intvar(0,3, name="b")
+
+        # row and column selection
+        for expr, sel in [(bv[a, :], lambda: bv.value()[a.value(), :]),
+                          (bv[a], lambda: bv.value()[a.value()]),
+                          (bv[:, b], lambda: bv.value()[:, b.value()]),
+                          (bv[1:4, b], lambda: bv.value()[1:4, b.value()]),
+                          (bv[a, 2:4], lambda: bv.value()[a.value(), 2:4]),
+                          (bv[a, ::2], lambda: bv.value()[a.value(), ::2]),
+                          (bv[a, 3:1:-1], lambda: bv.value()[a.value(), 3:1:-1])]:
+            model = cp.Model(cp.sum(expr) == 2, cp.sum(bv) == 2)
+            assert model.solve()
+            assert expr.shape == sel().shape
+            assert sel().sum() == 2
+
+        # multiple expression indices around a slice
+        x = cp.intvar(0,9, shape=(3,4,5), name="x")
+        c = cp.intvar(0,2, name="c")
+        expr = x[c, :, b]
+        assert expr.shape == (4,)
+        assert isinstance(expr[0], cp.NDElement)
+        assert cp.Model(expr == [1,2,3,4]).solve()
+        assert list(x.value()[c.value(), :, b.value()]) == [1,2,3,4]
+
+        # slices on both sides of an expression index
+        expr = x[1:3, b, 2:4]
+        assert expr.shape == (2,2)
+        assert cp.Model(expr == [[1,2],[3,4]]).solve()
+        assert x.value()[1:3, b.value(), 2:4].tolist() == [[1,2],[3,4]]
+
+        # empty slice
+        assert bv[a, 3:3].shape == (0,)
+
     def test_element_onearg(self):
 
         iv = cp.intvar(0, 10)
