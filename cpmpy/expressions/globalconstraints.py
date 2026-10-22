@@ -1062,9 +1062,6 @@ class Regular(GlobalConstraint):
             return constraining + flow_cons, defining
 
 
-
-
-
     def value(self) -> Optional[bool]:
         """
         Returns:
