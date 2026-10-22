@@ -477,7 +477,7 @@ class Circuit(GlobalConstraint):
                     # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
                     constraining.append((succ[i] == j) == (order[i] + 1 == order[j]))
 
-        return constraining, []
+        return constraining, defining
 
     def value(self) -> Optional[bool]:
         """
