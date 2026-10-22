@@ -1,0 +1,3 @@
+# Hidden package-data dirs are skipped unless listed. Copied at build time
+# from skills/ into cpmpy/.agents/skills/ (see skills/sync_into_package.py).
+recursive-include cpmpy/.agents *
