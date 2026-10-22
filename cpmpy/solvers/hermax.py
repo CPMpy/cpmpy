@@ -60,7 +60,7 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.negation import push_down_negation, push_down_negation_objective, recurse_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.linearize import (
     decompose_linear,
@@ -106,8 +106,8 @@ class CPM_hermax(SolverInterface):
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.2.9"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.2.9 "
+            if her_version is None or Version(her_version) < Version("1.2.10"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.2.10 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -177,9 +177,9 @@ class CPM_hermax(SolverInterface):
         """
         if not self.supported():
             her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.2.9"):
+            if her_version is not None and Version(her_version) < Version("1.2.10"):
                 raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.9 "
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.10 "
                     f"but you have version {her_version}"
                 )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
@@ -553,10 +553,6 @@ class CPM_hermax(SolverInterface):
                 hm_sub = self._hermax_expr(rhs)
                 if isinstance(hm_sub, bool):
                     return hm_bv if hm_sub else ~hm_bv
-                if not hasattr(hm_sub, "iff"):
-                    # not all Hermax comparisons are reifiable, post both implications
-                    self.add([lhs.implies(rhs), (~lhs).implies(recurse_negation(rhs))])
-                    return None
                 return hm_sub.iff(hm_bv)
 
             # Global functions in equality form: min/max/element(...) == rhs
