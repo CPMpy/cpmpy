@@ -695,7 +695,7 @@ def linearize_reified_variables(constraints:list[Expression],
     my_ivarmap = ivarmap if ivarmap is not None else {}
 
     # only the variables reified in these constraints
-    reified_vars = {}
+    reified_vars: dict[str, _IntVarImpl] = {}  # name -> var
     for con in constraints:
         if con.name == "==" and isinstance(con.args[1], _BoolVarImpl):
             lhs = con.args[0]
