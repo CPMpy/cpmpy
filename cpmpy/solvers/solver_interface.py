@@ -89,6 +89,7 @@ class SolverInterface(object):
         self.user_vars = set()  # variables in the original (non-transformed) model
         self._varmap: dict[str, Any] = {}  # maps cpmpy variable names to native solver variables
         self._csemap = CSEMap()  # maps cpmpy expressions to previously created expressions (typically auxiliary variables)
+        self._ivarmap = {}  # integer variable encodings already posted by `linearize_reified_variables`
 
         # rest uses own API
         if cpm_model is not None:
