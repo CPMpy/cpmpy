@@ -756,6 +756,24 @@ class TestGlobal:
         m_pos = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b.implies(mdd)])
         assert m_pos.solve()
 
+    def test_mdd_dead_end(self):
+        x = cp.intvar(0, 1, shape=2, name="x")
+        # MDD accepting exactly [0,0], node 'C' has no outgoing edges
+        mdd = cp.MDD(x, transitions=[('A', 0, 'B'),
+                                     ('A', 1, 'C'),
+                                     ('B', 0, 'D')])
+
+        # x=[1,0] ends in the dead end 'C' => MDD(x) is False => ~MDD(x) must be True.
+        assert cp.Model([x[0] == 1, x[1] == 0, ~mdd]).solve()
+
+        # Full reification: b == MDD(x), force b False with the rejected assignment.
+        b = cp.boolvar(name="b")
+        assert cp.Model([x[0] == 1, x[1] == 0, b == mdd, ~b]).solve()
+
+        # All assignments except [0,0] are rejected
+        assert cp.Model(mdd).solveAll() == 1
+        assert cp.Model(~mdd).solveAll() == 3
+
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)

@@ -1193,8 +1193,9 @@ class MDD(GlobalConstraint):
         dummy_nodes.append(sink_node)
 
         necessary_levels = []
-        for id1 in list(extended_mapping.keys()):
-            level = levels[id1]
+        for id1, level in levels.items():
+            if level == n:
+                continue
             domain = range(arr[level].lb, arr[level].ub + 1)
             for v in domain:
                 if v not in extended_mapping[id1]:
