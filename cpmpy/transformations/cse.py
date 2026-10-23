@@ -9,6 +9,7 @@ class CSEMap:
 
     def __init__(self):
         self.flat_map = dict[Expression, _IntVarImpl]()   # map expression to variable filled during flattening
+        self.reified_by_var = dict[_IntVarImpl, tuple[dict, dict]]()  # var -> ({val: bv} for ==, {val: bv} for >=)
         self.decomp_map = dict[Expression, Expression]()  # map global constraint/function to its decomposition
 
     # pass special methods to internal flat_map
@@ -51,11 +52,11 @@ class CSEMap:
                 var = ~var
             if normal_expr in self.flat_map:
                 raise ValueError(f"Expression {normal_expr} is already in the flat_map. Please report on github.")
-            self.flat_map[normal_expr] = var
+            self.store(normal_expr, var)
         else:
             if expr in self.flat_map:
                 raise ValueError(f"Expression {expr} is already in the flat_map. Please report on github.")
-            self.flat_map[expr] = var
+            self.store(expr, var)
 
     def save_decomposition(self, expr: Expression, newexpr: Expression):
         """Save the decomposition of the given global constraint or global function."""
@@ -71,23 +72,29 @@ class CSEMap:
         """Get the decomposition of the given global constraint or global function."""
         return self.decomp_map.get(expr, default)
 
-    def get_reified_varvalbounds(self) -> tuple[dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]],
-                                                dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]]:
-        """Collect bv <-> var == val and bv <-> var >= val expressions in flat_map."""
+    def store(self, expr: Expression, var: _IntVarImpl) -> None:
+        """Store expr -> var in flat_map, and index it if it is a reified 'var == val' or 'var >= val'."""
+        self.flat_map[expr] = var
+        if expr.name in ("==", ">="):
+            lhs, val = expr.args
+            if isinstance(lhs, _IntVarImpl) and is_int(val):
+                eq, ge = self.reified_by_var.setdefault(lhs, ({}, {}))
+                (eq if expr.name == "==" else ge)[int(val)] = var
 
-        comps = frozenset({"==", ">="})
-
+    def get_reified_varvalbounds(self, variables=None) -> tuple[dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]],
+                                                                dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]]:
+        """Collect bv <-> var == val and bv <-> var >= val expressions in flat_map (only of `variables`, if given)."""
         var_vals = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var == val: var -> [(val, bv)]
         var_bounds = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var >= val: var -> [(val, bv)]
-        for expr, bv in self.flat_map.items():
-            if expr.name in comps:
-                var, val = expr.args
-                if isinstance(var, _IntVarImpl) and is_int(val):
-                    if not isinstance(val, int):
-                        val = int(val)  # TODO: when Comparison stores typed intexpr, change the above is_int()
-                    target = var_vals if expr.name == "==" else var_bounds
-                    target.setdefault(var, []).append((val, bv))
-
+        for var in (self.reified_by_var if variables is None else variables):
+            entry = self.reified_by_var.get(var)
+            if entry is None:
+                continue
+            eq, ge = entry
+            if eq:
+                var_vals[var] = list(eq.items())
+            if ge:
+                var_bounds[var] = list(ge.items())
         return var_vals, var_bounds
 
     def get_or_make_var(self, expr: Expression) -> tuple[_IntVarImpl, Optional[Expression]]:
@@ -114,14 +121,14 @@ class CSEMap:
             bv = boolvar()
             expr, negate = self._canonicalize_boolexpr(expr)
 
-            self.flat_map[expr] = bv
+            self.store(expr, bv)
             if negate: # return the negated variable to get the original expression back
                 neg_bv = NegBoolView(bv) # invert
                 return neg_bv, Comparison("==", expr, bv)
             return bv, Comparison("==", expr, bv)
         else:
             iv = intvar(*expr.get_bounds())
-            self.flat_map[expr] = iv
+            self.store(expr, iv)
             return iv, Comparison("==", expr, iv)
 
 

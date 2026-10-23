@@ -79,7 +79,7 @@ from ..expressions.core import Comparison, Expression, ListLike, Operator, BoolV
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, InDomain, Regular, Circuit, ShortTable
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_boolexpr, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import IntVarEnc, _encode_int_var
 
 
@@ -694,7 +694,14 @@ def linearize_reified_variables(constraints:list[Expression],
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
 
-    var_vals, var_bounds = csemap.get_reified_varvalbounds()
+    # only the variables reified in these constraints
+    reified_vars = {}
+    for con in constraints:
+        if con.name == "==" and isinstance(con.args[1], _BoolVarImpl):
+            lhs = con.args[0]
+            if getattr(lhs, "name", None) in ("==", ">=") and isinstance(lhs.args[0], _IntVarImpl) and is_num(lhs.args[1]):
+                reified_vars.setdefault(lhs.args[0].name, lhs.args[0])
+    var_vals, var_bounds = csemap.get_reified_varvalbounds(reified_vars.values())
 
     # decide the encoding to use for each variable
     var_encodings = dict() # var -> (encoding, vals)

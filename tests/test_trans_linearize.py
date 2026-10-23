@@ -656,6 +656,7 @@ class TestLinearizeReifiedVariablesThreshold:
     def test_linearize_reified_variables_over_multiple_constraints(self):
         """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
         a = self.a
+        self.csemap = CSEMap()  # the reifications are made (and transformed) here, not in setup
         out = []
         for con in [(a == 1) | (a == 2), (a == 3) | (a == 2)]:
             out += linearize_reified_variables(self.linearize(con), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
@@ -665,6 +666,7 @@ class TestLinearizeReifiedVariablesThreshold:
     def test_linearize_reified_disequalities(self):
         """Use direct encoding on disequalities and replace `a != 1` expressions"""
         a = self.a
+        self.csemap = CSEMap()  # the reifications are made (and transformed) here, not in setup
         out = linearize_reified_variables(self.linearize((a != 1) | (a != 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
         assert str(out) == "[(~BV[a == 1]) or (~BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1]"
 
