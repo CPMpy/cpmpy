@@ -901,6 +901,11 @@ class Regular(GlobalConstraint):
         for s, v, e in transitions:
             node_set.update([s,e])
             self.trans_dict[(s, v)] = e
+        # The start and accepting nodes need not appear in any transition: a start node
+        # without outgoing transitions accepts nothing, an accepting node that cannot be
+        # reached is never used. Both still need an id.
+        node_set.add(start)
+        node_set.update(accepting)
         self.nodes = sorted(node_set)
         # normalize node_ids to be 0..n-1, allows for smaller domains
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
@@ -935,11 +940,15 @@ class Regular(GlobalConstraint):
             self.node_map[sink] = sink
             transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
 
+        id_start = self.node_map[start]
+        start_transitions = [[v, e] for s, v, e in transitions if s == id_start]
+        if len(start_transitions) == 0:
+            return [cp.BoolVal(False)], [] # no transition leaves the start node, cannot be satisfied
+
         # keep track of current state when traversing the array
         state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
-        id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        cons: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
+        cons: list[Expression] = [Table([arr[0], state_vars[0]], start_transitions)]
         # define the rest of the automaton using transition table
         cons.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
         # last state must be accepting
@@ -976,6 +985,9 @@ class Regular(GlobalConstraint):
             nodes_set.add(src)
             nodes_set.add(dst)
             values_set.add(value)
+        # as in __init__, the start and accepting nodes need an id even without transitions
+        nodes_set.add(start)
+        nodes_set.update(accepting)
 
         nodes = sorted(nodes_set)
         values = sorted(values_set)
