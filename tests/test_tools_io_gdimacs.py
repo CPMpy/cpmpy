@@ -23,11 +23,13 @@ BASIC_GCNF = """p gcnf 3 4 2
 
 
 def _assert_sat(model):
+    __tracebackhide__ = True
     assert model.solve()
     assert model.status().exitstatus == ExitStatus.FEASIBLE
 
 
 def _assert_unsat(model):
+    __tracebackhide__ = True
     assert not model.solve()
     assert model.status().exitstatus == ExitStatus.UNSATISFIABLE
 

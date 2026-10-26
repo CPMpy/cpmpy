@@ -52,7 +52,7 @@ def get_gcnf_cases():
     yield soft, hard
 
 
-@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_gcnf`) not installed")
+@pytest.mark.requires("pindakaas")
 class TestToGcnf:
     def idfn(val):
         return f"{val}"

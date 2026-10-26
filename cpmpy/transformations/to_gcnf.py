@@ -38,7 +38,8 @@ def to_gcnf(
         name (str, optional): name of the model
         csemap (CSEMap, optional): CSE map
         ivarmap (dict[str, IntVarEnc], optional): IVAR map
-        encoding (str): encoding of the model
+        encoding (str): the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
+
         disjoint (bool): whether to make the groups disjoint
 
     Returns:
