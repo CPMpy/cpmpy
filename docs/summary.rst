@@ -98,6 +98,8 @@ Global Constraints
         InDomain
         Xor
         Cumulative
+        Reservoir
+        ReservoirOptional
         Precedence
         NoOverlap
         GlobalCardinalityCount
