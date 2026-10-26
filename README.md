@@ -44,7 +44,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 * **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, Pumpkin, MiniZinc+solvers
 * **ILP Solvers**: SCIP, HiGHS, Gurobi (license required), CPLEX (license required)
 * **GO Solvers**: Hexaly (license required)
-* **SMT Solvers**: Z3
+* **SMT Solvers**: Z3, cvc5
 * **PB Solvers**: Exact
 * **SAT Encoders and Solvers**: PySAT+solvers, Pindakaas
 * **Decision Diagrams**: PySDD
