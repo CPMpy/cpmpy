@@ -177,7 +177,7 @@ class CPM_pindakaas(SolverInterface):
 
         t = time.time()
         with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
-            self.cpm_status.runtime = time.time() - t
+            self.cpm_status.solve_time = time.time() - t
 
             # translate pindakaas result status to cpmpy status
             import pindakaas as pdk
@@ -189,7 +189,7 @@ class CPM_pindakaas(SolverInterface):
             elif result.status == pdk.solver.Status.UNKNOWN:
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             else:
-                raise NotImplementedError(f"Pindakaas returned an unkown type of result status: {result}")
+                raise NotImplementedError(f"Pindakaas returned an unknown type of result status: {result}")
 
             # True/False depending on self.cpm_status
             has_sol = self._solve_return(self.cpm_status)

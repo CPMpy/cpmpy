@@ -8,7 +8,7 @@ different assumption variables toggled on/off, and the solver will reuse informa
 See :ref:`supported-solvers` for the list of solvers and their capabilities.
 
 To benefit from incrementality, you have to instantiate the solver object and reuse it, rather than working on a Model object.
-Solvers must be instantiated throught the static :class:`cp.SolverLookup <cpmpy.solvers.utils.SolverLookup>` class:
+Solvers must be instantiated through the static :class:`cp.SolverLookup <cpmpy.solvers.utils.SolverLookup>` class:
 
 - :meth:`cp.SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` -- List all installed solvers (including subsolvers).
 - :meth:`cp.SolverLookup.get(solvername, model=None) <cpmpy.solvers.utils.SolverLookup.get>` -- Initialize a specific solver.

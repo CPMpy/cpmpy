@@ -85,7 +85,7 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
+    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "reservoir", "reservoir_optional", "circuit",
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
@@ -247,7 +247,7 @@ class CPM_ortools(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.ort_solver.wall_time
+        self.cpm_status.solve_time = self.ort_solver.wall_time
 
         # translate exit status
         if self.ort_status == ort.FEASIBLE:
@@ -383,7 +383,7 @@ class CPM_ortools(SolverInterface):
             self.user_vars.update(vs)  # save user variables
             ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vs), ws) + const
         else:
-            # save user varables
+            # save user variables
             get_variables(expr, self.user_vars)
 
             # transform objective
@@ -644,7 +644,7 @@ class CPM_ortools(SolverInterface):
                 self.add(task_cons)
 
                 return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
-            
+
             elif cpm_expr.name == "cumulative_optional":
                 if len(cpm_expr.args) == 5:
                     start, dur, demand, cap, is_present = cpm_expr.args
@@ -677,6 +677,10 @@ class CPM_ortools(SolverInterface):
                 # make interval variables
                 tasks, task_cons = self._get_ort_intervals(start, dur, end)
                 self.add(task_cons)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # OR-Tools has strict semantics for NoOverlap, post as Cumulative instead
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
             elif cpm_expr.name == "no_overlap_optional":
@@ -692,20 +696,43 @@ class CPM_ortools(SolverInterface):
                 # make interval variables   
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
+
+                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
+                    # OR-Tools has strict semantics, see 'no_overlap'
+                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
+
+            elif cpm_expr.name == "reservoir":
+                start, demand, min_cap, max_cap = cpm_expr.args
+                return self.ort_model.AddReservoirConstraint(
+                        self.solver_vars(start), [int(d) for d in demand], int(min_cap), int(max_cap))
+               
+            elif cpm_expr.name == "reservoir_optional":
+                start, demand, min_cap, max_cap, is_present = cpm_expr.args
+                ort_present = []
+                for p in is_present:
+                    if isinstance(p, BoolVal):
+                        ort_present.append(bool(p))
+                    else:
+                        ort_present.append(self.solver_var(p))
+ 
+                return self.ort_model.AddReservoirConstraintWithActive(
+                    self.solver_vars(start), [int(d) for d in demand], ort_present, int(min_cap), int(max_cap))
 
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
-                # when using an objective over arcs, using these vars direclty is recommended
-                # (see PCTSP-path model in the future)
+                arc_vars = dict()
+                extra_cons = []
                 x = cpm_expr.args
-                N = len(x)
-                arcvars = boolvar(shape=(N,N))
-                # post channeling constraints from int to bool
-                self.add([b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)])
-                # post the global constraint
-                # when posting arcs on diagonal (i==j), it would do subcircuit
-                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
+                for i in range(len(cpm_expr.args)):
+                    for j in range(len(cpm_expr.args)):
+                        if i == j: # otherwise allows for subcircuits
+                            continue
+                        bv, cons = get_or_make_var(x[i] == j, csemap=self._csemap)
+                        arc_vars[(i,j)] = bv
+                        extra_cons.append(cons)
+                self.add(extra_cons)
+                ort_arcs = [(i,j, self.solver_var(b)) for (i,j), b in arc_vars.items()]
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"

@@ -14,6 +14,7 @@ from cpmpy.tools.datasets.mse import MaxSATEvalDataset
 from cpmpy.tools.datasets.opb import OPBDataset
 from cpmpy.tools.datasets.sat import SATDataset
 from cpmpy.tools.datasets.nurserostering import NurseRosteringDataset
+from cpmpy.tools.datasets.scaledsudoku import ScaledSudokuDataset
 
 # Matching model loaders for each dataset (turn a raw instance into a cp.Model).
 from cpmpy.tools.io import (
@@ -25,6 +26,7 @@ from cpmpy.tools.io import (
     load_opb,
     load_dimacs,
     load_nurserostering,
+    load_sudoku,
 )
 
 
@@ -151,6 +153,20 @@ RAW_DATASET_SPECS = [
         },
         "categories": None,  # no category dimensions
         "expected_instance_suffix": ".txt",
+        "expected_categories": {},
+    },
+    {
+        "id": "scaledsudoku",
+        "dataset_cls": ScaledSudokuDataset,
+        "loader": load_sudoku,
+        "download_timeout": 3600,  # full GitHub archive is several hundred MB
+        "init_kwargs": {
+            "ignore_sidecar": True,
+        },
+        "categories": [
+            {"kind": "base", "size": "6x6"},
+        ],
+        "expected_instance_suffix": ".sdk.txt",
         "expected_categories": {},
     },
 ]
