@@ -717,9 +717,16 @@ class TestGlobal:
         x = cp.intvar(0, 2, shape=2)
         reg = cp.Regular(x, [("a", 0, "a")], start, accepting)
 
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10) # all assignments = 9
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
         true_sols, false_sols = set(), set()
-        num_true = cp.Model(reg).solveAll(solver=solver, display=lambda: true_sols.add(tuple(argvals(x))))
-        num_false = cp.Model(~reg).solveAll(solver=solver, display=lambda: false_sols.add(tuple(argvals(x))))
+        num_true = cp.Model(reg).solveAll(solver=solver, display=lambda: true_sols.add(tuple(argvals(x))), **kwargs)
+        num_false = cp.Model(~reg).solveAll(solver=solver, display=lambda: false_sols.add(tuple(argvals(x))), **kwargs)
 
         assert true_sols == solutions and num_true == len(solutions)
         assert num_true + num_false == 3**2
@@ -728,7 +735,7 @@ class TestGlobal:
         # the linear (flow) decomposition used by MIP solvers agrees
         constraining, defining = reg.decompose_linear()
         linear_sols = set()
-        cp.Model(constraining + defining).solveAll(solver=solver, display=lambda: linear_sols.add(tuple(argvals(x))))
+        cp.Model(constraining + defining).solveAll(solver=solver, display=lambda: linear_sols.add(tuple(argvals(x))), **kwargs)
         assert linear_sols == solutions
 
 
