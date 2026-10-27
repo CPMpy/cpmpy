@@ -591,7 +591,8 @@ def only_positive_coefficients(lst_of_expr):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Optional[AbstractSet[str]] = None,
                      supported_reified: Optional[AbstractSet[str]] = None,
-                     csemap: Optional[CSEMap] = None):
+                     csemap: Optional[CSEMap] = None,
+                     supported_half_reified: Optional[AbstractSet[str]] = None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
 
@@ -600,6 +601,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
             supported: set of supported global constraints and global functions
             supported_reified: set of supported reified global constraints
             csemap: map of expressions to an auxiliary variable
+            supported_half_reified: set of global constraints supported when half-reified at the toplevel (``BE -> Global``)
 
         returns:
             list of expressions
@@ -612,7 +614,8 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
     decompose_custom = get_linear_decompositions()
     decompose_custom_positive = get_linear_positive_decompositions()
 
-    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
+    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive,
+                             supported_half_reified=supported_half_reified)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
