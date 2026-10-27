@@ -1,7 +1,6 @@
 import copy
 from typing import Optional, Any, cast, overload, Literal
 from ..expressions.core import Expression, Comparison
-from ..expressions.utils import is_int, is_bool
 from ..expressions.variables import NegBoolView, boolvar, intvar, _IntVarImpl, _BoolVarImpl
 
 
@@ -82,9 +81,7 @@ class CSEMap:
         for expr, bv in self.flat_map.items():
             if expr.name in comps:
                 var, val = expr.args
-                if isinstance(var, _IntVarImpl) and is_int(val):
-                    if not isinstance(val, int):
-                        val = int(val)  # TODO: when Comparison stores typed intexpr, change the above is_int()
+                if isinstance(var, _IntVarImpl) and isinstance(val, int):
                     target = var_vals if expr.name == "==" else var_bounds
                     target.setdefault(var, []).append((val, bv))
 
@@ -144,7 +141,7 @@ class CSEMap:
 
         if isinstance(expr, Comparison):
             lhs, rhs = expr.args
-            if is_int(rhs):
+            if isinstance(rhs, int):
                 name = expr.name
                 if name == "!=":
                     # b <-> (expr != val) :: (~b) <-> (expr == val)
