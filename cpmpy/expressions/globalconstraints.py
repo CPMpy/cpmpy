@@ -901,9 +901,7 @@ class Regular(GlobalConstraint):
         for s, v, e in transitions:
             node_set.update([s,e])
             self.trans_dict[(s, v)] = e
-        # The start and accepting nodes need not appear in any transition: a start node
-        # without outgoing transitions accepts nothing, an accepting node that cannot be
-        # reached is never used. Both still need an id.
+        # The start and accepting nodes need an id, even if they do not appear in any transition
         node_set.add(start)
         node_set.update(accepting)
         self.nodes = sorted(node_set)
@@ -985,7 +983,8 @@ class Regular(GlobalConstraint):
             nodes_set.add(src)
             nodes_set.add(dst)
             values_set.add(value)
-        # as in __init__, the start and accepting nodes need an id even without transitions
+
+        # The start and accepting nodes need an id even without transitions
         nodes_set.add(start)
         nodes_set.update(accepting)
 
