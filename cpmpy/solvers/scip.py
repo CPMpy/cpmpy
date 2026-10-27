@@ -31,6 +31,7 @@
 """
 import warnings
 from typing import Optional
+import cpmpy as cp
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -106,6 +107,8 @@ class CPM_scip(SolverInterface):
         self.scip_model = scip.Model()
         self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
         self.objective_ = None
+        self.scip_model.setParam("iis/silent", True)  # suppress native IIS statistics/logs
+        self.scip_model.hideOutput()
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -366,8 +369,14 @@ class CPM_scip(SolverInterface):
 
     __add__ = add
 
-    def _add_transformed_constraint(self, cpm_expr):
-        """Add already transformed CPMpy constraints to the solver. Some constraints are further transformed in this file, such as reified linear equality constraints `b -> ... == k` into `b -> ... >= k and b -> ... <= k`. In this case, we recursively call this function instead of `self.add`, which avoids both the full transformation pipeline overhead and also does not pollute `user_vars` with `b`."""
+    def _add_transformed_constraint(self, cpm_expr, name=None):
+        """Add already transformed CPMpy constraints to the solver and return the native SCIP constraint(s).
+
+        Some constraints are further transformed in this file, such as reified linear equality constraints
+        `b -> ... == k` into `b -> ... >= k and b -> ... <= k`. In this case, we recursively call this
+        function instead of `self.add`, which avoids both the full transformation pipeline overhead and also
+        does not pollute `user_vars` with `b`.
+        """
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             lhs_is_operator = isinstance(lhs, Operator)
@@ -376,18 +385,18 @@ class CPM_scip(SolverInterface):
             if cpm_expr.name == '<=':
                 if (lhs_is_operator and lhs.name == "sum" and all(a.is_bool() and not isinstance(a, NegBoolView) for a in lhs.args)):
                     if rhs == 1:
-                        self.scip_model.addConsSOS1(self.solver_vars(lhs.args))
+                        return self.scip_model.addConsSOS1(self.solver_vars(lhs.args), name=name or "")
                     else:
-                        self.scip_model.addConsCardinality(self.solver_vars(lhs.args), int(rhs))
+                        return self.scip_model.addConsCardinality(self.solver_vars(lhs.args), int(rhs), name=name or "")
                 else:
                     sciplhs = self._make_numexpr(lhs)
-                    self.scip_model.addCons(sciplhs <= sciprhs)
+                    return self.scip_model.addCons(sciplhs <= sciprhs, name=name or "")
             elif cpm_expr.name == '>=':
                 sciplhs = self._make_numexpr(lhs)
-                self.scip_model.addCons(sciplhs >= sciprhs)
+                return self.scip_model.addCons(sciplhs >= sciprhs, name=name or "")
             elif cpm_expr.name == '==':
                 sciplhs = self._make_numexpr(lhs)
-                self.scip_model.addCons(sciplhs == sciprhs)
+                return self.scip_model.addCons(sciplhs == sciprhs, name=name or "")
             else:
                 raise NotImplementedError(
                     "Not a known supported scip comparison '{}' {}".format(cpm_expr.name, cpm_expr))
@@ -408,12 +417,14 @@ class CPM_scip(SolverInterface):
                 else:
                     scip_cons = lin_expr >= rhs
                 if isinstance(cond, NegBoolView):
-                    self.scip_model.addConsIndicator(scip_cons, binvar=self.solver_var(cond._bv), activeone=False)
+                    return self.scip_model.addConsIndicator(scip_cons, binvar=self.solver_var(cond._bv), activeone=False, name=name or "")
                 else:
-                    self.scip_model.addConsIndicator(scip_cons, binvar=self.solver_var(cond), activeone=True)
+                    return self.scip_model.addConsIndicator(scip_cons, binvar=self.solver_var(cond), activeone=True, name=name or "")
             elif sub_expr.name == "==":
-                self._add_transformed_constraint(cond.implies(lhs <= rhs))
-                self._add_transformed_constraint(cond.implies(lhs >= rhs))
+                return [
+                    self._add_transformed_constraint(cond.implies(lhs <= rhs), name=f"{name}_le" if name else ""),
+                    self._add_transformed_constraint(cond.implies(lhs >= rhs), name=f"{name}_ge" if name else ""),
+                ]
             else:
                 raise Exception(f"Unknown linear expression {sub_expr} name")
 
@@ -436,7 +447,7 @@ class CPM_scip(SolverInterface):
                         scip_args.append(self.solver_var(arg))
 
                 # post constraint (note: `addConsXor` is tested to work for empty lists)
-                self.scip_model.addConsXor(scip_args, rhsvar)
+                return self.scip_model.addConsXor(scip_args, rhsvar, name=name or "")
 
             elif cpm_expr.name == "cumulative":
                 if len(cpm_expr.args) == 4:
@@ -445,39 +456,45 @@ class CPM_scip(SolverInterface):
                 else:
                     start, dur, end, demand, cap = cpm_expr.args
 
+                posted = []
+
                 if not hasattr(self.scip_model, "addConsCumulative"):
                     for c in self.transform(cpm_expr.decompose()[0]):
-                        self._add_transformed_constraint(c)
-                    return
+                        posted.extend(self._flatten_scip_cons(self._add_transformed_constraint(c)))
+                    return posted
 
                 dur, dur_cons = get_nonneg_args(dur)
                 demand, demand_cons = get_nonneg_args(demand)
                 for c in self.transform(dur_cons + demand_cons):
-                    self._add_transformed_constraint(c)
+                    posted.extend(self._flatten_scip_cons(self._add_transformed_constraint(c)))
 
                 if end is not None:
                     for c in self.transform([s + d == e for s, d, e in zip(start, dur, end)]):
-                        self._add_transformed_constraint(c)
+                        posted.extend(self._flatten_scip_cons(self._add_transformed_constraint(c)))
 
                 if not (all(is_num(d) for d in dur) and all(is_num(h) for h in demand) and is_num(cap)):
                     for c in self.transform(cpm_expr.decompose()[0]):
-                        self._add_transformed_constraint(c)
-                    return
+                        posted.extend(self._flatten_scip_cons(self._add_transformed_constraint(c)))
+                    return posted
 
-                self.scip_model.addConsCumulative(
-                    self.solver_vars(start),
-                    [int(d) for d in dur],
-                    [int(h) for h in demand],
-                    int(cap),
-                )
+                posted.extend(self._flatten_scip_cons(
+                    self.scip_model.addConsCumulative(
+                        self.solver_vars(start),
+                        [int(d) for d in dur],
+                        [int(h) for h in demand],
+                        int(cap),
+                        name=name or "",
+                    )
+                ))
+                return posted
 
             elif cpm_expr.name == "no_overlap":
                 if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
-                    self._add_transformed_constraint(Cumulative(start, dur, demand=1, capacity=1))
+                    return self._add_transformed_constraint(Cumulative(start, dur, demand=1, capacity=1), name=name)
                 else:
                     start, dur, end = cpm_expr.args
-                    self._add_transformed_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
+                    return self._add_transformed_constraint(Cumulative(start, dur, end, demand=1, capacity=1), name=name)
 
             else:
                 raise NotImplementedError(
@@ -487,14 +504,96 @@ class CPM_scip(SolverInterface):
                 )
         elif isinstance(cpm_expr, BoolVal):
             if cpm_expr.args[0] is False:
-                self.scip_model.addConsXor([], True)  # easiest way to post False to SCIP (e.g. 0 <= -1 is not allowed, bv <= -1 requires adding a dummy variables, ...)
+                return self.scip_model.addConsXor([], True, name=name or "")  # easiest way to post False to SCIP (e.g. 0 <= -1 is not allowed, bv <= -1 requires adding a dummy variables, ...)
+            return None
 
         elif isinstance(cpm_expr, DirectConstraint):
             cpm_expr.callSolver(self, self.scip_model)
+            return None
 
 
         else:
             raise NotImplementedError(cpm_expr)
+
+    @staticmethod
+    def _flatten_scip_cons(scip_cons):
+        if scip_cons is None:
+            return []
+        if isinstance(scip_cons, list):
+            return [con for sub in scip_cons for con in CPM_scip._flatten_scip_cons(sub)]
+        return [scip_cons]
+
+    @staticmethod
+    def _posts_multiple_scip_constraints(cpm_expr):
+        return (
+            isinstance(cpm_expr, Operator)
+            and cpm_expr.name == "->"
+            and isinstance(cpm_expr.args[1], Comparison)
+            and cpm_expr.args[1].name == "=="
+        )
+
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using SCIP's native IIS (Irreducible Infeasible Subsystem) algorithm.
+
+        SCIP's IIS is over native constraints. CPMpy soft constraints that post as a single
+        SCIP constraint are added as-is and mapped back to the original CPMpy constraint. 
+        Hard constraints and soft constraints that transform to multiple SCIP constraints
+        are not supported and raise a ValueError.
+        """
+        soft_cons = toplevel_list(soft, merge_and=False)
+        hard_cons = toplevel_list(hard, merge_and=False)
+
+        if len(hard_cons) > 0:
+            raise ValueError("SCIP: MUS extraction with hard constraints is not supported")
+
+        s = cls()
+        # Disable CSE so a later soft cannot depend on defining constraints
+        # that are only posted with an earlier soft.
+        # See https://github.com/CPMpy/cpmpy/pull/986.
+        s._csemap = None
+        native_soft_names = []
+
+        for soft_con in soft_cons:
+            soft_con_tf = s.transform(soft_con)
+
+            if len(soft_con_tf) == 0:
+                native_soft_names.append([])
+                continue
+            elif len(soft_con_tf) == 1 and not s._posts_multiple_scip_constraints(soft_con_tf[0]):
+                # One CPMpy soft constraint maps to one transformed SCIP-level constraint:
+                # post it directly so the IIS can minimize it natively.
+                scip_cons = s._flatten_scip_cons(
+                    s._add_transformed_constraint(soft_con_tf[0])
+                )
+                native_soft_names.append([con.name for con in scip_cons])
+            else:
+                raise ValueError("SCIP: MUS extraction with multiple transformed constraints is not supported")
+
+        # `generateIIS()` solves the model if needed. Unlike Gurobi, a feasible
+        # model does not raise: the returned IIS is then not infeasible.
+        try:
+            iis = s.native_model.generateIIS()
+        except Exception as e:
+            status = s.native_model.getStatus()
+            if status not in ("infeasible", "inforunbd"):
+                raise AssertionError("MUS: model must be UNSAT") from e
+            raise
+
+        if not iis.isSubscipInfeasible():
+            raise AssertionError("MUS: model must be UNSAT")
+        if not iis.isSubscipIrreducible():
+            raise AssertionError("MUS: SCIP IIS is not irreducible")
+
+        subscip = iis.getSubscip()
+        iis_names = {con.name for con in subscip.getConss()}
+
+        return [
+            soft_con
+            for soft_con, scip_names in zip(soft_cons, native_soft_names)
+            if any(name in iis_names for name in scip_names)
+        ]
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         warnings.warn("Solution enumeration is not implemented in PySCIPOpt, defaulting to CPMpy's naive implementation")
@@ -502,4 +601,3 @@ class CPM_scip(SolverInterface):
         # - https://github.com/scipopt/PySCIPOpt/issues/549 and
         # - https://github.com/scipopt/PySCIPOpt/issues/248
         return super().solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
-
