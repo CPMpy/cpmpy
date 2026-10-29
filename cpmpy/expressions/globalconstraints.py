@@ -460,21 +460,22 @@ class Circuit(GlobalConstraint):
         order = cp.intvar(0, n - 1, shape=n)
 
         constraining : list[Expression] = []
+        defining: list[Expression] = []
+        
         constraining.extend(x >= 0 for x in succ) # lower bound on successors
         constraining.extend(x < n for x in succ)  # upper bound on successors
         constraining.extend(cp.sum(succ[j] == i for j in range(n)) == 1 for i in range(n))  # each node i has exactly one predecessor
-        constraining.append(cp.AllDifferent(order))  # redundant constraint
-        constraining.append(order[0] == 0)
+        defining.append(cp.AllDifferent(order))  # redundant constraint
+        defining.append(order[0] == 0)
 
-        defining: list[Expression] = []
         for i in range(n):
             for j in range(n):
                 if i == j:
                     # forbid self-loops
                     constraining.append(succ[i] != j)
-                if j != 0:
+                elif j != 0:
                     # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
-                    defining.append((succ[i] == j) == (order[i] + 1 == order[j]))
+                    constraining.append((succ[i] == j) == (order[i] + 1 == order[j]))
 
         return constraining, defining
 
@@ -988,6 +989,11 @@ class Regular(GlobalConstraint):
         nodes_set.add(start)
         nodes_set.update(accepting)
 
+        if complete:
+            # The sink node must also capture values in the domain of the array that do not occur in any transition
+            lbs, ubs = get_bounds(arr)
+            values_set.update(range(min(lbs), max(ubs) + 1))
+
         nodes = sorted(nodes_set)
         values = sorted(values_set)
 
@@ -1039,9 +1045,10 @@ class Regular(GlobalConstraint):
                 defining.append(cp.sum(s[0, j, q] for j in range(len(values))) == 0)
 
         # Enforce flow constraints: flow in = flow out
+        flow_cons = []
         for i in range(1, len(arr)):
             for q in range(len(nodes)):
-                defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
+                flow_cons.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
                 defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) <= 1) # redundant constraint
                 defining.append(cp.sum(s[i, j, q] for (j, _) in flow_out[q]) <= 1) # redundant constraint
 
@@ -1059,7 +1066,12 @@ class Regular(GlobalConstraint):
             for j in range(len(values)):
                 defining.append(cp.sum(s[i, j, q] for q in range(len(nodes))) == (arr[i] == values[j]))
 
-        return constraining, defining
+        if complete:
+            # With a flow from root to sink for every possible assignment, flow constraints can be defining
+            return constraining, defining + flow_cons
+        else:
+            # Without a flow from root to sink for every possible assignment, flow constraints must be constraining
+            return constraining + flow_cons, defining
 
 
     def value(self) -> Optional[bool]:
