@@ -460,21 +460,22 @@ class Circuit(GlobalConstraint):
         order = cp.intvar(0, n - 1, shape=n)
 
         constraining : list[Expression] = []
+        defining: list[Expression] = []
+        
         constraining.extend(x >= 0 for x in succ) # lower bound on successors
         constraining.extend(x < n for x in succ)  # upper bound on successors
         constraining.extend(cp.sum(succ[j] == i for j in range(n)) == 1 for i in range(n))  # each node i has exactly one predecessor
-        constraining.append(cp.AllDifferent(order))  # redundant constraint
-        constraining.append(order[0] == 0)
+        defining.append(cp.AllDifferent(order))  # redundant constraint
+        defining.append(order[0] == 0)
 
-        defining: list[Expression] = []
         for i in range(n):
             for j in range(n):
                 if i == j:
                     # forbid self-loops
                     constraining.append(succ[i] != j)
-                if j != 0:
+                elif j != 0:
                     # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
-                    defining.append((succ[i] == j) == (order[i] + 1 == order[j]))
+                    constraining.append((succ[i] == j) == (order[i] + 1 == order[j]))
 
         return constraining, defining
 

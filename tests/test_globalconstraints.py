@@ -219,6 +219,19 @@ class TestGlobal:
         assert not model.solve()
         assert not cp.Circuit(x).value()
 
+    def test_circuit_linear_half_reified(self):
+        x = cp.intvar(0, 2, shape=3, name="x")
+        b = cp.boolvar(name="b")
+        cons = decompose_linear([b.implies(cp.Circuit(x))])
+
+        assert cp.Model(cons + [b, x == [1, 2, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 1, 2]]).solve()  # self-loops
+        assert not cp.Model(cons + [b, x == [1, 2, 1]]).solve()  # subtour
+
+        # successors are unrestricted when the circuit is not enforced
+        assert cp.Model(cons + [~b, x == [0, 1, 2]]).solve()
+        assert cp.Model(cons + [~b, x == [1, 2, 1]]).solve()
+
     def test_ort_circuit_cse(self):
 
         x = cp.intvar(0,10, shape=5, name="x")
