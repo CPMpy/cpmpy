@@ -170,7 +170,7 @@ def test_minimize(solver):
 
     if solver_name == "choco":
         # pychoco crashes on a second find_optimal_solution (empty Solution / get_int_val).
-        # Upstream: https://github.com/chocoteam/pychoco/issues/44
+        # Upstream: https://github.com/chocoteam/pychoco/issues/47
         pytest.skip("pychoco crashes when re-solving an optimisation problem")
 
     solver += ivar > 20
