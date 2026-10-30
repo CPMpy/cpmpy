@@ -721,6 +721,37 @@ class TestGlobal:
 
         assert sat, "BUG: half-reified Regular is unsound for rejected strings"
 
+    @pytest.mark.parametrize("start, accepting, solutions", [
+        ("z", ["a"], set()),  # start node without transitions: accepts nothing
+        ("a", ["a", "q"], {(0, 0)}),  # unreachable accepting node: ignored
+        ("a", ["q"], set()),  # only unreachable accepting nodes
+    ])
+    def test_regular_nodes_without_transitions(self, solver, start, accepting, solutions):
+        # Start and accepting nodes need not appear in any transition (issue #1137)
+        x = cp.intvar(0, 2, shape=2)
+        reg = cp.Regular(x, [("a", 0, "a")], start, accepting)
+
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10) # all assignments = 9
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        true_sols, false_sols = set(), set()
+        num_true = cp.Model(reg).solveAll(solver=solver, display=lambda: true_sols.add(tuple(argvals(x))), **kwargs)
+        num_false = cp.Model(~reg).solveAll(solver=solver, display=lambda: false_sols.add(tuple(argvals(x))), **kwargs)
+
+        assert true_sols == solutions and num_true == len(solutions)
+        assert num_true + num_false == 3**2
+        assert len(true_sols & false_sols) == 0
+
+        # the linear (flow) decomposition used by MIP solvers agrees
+        constraining, defining = reg.decompose_linear()
+        linear_sols = set()
+        cp.Model(constraining + defining).solveAll(solver=solver, display=lambda: linear_sols.add(tuple(argvals(x))), **kwargs)
+        assert linear_sols == solutions
+
     def test_regular_linear_positive_reif(self):
         x = cp.intvar(0, 1, shape=4, name="x")
         b = cp.boolvar(name="b")
