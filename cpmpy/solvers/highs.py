@@ -48,8 +48,8 @@ import numpy.typing as npt
 
 from .solver_interface import Callback, SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
-from ..expressions.utils import is_any_list, is_num, is_int
+from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from ..expressions.utils import is_any_list, is_num, is_int, materialize_generators
 from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.globalconstraints import DirectConstraint
@@ -236,7 +236,7 @@ class CPM_highs(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_highs":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_highs":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -244,11 +244,14 @@ class CPM_highs(SolverInterface):
             and then posted to the solver in this function.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
+
         # track user vars and ensure newly seen ones have solver columns
         get_variables(cpm_expr, collect=self.user_vars)
 

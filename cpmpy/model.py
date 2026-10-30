@@ -32,8 +32,8 @@ import time
 from typing import Optional
 
 from .exceptions import NotSupportedError
-from .expressions.core import Expression, NestedBoolExprLike
-from .expressions.utils import is_any_list
+from .expressions.core import Expression, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from .expressions.utils import is_any_list, materialize_generators
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import ExitStatus, SolverInterface, SolverStatus, Callback
 
@@ -44,12 +44,12 @@ class Model(object):
     CPMpy Model object, contains the constraint and objective expressions
     """
 
-    def __init__(self, *args: NestedBoolExprLike, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
+    def __init__(self, *args: NestedBoolExprLikeOrGen, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
         """
             Arguments of constructor:
 
             Arguments:
-                *args (NestedBoolExprLike): constraints passed to :meth:`add`
+                *args (NestedBoolExprLikeOrGen): constraints passed to :meth:`add`
                 minimize (Expression): The objective to minimize
                 maximize (Expression): The objective to maximize
 
@@ -81,12 +81,12 @@ class Model(object):
             self.minimize(minimize)
 
         
-    def add(self, con: NestedBoolExprLike) -> "Model":
+    def add(self, con: NestedBoolExprLikeOrGen) -> "Model":
         """
         Add one or more constraints to the model.
 
         Arguments:
-            con (NestedBoolExprLike): Boolean constraint expression or constant, or nested list/tuple thereof
+            con (NestedBoolExprLikeOrGen): Boolean constraint expression or constant, or nested list/tuple/generator thereof
 
         Returns:
             self
@@ -97,24 +97,27 @@ class Model(object):
                 m = Model()
                 m.add([x > 0])
         """
-        if is_any_list(con):
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cons: NestedBoolExprLike = materialize_generators(con)
+
+        if is_any_list(cons):
             # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
-            for elem in con:
+            for elem in cons:
                 if isinstance(elem, Expression) and not elem.is_bool():
                     raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
 
-            if len(con) == 0:
+            if len(cons) == 0:
                 # ignore empty list
                 return self
-            elif len(con) == 1:
+            elif len(cons) == 1:
                 # unpack size 1 list
-                con = con[0]
+                cons = cons[0]
 
-        elif isinstance(con, Expression) and not con.is_bool():
+        elif isinstance(cons, Expression) and not cons.is_bool():
             # catch some beginner mistakes: ensure that a top-level Expression has Boolean return type
-            raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{con}` does not.")
+            raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{cons}` does not.")
 
-        self.constraints.append(con)
+        self.constraints.append(cons)
         return self
     __add__ = add  # Make __add__() (for the += operation) be the same as add() 
 
