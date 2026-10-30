@@ -357,7 +357,7 @@ class CPM_exact(SolverInterface):
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
-                self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
+                self.xct_solver.invalidateLastSol(self.solver_vars(list(self.user_vars))) # only block user vars, not auxiliaries
                 if display is not None:
                     self._fillVars(has_solution=True)
                     self.print_display(display)

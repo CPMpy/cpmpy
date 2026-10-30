@@ -1,3 +1,4 @@
+import itertools
 import pytest
 import cpmpy as cp
 from cpmpy.exceptions import NotSupportedError
@@ -68,6 +69,41 @@ class TestSolveAll:
         count = s.solveAll(**kwargs)
         assert 3 == count
         assert sols == {"[True, True]", "[True, False]", "[False, True]"}
+
+    def test_solveall_no_duplicates(self, solver):
+        # solutions that only differ in auxiliary variables should be counted once
+        if solver == "rc2":
+            pytest.skip(reason="rc2 does not support decision problems (solveAll)")
+        x = cp.intvar(0, 2, shape=3, name="x")
+        b = cp.boolvar(shape=3, name="b")
+        m = cp.Model(b[0].implies(cp.Table(x, [[0, 1, 2], [1, 2, 0], [2, 2, 1]])),
+                     b[1].implies(cp.MDD(x, [("r", 0, "n1"), ("r", 1, "n2"), ("n1", 1, "n3"), ("n2", 2, "n3"),
+                                             ("n1", 2, "n4"), ("n3", 0, "t"), ("n3", 2, "t"), ("n4", 1, "t")])),
+                     b[2].implies(cp.Regular(x, [("a", 0, "b"), ("b", 1, "c"), ("c", 2, "a"), ("a", 1, "a")], "a", ["a", "c"])))
+        table_sols = {(0, 1, 2), (1, 2, 0), (2, 2, 1)}
+        mdd_sols = {(0, 1, 0), (0, 1, 2), (1, 2, 0), (1, 2, 2), (0, 2, 1)}
+        regular_sols = {(1, 1, 1), (1, 0, 1), (0, 1, 2)}
+        # for each subset of b that is true, x must satisfy all corresponding constraints
+        all_x = set(itertools.product(range(3), repeat=3))
+        n_expected = sum(len(all_x.intersection(*sub)) for k in range(4)
+                         for sub in itertools.combinations([table_sols, mdd_sols, regular_sols], k))
+
+        kwargs = dict()
+        if solver in ("gurobi", "cplex"):
+            kwargs["solution_limit"] = 1000
+        elif solver == "hexaly":
+            kwargs["time_limit"] = 5
+
+        sols = []
+        count = m.solveAll(solver=solver, display=lambda: sols.append((*b.value(), *x.value())), **kwargs)
+        assert count == n_expected
+        assert len(sols) == len(set(sols)) == n_expected
+
+        # the solution limit counts distinct solutions too
+        sols = []
+        count = m.solveAll(solver=solver, display=lambda: sols.append((*b.value(), *x.value())), solution_limit=20)
+        assert count == 20
+        assert len(sols) == len(set(sols)) == 20
 
     def test_solveall_with_obj(self, solver):
         x = cp.intvar(0, 3, shape=3)
