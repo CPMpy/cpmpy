@@ -219,6 +219,130 @@ class TestGlobal:
         assert not model.solve()
         assert not cp.Circuit(x).value()
 
+    def test_circuit_arcs(self):
+        b = cp.boolvar(shape=(3, 3), name="arc")
+        arcs = [(i, j, b[i, j]) for i in range(3) for j in range(3) if i != j]
+        con = cp.CircuitArcs(arcs)
+        cycles = [{(0, 1), (1, 2), (2, 0)}, {(0, 2), (2, 1), (1, 0)}]
+
+        assert con.value() is None
+
+        def chosen():
+            return frozenset((i, j) for i in range(3) for j in range(3) if i != j and b[i, j].value())
+
+        sols = set()
+        assert cp.Model(con).solveAll(display=lambda: sols.add(chosen())) == 2
+        assert sols == {frozenset(c) for c in cycles}
+        assert con.value()
+
+        decomp_sols = set()
+        assert cp.Model(con.decompose()).solveAll(display=lambda: decomp_sols.add(chosen())) == 2
+        assert decomp_sols == sols
+
+        # CP solvers post the positive reformulation, which channels each arc directly
+        direct_sols = set()
+        assert cp.Model(con._to_circuit(positive_only=True)).solveAll(display=lambda: direct_sols.add(chosen())) == 2
+        assert direct_sols == sols
+
+        # positive context uses the sparse MTZ decomposition, not Circuit
+        pos_sols = set()
+        assert cp.Model(con.decompose_positive()).solveAll(display=lambda: pos_sols.add(chosen())) == 2
+        assert pos_sols == sols
+        pos_cons, pos_defin = con.decompose_positive()
+        assert not any(getattr(c, "name", None) == "circuit" for c in pos_cons + pos_defin)
+
+        # a disjoint pair of 2-cycles is not one tour
+        a = cp.boolvar(shape=4)
+        sub = cp.CircuitArcs([(0, 1, a[0]), (1, 0, a[1]), (2, 3, a[2]), (3, 2, a[3])])
+        assert not cp.Model(sub.decompose_positive()).solve()
+        assert not cp.Model(sub).solve()
+
+        # order links follow the existing arcs, so a long cycle stays linear in the number of nodes
+        n = 8
+        step = cp.boolvar(shape=n)
+        cycle = cp.CircuitArcs([(i, (i + 1) % n, step[i]) for i in range(n)])
+        cycle_cons, _ = cycle.decompose_positive()
+        assert len(cycle_cons) < n * (n - 1)
+
+        assign = [b[i, j] == ((i, j) in cycles[0]) for i in range(3) for j in range(3) if i != j]
+        assert cp.Model(assign).solve()
+        assert con.value()
+        assert not cp.Model([~con] + assign).solve()
+
+        # two outgoing arcs is not a circuit, and it is allowed when the constraint is negated or not implied
+        bad = [b[0, 1], b[0, 2]] + [~b[i, j] for i in range(3) for j in range(3) if i != j and (i, j) not in {(0, 1), (0, 2)}]
+        assert cp.Model(bad).solve()
+        assert con.value() is False
+        assert cp.Model([~con] + bad).solve()
+        flag = cp.boolvar()
+        assert cp.Model([flag.implies(con), ~flag] + bad).solve()
+        assert not cp.Model([flag.implies(con), flag] + bad).solve()
+
+        # only one cycle, and a fixed arc must be taken
+        c12, c20 = cp.boolvar(shape=2)
+        sparse = cp.CircuitArcs([(0, 1, True), (1, 2, c12), (2, 0, c20)])
+        assert cp.Model(sparse).solve()
+        assert c12.value() and c20.value() and sparse.value()
+        assert cp.Model(sparse.decompose()).solve()
+        assert c12.value() and c20.value()
+
+        # a self-loop cannot take a node out of the circuit
+        s0, a01, a12, a20 = cp.boolvar(shape=4)
+        with_loop = cp.CircuitArcs([(0, 1, a01), (1, 2, a12), (2, 0, a20), (0, 0, s0)])
+        assert cp.Model(with_loop).solve()
+        assert s0.value() is False
+        assert not cp.Model(with_loop, s0).solve()
+        loop_only = cp.CircuitArcs([(0, 1, a01), (1, 0, cp.boolvar()), (2, 2, cp.boolvar())])
+        assert not cp.Model(loop_only).solve()
+        assert not cp.Model(loop_only.decompose()).solve()
+
+        # two literals on the same edge: exactly one of them is true
+        p1, p2 = cp.boolvar(shape=2)
+        rest = cp.boolvar(shape=2)
+        parallel = cp.CircuitArcs([(0, 1, p1), (0, 1, p2), (1, 2, rest[0]), (2, 0, rest[1])])
+        par_sols = set()
+        assert cp.Model(parallel).solveAll(display=lambda: par_sols.add((p1.value(), p2.value()))) == 2
+        assert par_sols == {(True, False), (False, True)}
+
+        with pytest.raises(ValueError):
+            cp.CircuitArcs([])
+        with pytest.raises(ValueError):
+            cp.CircuitArcs([(0, 0, cp.boolvar())])
+        with pytest.raises(TypeError):
+            cp.CircuitArcs([(0, 1, cp.intvar(0, 1))])
+
+    def test_circuit_arcs_node_ids(self):
+        # a gap in the ids is not a missing node; literals are the only arguments
+        a, b = cp.boolvar(shape=2)
+        gap = cp.CircuitArcs([(0, 2, a), (2, 0, b)])
+        assert gap.args == (a, b)
+        assert list(gap.tails) == [0, 2]
+        assert list(gap.heads) == [2, 0]
+        assert gap.node_map == {0: 0, 2: 1}
+        assert "(0,2," in repr(gap) and "(2,0," in repr(gap)
+        assert cp.Model(gap).solve()
+        assert a.value() and b.value() and gap.value()
+        assert cp.Model(gap.decompose()).solve()
+        assert cp.Model(gap.decompose_positive()).solve()
+
+        x = cp.boolvar(shape=3)
+        named = cp.CircuitArcs([("C", "A", x[0]), ("A", "B", x[1]), ("B", "C", x[2])])
+        assert named.node_map == {"A": 0, "B": 1, "C": 2}
+        assert cp.Model(named).solve()
+        assert all(v.value() for v in x) and named.value()
+        assert cp.Model(named.decompose()).solve()
+        shifted = cp.CircuitArcs([(-1, 4, x[0]), (4, 8, x[1]), (8, -1, x[2])])
+        assert shifted.node_map == {-1: 0, 4: 1, 8: 2}
+        assert cp.Model(shifted).solve()
+        assert all(v.value() for v in x)
+
+        with pytest.raises(TypeError):
+            cp.CircuitArcs([(True, 1, a)])
+        with pytest.raises(TypeError):
+            cp.CircuitArcs([("A", 1, a)])
+        with pytest.raises(TypeError):
+            cp.CircuitArcs([(1.5, 2, a)])
+
     def test_circuit_linear_half_reified(self):
         x = cp.intvar(0, 2, shape=3, name="x")
         b = cp.boolvar(name="b")
