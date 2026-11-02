@@ -62,11 +62,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.reification import reify_rewrite, only_bv_reifies
-from ..transformations.linearize import (
-    decompose_linear,
-    decompose_linear_objective,
-    linearize_reified_variables,
-)
+from ..transformations.linearize import decompose_linear, decompose_linear_objective
 
 @lru_cache(maxsize=None)
 def _subsolver_available(subsolver: str) -> bool:
@@ -465,7 +461,6 @@ class CPM_hermax(SolverInterface):
             supported=frozenset({"sum", "wsum", "sub"}),
             csemap=self._csemap,
         )
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
