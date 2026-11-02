@@ -106,8 +106,8 @@ class CPM_hermax(SolverInterface):
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.2.10"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.2.10 "
+            if her_version is None or Version(her_version) < Version("1.3.0"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.3.0 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -177,9 +177,9 @@ class CPM_hermax(SolverInterface):
         """
         if not self.supported():
             her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.2.10"):
+            if her_version is not None and Version(her_version) < Version("1.3.0"):
                 raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.2.10 "
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.3.0 "
                     f"but you have version {her_version}"
                 )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
@@ -206,7 +206,6 @@ class CPM_hermax(SolverInterface):
         self.her_model = Model()
         self.her_solver = her_solver
         self._objective = None
-        self._objective_posted = False
         self._assumption_map = {}  # dimacs lit -> CPMpy assumption expr
         self._int_cache = {}  # constant or Boolean var name -> Hermax IntVar, see _int_var()
         self._false_lit = None  # see _hermax_false()
@@ -408,7 +407,7 @@ class CPM_hermax(SolverInterface):
             Post the given expression to the solver as objective to minimize/maximize
 
             ``objective()`` can be called multiple times; only the last one is stored.
-            Subsequent calls replace the Hermax objective via ``model.obj.replace_with(...)``.
+            Each call replaces the Hermax objective via ``model.obj.set(...)``.
 
             Arguments:
                 expr: Expression, the CPMpy expression that represents the objective function
@@ -430,15 +429,8 @@ class CPM_hermax(SolverInterface):
         self._objective = obj
 
         hm_obj = self._make_numexpr(obj)
-        # Hermax soft IntVar terms currently require a non-negative domain;
-        # also encode maximize as minimize(ub - expr).
-        lb, ub = obj.get_bounds()
-        hm_expr = (hm_obj - int(lb)) if minimize else (int(ub) - hm_obj)
-        if self._objective_posted:
-            self.her_model.obj.replace_with(hm_expr)
-        else:
-            self.her_model.obj += hm_expr
-            self._objective_posted = True
+        # Hermax only minimizes; obj.set() replaces any previous objective
+        self.her_model.obj.set(hm_obj if minimize else (-1) * hm_obj)
 
     def has_objective(self):
         return self._objective is not None
@@ -629,13 +621,12 @@ class CPM_hermax(SolverInterface):
                     raise NotSupportedError("Hermax Cumulative only supports fixed capacity")
 
                 hm_starts = [self._int_var(s) for s in start]
-                self.her_model.cumulative(
+                return self.her_model.cumulative(
                     hm_starts,
                     [int(d) for d in dur],
                     [int(h) for h in demand],
                     int(cap),
                 )
-                return None
             raise NotImplementedError(f"Hermax: unsupported global {cpm_con}")
 
         raise NotImplementedError(f"Hermax: unexpected constraint {cpm_con}")
