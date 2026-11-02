@@ -86,7 +86,7 @@ class CPM_choco(SolverInterface):
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "allequal",
                                     "table", 'negative_table', "short_table", "regular", "indomain",
-                                    "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
+                                    "cumulative", "no_overlap", "circuit", "circuit_arcs", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
                                     "lex_lesseq", "lex_less", "mdd",
                                     "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
@@ -594,6 +594,12 @@ class CPM_choco(SolverInterface):
 # Ready for when it is fixed in pychoco (https://github.com/chocoteam/pychoco/issues/30)
 #                elif cpm_expr.name == "lex_chain_less":
 #                    return self.chc_model.lex_chain_less(chc_args)
+
+            elif cpm_expr.name == "circuit_arcs":
+                # cam also be nested, TODO: refactor _get_constraint to determine if it is nested
+                cons, defining = cpm_expr._to_circuit()
+                self.add(defining)
+                return self._get_constraint(cons[0])
 
             # but not all
             elif cpm_expr.name == 'alldifferent_except_0':

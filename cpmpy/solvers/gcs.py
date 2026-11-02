@@ -90,7 +90,7 @@ class CPM_gcs(SolverInterface):
     https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "table", "negative_table", "inverse", "circuit", "xor",
+    supported_global_constraints = frozenset({"alldifferent", "table", "negative_table", "inverse", "circuit", "circuit_arcs", "xor",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue"})
     supported_reified_global_constraints = frozenset()
 
@@ -657,6 +657,9 @@ class CPM_gcs(SolverInterface):
                 self.gcs.post_xor(self.solver_vars(con.args))
             elif con.name == 'circuit':
                 self.gcs.post_circuit(self.solver_vars(con.args))
+            elif con.name == 'circuit_arcs':
+                cons, defining = con._to_circuit(positive_only=True)
+                self.add(cons + defining)
             elif con.name == 'inverse':
                 gcs_args = self.solver_vars(con.args)
                 self.gcs.post_inverse(gcs_args[0], gcs_args[1])
