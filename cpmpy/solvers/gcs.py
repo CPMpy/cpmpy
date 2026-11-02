@@ -63,7 +63,7 @@ from ..exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, ExprLike, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl, NegBoolView, boolvar
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, CircuitArcs
 from ..expressions.utils import is_int, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
@@ -658,6 +658,7 @@ class CPM_gcs(SolverInterface):
             elif con.name == 'circuit':
                 self.gcs.post_circuit(self.solver_vars(con.args))
             elif con.name == 'circuit_arcs':
+                assert isinstance(con, CircuitArcs) # for mypy
                 cons, defining = con._to_circuit(positive_only=True)
                 self.add(cons + defining)
             elif con.name == 'inverse':
