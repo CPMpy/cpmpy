@@ -20,6 +20,7 @@ Internal utilities for expression handling.
         is_boolexpr
         is_pure_list
         is_any_list
+        materialize_generators
         is_transition
         flatlist
         all_pairs
@@ -35,12 +36,13 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final
+from types import GeneratorType
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final, cast
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression, BoolVal
+    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
     from cpmpy.expressions.variables import NDVarArray
 
 NP_TYPES: Final = frozenset({
@@ -107,6 +109,38 @@ def is_any_list(arg) -> TypeGuard[list | tuple | np.ndarray]:
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))
+
+def materialize_generators(arg: "NestedBoolExprLikeOrGen") -> "NestedBoolExprLike":
+    """ recursively replace generator expressions in `arg` (at any list/tuple nesting level) by lists
+
+        Allows writing `m.add(x != 3 for x in Y)` instead of `m.add([x != 3 for x in Y])`.
+        Generators can only be iterated once, so they must be materialized before being inspected or stored.
+        Returns `arg` itself (no copy) if it contains no generators.
+
+        Examples of supported (nested) generators, as passed to `add()`:
+
+        .. code-block:: python
+
+            m.add(x != 3 for x in Y)                          # toplevel generator
+            m += [(x != 3 for x in row) for row in grid]      # list of generators (nested comprehension)
+            m += [Y[0] == 1, (x != 3 for x in Y)]             # generator mixed with expressions
+            m += a, (x for x in Y)                            # generator in a tuple
+            m.add((x != y for x in Y) for y in Z)             # generator of generators
+
+        Generators used as arguments of expressions, e.g. `cp.Xor(x == 1 for x in Y)` or
+        `cp.AllDifferent(x for x in Y)`, are NOT handled here: those are consumed by the
+        expression constructor itself, before `add()` is called.
+    """
+    # GeneratorType can not be subclassed, so exact type checks suffice
+    if type(arg) is GeneratorType:
+        return [materialize_generators(a) for a in arg]
+    if isinstance(arg, (list, tuple)):
+        for i, a in enumerate(arg):
+            if type(a) is GeneratorType or isinstance(a, (list, tuple)):
+                new_a = materialize_generators(a)
+                if new_a is not a:  # found a generator, rebuild from here on
+                    return list(arg[:i]) + [new_a] + [materialize_generators(b) for b in arg[i+1:]]
+    return cast("NestedBoolExprLike", arg)  # no generators found
 
 def flatlist(args):
     """ recursively flatten arguments into one single list

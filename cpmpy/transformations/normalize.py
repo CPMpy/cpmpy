@@ -4,6 +4,7 @@
 
 import copy
 from collections.abc import Callable, Iterable
+from types import GeneratorType
 from typing import Any
 
 import numpy as np
@@ -41,6 +42,14 @@ def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> list[
             elif e is False or e is np.False_:
                 append(BoolVal(False))
             elif e is not True and e is not np.True_:  # if True: pass
+                if type(e) is GeneratorType:
+                    # solver interfaces should call `materialize_generators()` at the start of `add()`
+                    raise NotSupportedError(
+                        "Generator expressions are not supported as constraints by this solver interface.\n"
+                        "Fix: use a list comprehension instead, by writing square brackets around it, e.g. "
+                        "`s.add([x != 3 for x in Y])` instead of `s.add(x != 3 for x in Y)`.\n"
+                        "(Solver interface developers: call `cpm_expr = materialize_generators(cpm_expr)` "
+                        "at the start of `add()` to support generator expressions.)")
                 raise NotSupportedError(f"Expression {e} is not a valid CPMpy constraint")
 
     newlist: list[Expression] = []

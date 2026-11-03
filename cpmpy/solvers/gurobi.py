@@ -51,9 +51,9 @@ from cpmpy.transformations.negation import push_down_negation, push_down_negatio
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.globalfunctions import FloatSum
-from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
+from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int, materialize_generators
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -411,7 +411,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_gurobi":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_gurobi":
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -425,11 +425,14 @@ class CPM_gurobi(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
       """
+      # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+      cpm_expr = materialize_generators(cpm_expr)
+
       from gurobipy import GRB
 
       # add new user vars to the set
