@@ -48,7 +48,8 @@ extensions = [
     'sphinx_automodapi.smart_resolver',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
-    'sphinx.ext.autosectionlabel'
+    'sphinx.ext.autosectionlabel',
+    'sphinx_llm.txt'
 ]
 
 myst_enable_extensions = [
@@ -118,3 +119,8 @@ html_static_path = ['_static']
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'cpmpy'
+
+# Config options for sphinx_llm
+llms_txt_exclude = [
+    'docs_todo',
+]
