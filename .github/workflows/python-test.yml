@@ -30,6 +30,7 @@ jobs:
           - solver: pumpkin
           - solver: scip
           - solver: highs
+          - solver: cvc5
     uses: ./.github/workflows/test-solver.yml
     with:
       solver: ${{ matrix.solver }}
