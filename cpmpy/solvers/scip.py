@@ -503,5 +503,7 @@ class CPM_scip(SolverInterface):
         # Issues to track for future reference:
         # - https://github.com/scipopt/PySCIPOpt/issues/549 and
         # - https://github.com/scipopt/PySCIPOpt/issues/248
+        
+        self._from_model = False # enforces freeTransform() so we can add the blocking constraint
         return super().solveAll(display, time_limit, solution_limit, **kwargs)
 
