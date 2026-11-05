@@ -2,6 +2,7 @@ import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import flatlist
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
 from cpmpy.transformations.linearize import decompose_linear
@@ -245,9 +246,53 @@ class TestTransfDecomp:
         assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
         assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
 
-        # custom decompose has precedence over positive decompose
-        decompose_custom = {"mycustomglobal": lambda x : ([cp.sum(x.args) == 5], [])}
-        assert set(map(str, decompose_in_tree([cons], decompose_custom=decompose_custom))) == {"sum(a, b, c) == 5"} # custom decompose
+
+
+
+    def test_decompose_custom(self):
+
+        # make a custom global constraint to test custom decompose
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+
+            def decompose(self):
+                return [cp.sum(self.args) == 1], []
+
+        a, b, c = cp.intvar(0, 10, shape=3, name=("a", "b", "c"))
+        bv = cp.boolvar(name="bv")
+        cons = MyCustomGlobal([a, b, c])
+
+        decompose_custom_positive = {"mycustomglobal": lambda x: ([cp.sum(x.args) == 5], [])}
+        decompose_custom = {"mycustomglobal": lambda x: ([cp.sum(x.args) == 3], [])}
+        # In positive context, custom positive decompose takes precedence over both custom decompose and standard decompose
+        assert (set(map(str, decompose_in_tree([cons],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"sum(a, b, c) == 5"})
+        assert (set(map(str, decompose_in_tree([bv.implies(cons)],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) -> (sum(a, b, c) == 5)"})
+        # In positive context, custom decompose takes precedence over standard decompose if no custom positive decomposition is provided
+        assert (set(map(str, decompose_in_tree([cons],
+                                               decompose_custom=decompose_custom)))
+                == {"sum(a, b, c) == 3"})
+        assert (set(map(str, decompose_in_tree([bv.implies(cons)],
+                                               decompose_custom=decompose_custom)))
+                == {"(bv) -> (sum(a, b, c) == 3)"})
+
+        # In non-positive context, custom positive decompose is disregarded
+        assert (set(map(str, decompose_in_tree([bv == cons],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) == (sum(a, b, c) == 3)"})
+        assert (set(map(str, decompose_in_tree([bv == cons],
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) == (sum(a, b, c) == 1)"})
+
+        # Standard decomposition is called if no custom decomposition is provided
+        assert (set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) == 1"})
 
 
     def test_issue_546(self):
@@ -269,3 +314,76 @@ class TestTransfDecomp:
         if "exact" in cp.SolverLookup.solvernames():  # otherwise, not supported
             model = cp.Model(cons)
             model.solve(solver="exact")
+
+
+    # edge cases find by fuzztesting
+    def test_repeated_nested_global(self):
+        a,b = cp.intvar(0,10, shape=2, name=tuple("ab"))
+        cons = cp.AllDifferent(a,b)
+
+        constraints = [cons, ~cons | cons]
+        decomposed = decompose_in_tree(constraints)
+        assert set(map(str, decomposed)) == {
+            "(a) != (b)", # decomposition of the first constraint
+            "((a) == (b)) or ((a) != (b))", # decomposition of the second constraint
+        }
+    
+    def test_all_equal_exceptn_nested_boolexpr_with_negated_reuse(self):
+        a, b = cp.boolvar(2, name=("a", "b"))
+        constr = cp.AllEqualExceptN([a, b, False, a | b], 4)
+        assert cp.Model([constr, (~constr) | constr]).solve(solver="ortools")
+
+    def test_single_expr_in_decomp_reused(self):
+
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+
+            def decompose(self):
+                return [cp.sum(self.args) == 1], []
+
+        x = cp.intvar(0, 10, shape=3, name="x")
+        cons = MyCustomGlobal(x)
+
+        decomposed = decompose_in_tree([cons, ~cons | cons], csemap=CSEMap())
+        assert set(map(str, decomposed)) == {
+            "sum(x[0], x[1], x[2]) == 1",
+            "(sum(x[0], x[1], x[2]) != 1) or (sum(x[0], x[1], x[2]) == 1)",
+        }
+
+        decomposed = decompose_in_tree([~cons | cons, cons], csemap=CSEMap())
+        assert set(map(str, decomposed)) == {
+            "sum(x[0], x[1], x[2]) == 1",
+            "(sum(x[0], x[1], x[2]) != 1) or (sum(x[0], x[1], x[2]) == 1)",
+        }
+    
+    def test_global_custom_toplevel_repeated(self):
+
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+
+            def decompose(self):
+                return [cp.sum(self.args) == 1], []
+            
+            def decompose_positive(self):
+                return [cp.sum(self.args) == 5], [] # something else to distinguish output
+
+        x = cp.intvar(0, 10, shape=3, name="x")
+        cons = MyCustomGlobal(x)
+
+        decomposed = decompose_in_tree([cons, ~cons], csemap=CSEMap())
+        assert set(map(str, decomposed)) == {
+            "sum(x[0], x[1], x[2]) == 5", # positive decompose
+            "sum(x[0], x[1], x[2]) != 1", # negative decompose (don't use positive-only one)
+        }
+    
+    def test_decompose_empty_nested_alldifferent(self):
+        # Fuzz-test regression: a single-variable AllDifferent is trivially true.
+        x = cp.intvar(0, 10, name="x")
+        cons = [cp.any([cp.AllDifferent(x), cp.AllDifferent(x)])]
+
+        decomposed = decompose_in_tree(cons)
+        assert str(decomposed) == "[(boolval(True)) or (boolval(True))]"
+
+        assert cp.Model(cons).solve(solver="ortools")

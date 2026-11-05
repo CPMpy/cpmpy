@@ -19,13 +19,13 @@
         ExitStatus
 
 """
-from typing import Any, Optional, List, Callable, TypeAlias, Iterable, Any
+from typing import Any, Optional, List, Callable, TypeAlias, Iterable
 import warnings
 import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, ListLike, ExprLike
+from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike
 from ..expressions.variables import _NumVarImpl
 from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
@@ -33,7 +33,7 @@ from ..expressions.utils import is_any_list, argvals
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
-Callback: TypeAlias = Expression | ListLike[Expression] | Callable # type alias to use in solveAll
+Callback: TypeAlias = Expression | ListLike[Expression] | Callable[[], None] # type alias to as display argument in solve and solveAll
 
 class SolverInterface(object):
     """
@@ -65,7 +65,7 @@ class SolverInterface(object):
 
     def __init__(self, name="dummy", cpm_model=None, subsolver=None, _from_model=False):
         """
-            Initalize solver interface
+            Initialize solver interface
 
             - name: str: name of this solver
             - subsolver: string: not used/allowed here
@@ -85,7 +85,7 @@ class SolverInterface(object):
 
         self.name = name
         self.cpm_status = SolverStatus(self.name) # status of solving this model
-        self.objective_value_ = None
+        self.objective_value_: Optional[int] = None
         self._from_model = _from_model
 
         # initialise variable handling
@@ -114,29 +114,29 @@ class SolverInterface(object):
                                   "alternative native objects to access directly.")
 
     # instead of overloading minimize/maximize, better just overload 'objective()'
-    def minimize(self, expr):
+    def minimize(self, expr: Expression) -> None:
         """
             Post the given expression to the solver as objective to minimize
 
             `minimize()` can be called multiple times, only the last one is stored
         """
-        return self.objective(expr, minimize=True)
+        self.objective(expr, minimize=True)
 
-    def maximize(self, expr):
+    def maximize(self, expr: Expression) -> None:
         """
             Post the given expression to the solver as objective to maximize
 
             `maximize()` can be called multiple times, only the last one is stored
         """
-        return self.objective(expr, minimize=False)
+        self.objective(expr, minimize=False)
 
     # REQUIRED functions to mimic `Model` interface:
-    def objective(self, expr, minimize):
+    def objective(self, expr: Expression, minimize: bool) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
             Arguments:
-                expr: Expression, the CPMpy expression that represents the objective function
+                expr: a CPMpy :class:`~cpmpy.expressions.core.Expression`
                 minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             ``objective()`` can be called multiple times, only the last one is stored
@@ -144,6 +144,8 @@ class SolverInterface(object):
         raise NotImplementedError("Solver does not support objective functions")
 
     def status(self):
+        if self.cpm_status.runtime is None: # solver set solve_time, copy to runtime for backwards compatibility
+            self.cpm_status.runtime = self.cpm_status.solve_time
         return self.cpm_status
 
     def solve(self,time_limit:Optional[float]=None):
@@ -160,13 +162,13 @@ class SolverInterface(object):
         """
         return False
 
-    def has_objective(self):
+    def has_objective(self) -> bool:
         """
             Returns whether the solver has an objective function or not.
         """
         return False
 
-    def objective_value(self):
+    def objective_value(self) -> Optional[int]:
         """
             Returns the value of the objective function of the latest solver run on this model
 
@@ -203,7 +205,7 @@ class SolverInterface(object):
                 res.append(self.solver_var(cpm_var))
         return res
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -212,14 +214,15 @@ class SolverInterface(object):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -232,10 +235,11 @@ class SolverInterface(object):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -247,7 +251,7 @@ class SolverInterface(object):
         return self
     
     # needed here for subclasses that don't do the more direct `__add__ = add` in their class
-    def __add__(self, cpm_expr):
+    def __add__(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         return self.add(cpm_expr)
 
 
@@ -312,11 +316,11 @@ class SolverInterface(object):
             self.add(any([v != v.value() for v in self.user_vars if v.value() is not None]))
 
             if time_limit is not None: # update remaining time
-                time_limit -= self.status().runtime
+                time_limit -= self.status().solve_time
         end = time.time()
 
         # update solver status
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
         if solution_count:
             if solution_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -368,18 +372,24 @@ class SolverInterface(object):
         """
         raise NotSupportedError("Solver does not support MUS extraction")
 
+    def get_proof_files(self):
+        """
+        For use when solving using proof-logging.
+        Returns a list of filenames where the proof was stored.
+
+        Depending on the proof-format used, a solver may use multiple proof files for a single solve-call
+        """
+        raise NotSupportedError("Solver does not support proof logging")
 
     # shared helper functions
 
-    def _solve_return(self, cpm_status, objective_value=None):
+    def _solve_return(self, cpm_status):
         """
             Take a CPMpy Model and SolverStatus object and return
             the proper answer (True/False/objective_value)
 
             :param cpm_status: status extracted from the solver
             :type cpm_status: SolverStatus
-
-            :param objective_value: None or Int, as computed by solver [DEPRECATED]
 
             :return: Bool
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
@@ -406,7 +416,7 @@ class ExitStatus(Enum):
 
         `UNSATISFIABLE`: No satisfying solution exists
 
-        `ERROR`: Some error occured (solver should have thrown Exception)
+        `ERROR`: Some error occurred (solver should have thrown Exception)
 
         `UNKNOWN`: Outcome unknown, for example when timeout is reached
     """
@@ -421,14 +431,22 @@ class ExitStatus(Enum):
 class SolverStatus(object):
     """
         Status and statistics of a solver run
+
+        Attributes:
+            exitstatus: ExitStatus, the exit status of the solver
+            runtime: float, the wallclock time of a solve call (including transformation time)
+            solve_time: float, the time taken by the solver to solve the problem
     """
     exitstatus: ExitStatus
     runtime: Optional[float]
+    solve_time: Optional[float]
 
     def __init__(self, name):
         self.solver_name = name
         self.exitstatus = ExitStatus.NOT_RUN
         self.runtime = None
+        self.solve_time = None
+        
 
     def __repr__(self):
         return "{} ({} seconds)".format(self.exitstatus, self.runtime)

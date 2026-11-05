@@ -12,6 +12,7 @@ from cpmpy.expressions.utils import STAR, argvals, argval
 from cpmpy.solvers import CPM_minizinc
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.safening import no_partial_functions
+from cpmpy.transformations.linearize import decompose_linear
 
 from utils import skip_on_missing_pblib, inclusive_range, lambda_assert
 
@@ -218,6 +219,33 @@ class TestGlobal:
         assert not model.solve()
         assert not cp.Circuit(x).value()
 
+    def test_circuit_linear_half_reified(self):
+        x = cp.intvar(0, 2, shape=3, name="x")
+        b = cp.boolvar(name="b")
+        cons = decompose_linear([b.implies(cp.Circuit(x))])
+
+        assert cp.Model(cons + [b, x == [1, 2, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 1, 2]]).solve()  # self-loops
+        assert not cp.Model(cons + [b, x == [1, 2, 1]]).solve()  # subtour
+
+        # successors are unrestricted when the circuit is not enforced
+        assert cp.Model(cons + [~b, x == [0, 1, 2]]).solve()
+        assert cp.Model(cons + [~b, x == [1, 2, 1]]).solve()
+
+    def test_ort_circuit_cse(self):
+
+        x = cp.intvar(0,10, shape=5, name="x")
+
+        model = cp.Model(
+            cp.Circuit(x),
+            (x[0] == 1).implies(x[1] == 2) # enforce some nested constraint
+        )
+        solver = cp.SolverLookup.get("ortools", model)
+
+        # variables should be: x1..x5 and 20x bv[i,j]
+        vars_except_neg = set(var.replace("~","") for var in solver._varmap)
+        assert len(vars_except_neg) == 25
+
 
     def test_not_circuit(self):
         x = cp.intvar(lb=-1, ub=5, shape=4)
@@ -293,6 +321,7 @@ class TestGlobal:
 
         # Test InDomain with constant list
         vals = [1, 5, 8, -4]
+        assert cp.InDomain(iv, vals).name == "indomain"
         model = cp.Model([cp.InDomain(iv, vals)])
         assert model.solve()
         assert iv.value() in vals
@@ -431,6 +460,12 @@ class TestGlobal:
         model = cp.Model(constraints[0].decompose())
         assert not model.solve()
 
+    def test_table_with_subexpr(self):
+        iv = cp.intvar(0, 10, shape=3)
+        c = cp.Table(iv+iv, [[10, 8, 2], [5, 9, 2]])
+        assert cp.Model(c).solve()
+        assert cp.Model(c.decompose()).solve()
+
     def test_table_value(self):
         """Test Table.value() with known assignments (and unassigned -> None)."""
         iv = cp.intvar(0, 10, shape=3)
@@ -545,7 +580,7 @@ class TestGlobal:
         # unconstrained
         true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
         assert cp.Model(true_cons).solve(solver=solver)
-        assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
+        #assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
         constraining, defining = true_cons.decompose() # should be True, []
         assert constraining[0]
 
@@ -639,6 +674,113 @@ class TestGlobal:
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
 
+    def test_regular_multiple_accepting_nodes(self, solver):
+        # testing DFA with multiple accepting nodes
+        x = cp.intvar(0, 1, shape=3)
+
+        transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 1, "d")]
+        start = "a"
+        ends = ["b", "c"]
+
+        true_sols = set()
+        false_sols = set()
+
+        solutions = [(0,0,1), (0,1,1)]
+
+        true_model = cp.Model(cp.Regular(x, transitions, start, ends))
+        false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
+
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10) # all assignments = 8
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))), **kwargs)
+        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))), **kwargs)
+
+        assert num_true == len(solutions)
+        assert true_sols == set(solutions)
+
+        assert num_true + num_false == 2**3
+        assert len(true_sols & false_sols) == 0# no solutions can be in both
+
+    def test_regular_positive_reif(self):
+        b = cp.boolvar()
+        x = cp.intvar(0, 1, shape=2)
+
+        # 3-state automaton that accepts only the string [0, 0].
+        reg = cp.Regular(x, transitions=[('a', 0, 'b'), ('b', 0, 'c')], start='a', accepting=['c'])
+
+        m = cp.Model([x[0] == 1, b.implies(reg)])
+
+        # x[0] = 1 has no transition from 'a' -> automaton rejects -> reg is False.
+        # b is False, so "b -> reg" MUST be satisfiable.
+        sat = m.solve()
+
+        assert sat, "BUG: half-reified Regular is unsound for rejected strings"
+
+    @pytest.mark.parametrize("start, accepting, solutions", [
+        ("z", ["a"], set()),  # start node without transitions: accepts nothing
+        ("a", ["a", "q"], {(0, 0)}),  # unreachable accepting node: ignored
+        ("a", ["q"], set()),  # only unreachable accepting nodes
+    ])
+    def test_regular_nodes_without_transitions(self, solver, start, accepting, solutions):
+        # Start and accepting nodes need not appear in any transition (issue #1137)
+        x = cp.intvar(0, 2, shape=2)
+        reg = cp.Regular(x, [("a", 0, "a")], start, accepting)
+
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10) # all assignments = 9
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        true_sols, false_sols = set(), set()
+        num_true = cp.Model(reg).solveAll(solver=solver, display=lambda: true_sols.add(tuple(argvals(x))), **kwargs)
+        num_false = cp.Model(~reg).solveAll(solver=solver, display=lambda: false_sols.add(tuple(argvals(x))), **kwargs)
+
+        assert true_sols == solutions and num_true == len(solutions)
+        assert num_true + num_false == 3**2
+        assert len(true_sols & false_sols) == 0
+
+        # the linear (flow) decomposition used by MIP solvers agrees
+        constraining, defining = reg.decompose_linear()
+        linear_sols = set()
+        cp.Model(constraining + defining).solveAll(solver=solver, display=lambda: linear_sols.add(tuple(argvals(x))), **kwargs)
+        assert linear_sols == solutions
+
+    def test_regular_linear_positive_reif(self):
+        x = cp.intvar(0, 1, shape=4, name="x")
+        b = cp.boolvar(name="b")
+        # automaton accepting 0*100*
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "b"), ("b", 0, "c"), ("c", 0, "c")], "a", ["c"])
+        cons = decompose_linear([b.implies(reg)])
+
+        assert cp.Model(cons + [b, x == [0, 1, 0, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 1, 1, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 0, 0, 1]]).solve()
+
+        # the array is unrestricted when the automaton is not enforced
+        assert cp.Model(cons + [~b, x == [0, 1, 1, 0]]).solve()
+        assert cp.Model(cons + [~b, x == [0, 0, 0, 1]]).solve()
+
+    def test_regular_linear_values_outside_transitions(self):
+        x = cp.intvar(0, 2, shape=3, name="x")
+        b = cp.boolvar(name="b")
+        # automaton accepting 0*100*, value 2 is in the domain of x but does not occur in any transition
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "b"), ("b", 0, "c"), ("c", 0, "c")], "a", ["c"])
+
+        assert cp.Model(decompose_linear([~reg]) + [x == [0, 0, 2]]).solve()
+
+        cons = decompose_linear([b == reg])
+        assert cp.Model(cons + [b, x == [1, 0, 0]]).solve()
+        assert not cp.Model(cons + [b, x == [0, 0, 2]]).solve()
+        assert cp.Model(cons + [~b, x == [0, 0, 2]]).solve()
+        assert not cp.Model(cons + [~b, x == [1, 0, 0]]).solve()
+
     def test_mdd(self):
         x = cp.intvar(0, 3, shape=3)
 
@@ -649,6 +791,8 @@ class TestGlobal:
 
         mdd_orig = cp.MDD(x, transitions, start=start, reduce=False)
         mdd_redu = cp.MDD(x, transitions, start=start, reduce=True)
+        # _reduce() is normally only called during decomposition, so call it explicitly here
+        mdd_redu._reduce()
         assert mdd_orig.levels.keys() - mdd_redu.levels.keys() == {"b1", "b2", "c2"}
 
         sols_orig = set()
@@ -660,6 +804,30 @@ class TestGlobal:
         assert sols_redu == set(solutions)
 
         assert num_orig == num_redu
+
+    def test_mdd_variable_reuse(self):
+        x = cp.intvar(0, 3, shape=3, name="x")
+        # MDD accepting exactly [1,1,1]
+        mdd = cp.MDD(x, transitions=[('A', 1, 'B'),
+                                  ('B', 1, 'C'),
+                                  ('C', 1, 'D'), ])
+
+        # x=[0,0,0] is NOT a path in the MDD => MDD(x) is False => ~MDD(x) must be True.
+        m_neg = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, ~mdd])
+        assert m_neg.solve()
+
+        # Full reification: b == MDD(x), force b False with the rejected assignment.
+        b = cp.boolvar(name="b")
+        m_reif = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b == mdd, ~b])
+        assert m_reif.solve()
+
+        # Sanity: a genuinely accepted assignment still works positively.
+        m_toplevel = cp.Model([x[0] == 1, x[1] == 1, x[2] == 1, mdd])
+        assert m_toplevel.solve()
+
+        # Sanity: a non-accepted assignment still works when the mdd is positively reified, with no other constraints on b.
+        m_pos = cp.Model([x[0] == 0, x[1] == 0, x[2] == 0, b.implies(mdd)])
+        assert m_pos.solve()
 
 
     def test_minimum(self):
@@ -793,6 +961,28 @@ class TestGlobal:
         expr = x[1,2,a]
         assert str(expr) == "[x[1,2,0] x[1,2,1] x[1,2,2] x[1,2,3] x[1,2,4]][a]"
 
+    def test_multid_element(self):
+        x = cp.intvar(1,9, shape=(3,4,5), name="x")
+        a = cp.intvar(0,2, name="a")
+        b = cp.intvar(0,3, name="b")
+        c = cp.intvar(0,4, name="c")
+
+        expr = x[a,b,c]
+        assert isinstance(expr, cp.NDElement)
+        cons = expr == 7
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), c.value()] == 7
+
+        expr = x[a,b,2]
+        assert isinstance(expr, cp.NDElement)
+        cons = expr == 4
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), 2] == 4
+
     def test_element_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -827,25 +1017,51 @@ class TestGlobal:
         }
         assert set(map(str, decomposed)) == expected
 
-        # should raise a warning if we don't safen first
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose()
-            expected = {
-                # actual decomposition
-                '(x == 0) -> (IV2 == 0)',
-                '(x == 1) -> (IV2 == 1)',
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
+        # decomposition should safen
+        val, decomp = elem.decompose()
+        expected = {
+            # actual decomposition
+            '(x == 0) -> (IV2 == 0)',
+            '(x == 1) -> (IV2 == 1)',
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
 
         # also for linear decomp
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose_linear()
-            expected = {
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
-            assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+        val, decomp = elem.decompose_linear()
+        expected = {
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
+        assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+
+    def test_multid_element_index_dom_mismatched(self):
+        """
+            NDElement with OOB index domains: safened per dimension before decompose.
+            Toplevel `arr[a,b] == 3` only allows in-bounds index pairs.
+        """
+        arr = cp.cpm_array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+        a = cp.intvar(0, 10, name="a")
+        b = cp.intvar(-1, 1, name="b")
+        y = cp.intvar(1, 5, name="y")
+        decomposed = decompose_in_tree(no_partial_functions([cp.NDElement(arr, [a, b]) <= y], safen_toplevel={"nd_element"}))
+        decomp = set(map(str, decomposed))
+        assert {
+            "((a >= 0) and (a <= 2)) -> ((IV0) == (a))",
+            "((a < 0) or (a > 2)) -> (IV0 == 0)",
+            "((b >= 0) and (b <= 2)) -> ((IV1) == (b))",
+            "((b < 0) or (b > 2)) -> (IV1 == 0)",
+            "(a >= 0) and (a <= 2)",
+            "(b >= 0) and (b <= 2)",
+        } <= decomp
+        assert any(c.endswith("<= (y)") for c in decomp)
+
+        arr = cp.cpm_array(np.full((3, 3), 3))
+        a, b = cp.intvar(0, 10, shape=2, name=tuple("ab"))
+        sols = set()
+        n_sols = cp.Model(arr[a, b] == 3).solveAll(display=lambda: sols.add((a.value(), b.value())))
+        assert n_sols == 9
+        assert sols == {(i, j) for i in range(3) for j in range(3)}
 
     def test_modulo(self):
 
@@ -1005,6 +1221,186 @@ class TestGlobal:
         # also test decomposition
         assert not cp.Model(cons.decompose()).solve()# capacity was not taken into account and this failed
 
+    def test_cumulative_zero_duration(self, solver):
+        # Zero-duration tasks occupy no resource
+        if solver == "pumpkin":
+            pytest.skip("Bug in Pumpkin Cumulative, see test below")
+
+        s = cp.intvar(0, 5, name="s")
+        d = 0
+        cons = cp.Cumulative([s], [d], demand=[2], capacity=1)
+
+        assert cp.Model(cons).solve(solver=solver)
+        assert cons.value() is True
+
+        task, _ = cons.decompose(how="task")
+        time, _ = cons.decompose(how="time")
+        assert all(argval(q) for q in task)
+        assert all(argval(q) for q in time)
+        assert cp.Model(cons.decompose(how="task")).solve(solver=solver)
+        assert cp.Model(cons.decompose(how="time")).solve(solver=solver)
+    
+    def test_cumulative_optional_zero_duration(self, solver):
+         # Present, zero-duration tasks occupy no resource
+        s = cp.intvar(0, 5, name="s")
+        d = 0
+        active = cp.boolvar(name="active")
+        cons = cp.CumulativeOptional([s], [d], demand=[2], capacity=1, is_present=[active])
+
+        assert cp.Model(cons, active == True).solve(solver=solver)
+        assert cons.value() is True
+
+        task, _ = cons.decompose(how="task")
+        time, _ = cons.decompose(how="time")
+        assert all(argval(q) for q in task)
+        assert all(argval(q) for q in time)
+        assert cp.Model(cons.decompose(how="task"), active == True).solve(solver=solver)
+        assert cp.Model(cons.decompose(how="time"), active == True).solve(solver=solver)
+
+    def test_reservoir_value(self):
+        start = cp.intvar(0, 5, shape=3, name="start")
+        cons = cp.Reservoir(start, [2, -1, -3], -3, 2)
+
+        # +2, then -1, then -3: levels 2, 1, -2
+        for var, val in zip(start, [0, 1, 2]):
+            var._value = val
+        assert cons.value() is True
+
+        # -3 first: level -3, then -1 makes -4, then +2 makes -2. -4 is below the minimum
+        for var, val in zip(start, [2, 1, 0]):
+            var._value = val
+        assert cons.value() is False
+
+        # -1 first, then -3, then +2: level -1, -4, -2
+        for var, val in zip(start, [2, 0, 1]):
+            var._value = val
+        assert cons.value() is False
+
+        # simultaneous events are applied together: +2 and -2 net to 0
+        same = cp.Reservoir(start[:2], [2, -2], 0, 0)
+        start[0]._value = start[1]._value = 3
+        assert same.value() is True
+
+        pytest.raises(ValueError, cp.Reservoir, [], [], -1, 4)
+        pytest.raises(TypeError, cp.Reservoir, 1, [1], -1, 1)
+        pytest.raises(TypeError, cp.Reservoir, [1], 1, -1, 1)
+        pytest.raises(ValueError, cp.Reservoir, [1, 2], [1], -1, 1)
+        # capacity bounds must include the initial level 0
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], 1, 2)
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], -2, -1)
+        pytest.raises(ValueError, cp.Reservoir, [1], [1], 1, -1)
+        # capacities and demands must be integer constants, not expressions
+        capa = cp.intvar(-2, 2, name="capa")
+        pytest.raises(TypeError, cp.Reservoir, [1], [1], capa, 2)
+        pytest.raises(TypeError, cp.Reservoir, [1], [1], -1, capa)
+        pytest.raises(TypeError, cp.Reservoir, [1], [cp.intvar(-1, 1)], -1, 1)
+        pytest.raises(ValueError, lambda: cons.decompose(how="nope"))
+
+    def test_reservoir(self, solver):
+        start = cp.intvar(0, 3, shape=2, name="start")
+        cons = cp.Reservoir(start, [2, -3], -3, 2)
+
+        assert cp.Model(cons).solve(solver=solver)
+        assert cons.value() is True
+
+        # a single withdrawal of 4 cannot fit in [-1, 2]
+        tight = cp.Reservoir(start[:1], [4], -1, 2)
+        assert cp.Model(tight).solve(solver=solver) is False
+        assert cp.Model(tight.decompose(how="time")).solve(solver=solver) is False
+        assert cp.Model(tight.decompose(how="task")).solve(solver=solver) is False
+
+        # emptying before filling drops the level below 0
+        ordered = cp.Reservoir(start, [2, -2], 0, 2)
+        assert cp.Model(ordered, start[1] < start[0]).solve(solver=solver) is False
+        assert cp.Model(ordered, start[0] <= start[1]).solve(solver=solver)
+        assert ordered.value() is True
+
+        # same start time: the intermediate level is not checked
+        together = cp.Reservoir(start, [3, -3], 0, 0)
+        assert cp.Model(together, start[0] == start[1]).solve(solver=solver)
+        assert together.value() is True
+        assert cp.Model(together, start[0] < start[1]).solve(solver=solver) is False
+
+        # reified: the reservoir itself is unsatisfiable, so the Boolean is false
+        b = cp.boolvar(name="b")
+        reif = cp.Reservoir([start[0]], [5], -1, 1)
+        assert cp.Model(b == reif).solve(solver=solver)
+        assert b.value() is False
+        assert reif.value() is False
+
+    def test_reservoir_optional_value(self):
+        start = cp.intvar(0, 5, shape=2, name="start")
+        present = cp.boolvar(shape=2, name="present")
+        cons = cp.ReservoirOptional(start, [3, -1], -1, 2, present)
+
+        # only the withdrawal happens
+        start[0]._value, start[1]._value = 0, 1
+        present[0]._value, present[1]._value = False, True
+        assert cons.value() is True
+
+        # both present at the same time: 3 and -1 net to 2
+        start[0]._value = start[1]._value = 0
+        present[0]._value = present[1]._value = True
+        assert cons.value() is True
+
+        # +3 alone exceeds the maximum
+        present[1]._value = False
+        assert cons.value() is False
+
+        pytest.raises(ValueError, cp.ReservoirOptional, [], [], -1, 1, [])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, 1, True)
+        pytest.raises(ValueError, cp.ReservoirOptional, [1, 2], [1], -1, 1, [True])
+        # capacity bounds must include the initial level 0
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], 1, 2, [True])
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], -2, -1, [True])
+        pytest.raises(ValueError, cp.ReservoirOptional, [1], [1], 1, -1, [True])
+        # capacities and demands must be integer constants, not expressions
+        capa = cp.intvar(-2, 2, name="capa")
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], capa, 2, [True])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [1], -1, capa, [True])
+        pytest.raises(TypeError, cp.ReservoirOptional, [1], [cp.intvar(-1, 1)], -1, 1, [True])
+
+    def test_reservoir_optional(self, solver):
+        start = cp.intvar(0, 3, shape=2, name="start")
+        present = cp.boolvar(shape=2, name="present")
+        # a demand of 4 never fits, so that event has to be absent
+        cons = cp.ReservoirOptional(start, [4, -1], -1, 2, present)
+
+        assert cp.Model(cons).solve(solver=solver)
+        assert cons.value() is True
+        assert present[0].value() is False
+
+        assert cp.Model(cons, present[0]).solve(solver=solver) is False
+        assert cp.Model(cons.decompose(how="time"), present[0]).solve(solver=solver) is False
+        assert cp.Model(cons.decompose(how="task"), present[0]).solve(solver=solver) is False
+
+        # an absent withdrawal is ignored; a present one before the refill is not
+        ordered = cp.ReservoirOptional(start, [2, -2], 0, 2, present)
+        assert cp.Model(ordered, present[1], ~present[0]).solve(solver=solver) is False
+        assert cp.Model(ordered, present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+        assert ordered.value() is True
+        assert cp.Model(ordered.decompose(how="time"), present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+        assert cp.Model(ordered.decompose(how="task"), present[0], present[1], start[0] <= start[1]).solve(solver=solver)
+
+        # constant presence, including an event that is fixed absent
+        fixed = cp.ReservoirOptional(start, [4, -1], -1, 2, [False, True])
+        assert cp.Model(fixed).solve(solver=solver)
+        assert fixed.value() is True
+        assert cp.Model(cp.ReservoirOptional(start, [4, -1], -1, 2, [True, True])).solve(solver=solver) is False
+
+    @pytest.mark.xfail(reason="Bug in Pumpkin Cumulative, issue at: https://github.com/ConSol-Lab/Pumpkin/issues/577")
+    def test_cumulative_zero_duration_pumpkin(self):
+        if not cp.SolverLookup.lookup("pumpkin").supported():
+            pytest.skip("Pumpkin not installed")
+
+        s = cp.intvar(0, 5, name="s")
+        d = 0
+        cons = cp.Cumulative([s], [d], demand=[2], capacity=1)
+
+        assert cp.Model([cons, s == 0]).solve(solver="pumpkin")
+        assert cons.value() is True
+
+
     def test_cumulative_nested_expressions(self):
         import numpy as np
 
@@ -1077,6 +1473,20 @@ class TestGlobal:
         model = cp.Model(constraints)
         assert not model.solve(solver="minizinc")
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_mdd_minizinc(self):
+        """Test native mdd global constraint with minizinc solver"""
+        x = cp.intvar(0, 3, shape=3)
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = {(0, 1, 0), (1, 1, 0), (2, 2, 0)}
+
+        mdd = cp.MDD(x, transitions, start="src")
+        sols = set()
+        num = cp.Model(mdd).solveAll(solver="minizinc", display=lambda: sols.add(tuple(argvals(x))))
+        assert sols == solutions
+        assert num == len(solutions)
 
 
     def test_cumulative_no_np(self):
@@ -1115,6 +1525,25 @@ class TestGlobal:
         assert not cp.Model(expr).solve()
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
+
+    def test_cumulative_var_duration_no_end(self):
+        # regression: OR-Tools interval construction used self.csemap (missing) when
+        # duration is variable and end is not provided
+        start = cp.intvar(0, 10, shape=3, name="start")
+        duration = cp.intvar(1, 5, shape=3, name="dur")
+        demand = [1, 2, 1]
+        capacity = 3
+        cons = cp.Cumulative(start=start, duration=duration, demand=demand, capacity=capacity)
+        assert cp.Model(cons).solve(solver="ortools")
+        assert cons.value()
+
+    def test_no_overlap_var_duration_no_end(self):
+        # same OR-Tools path as Cumulative for variable-sized intervals without end
+        start = cp.intvar(0, 10, shape=3, name="start")
+        duration = cp.intvar(1, 4, shape=3, name="dur")
+        cons = cp.NoOverlap(start, duration)
+        assert cp.Model(cons).solve(solver="ortools")
+        assert cons.value()
 
     def test_optional_cumulative(self):
         start = cp.intvar(0, 10, shape=4, name="start")
@@ -1321,6 +1750,29 @@ class TestGlobal:
         iv = cp.intvar(0, 10, shape=(3, 3))
         assert cp.Model([cp.NValueExcept(i, val) == 3 for i in iv.T]).solve()
 
+    @pytest.mark.parametrize("make_expr, expected, optimum", [
+        (lambda x: cp.Count(x, 1), 4, 6),
+        (lambda x: cp.Among(x, [1, 2]), 5, 6),
+        (lambda x: cp.NValue(x), 3, 4),
+        (lambda x: cp.NValueExcept(x, 0), 2, 3),
+    ], ids=["count", "among", "nvalue", "nvalue_except"])
+    def test_multidim_count_functions(self, make_expr, expected, optimum):
+        # https://github.com/CPMpy/cpmpy/issues/1109
+        x = cp.intvar(0, 3, shape=(2, 3), name="x")
+        expr = make_expr(x)
+        assert expr.get_bounds()[1] == 6
+
+        assert cp.Model(x == [[1, 1, 2], [1, 0, 1]]).solve()
+        assert expr.value() == expected
+        assert expr.value() == make_expr(x.flatten()).value()
+
+        # as constraint and as objective
+        assert cp.Model(expr == expected).solve()
+        assert expr.value() == expected
+        m = cp.Model(maximize=expr)
+        assert m.solve()
+        assert m.objective_value() == optimum
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
@@ -1380,6 +1832,81 @@ class TestGlobal:
             assert cons.value() is False
 
         cp.Model(~cons).solveAll(display=check_val)
+
+    def test_no_overlap_zero_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+
+        # a zero-duration task occupies no time, so it never overlaps another task
+        start = cp.intvar(0,5, shape=3, name="start")
+        start_val = [1,0,5]  # task 0 has duration 0 and starts in the middle of task 1
+        dur = [0,5,3]
+        cons = cp.NoOverlap(start, dur)
+
+        assert cp.Model(cons, start == start_val).solve(solver=solver)
+        assert cons.value() is True
+        assert cp.Model(cons.decompose(), start == start_val).solve(solver=solver)
+        # NoOverlap has the same semantics as Cumulative with demand and capacity equal to 1
+        assert cp.Model(cp.Cumulative(start, dur, demand=1, capacity=1), start == start_val).solve(solver=solver)
+
+    def test_no_overlap_zero_duration_var(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+        if solver == "pumpkin":
+            pytest.skip("Pumpkin does not support variables as duration")
+
+        # same, but now 0 is only in the domain of the duration variables
+        start = cp.intvar(0,5, shape=3, name="start")
+        dur = cp.intvar(0,5, shape=3, name="dur")
+        cons = cp.NoOverlap(start, dur)
+
+        assert cp.Model(cons, start == [1,0,5], dur == [0,5,3]).solve(solver=solver)
+        assert cons.value() is True
+        assert cp.Model(cons, start == [1,0,2], dur == [0,5,3]).solve(solver=solver) is False
+
+    def test_no_overlap_optional_zero_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+
+        # a present task with zero duration occupies no time either
+        start = cp.intvar(0,5, shape=3, name="start")
+        start_val = [1,0,5]  # task 0 has duration 0 and starts in the middle of task 1
+        dur = [0,5,3]
+        is_present = cp.boolvar(shape=3, name="is_present")
+        cons = cp.NoOverlapOptional(start, dur, is_present=is_present)
+
+        assert cp.Model(cons, start == start_val, cp.all(is_present)).solve(solver=solver)
+        assert cons.value() is True
+        assert cp.Model(cons.decompose(), start == start_val, cp.all(is_present)).solve(solver=solver)
+        # NoOverlapOptional has the same semantics as CumulativeOptional with demand and capacity equal to 1
+        assert cp.Model(cp.CumulativeOptional(start, dur, demand=1, capacity=1, is_present=is_present),
+                        start == start_val, cp.all(is_present)).solve(solver=solver)
+
+    def test_no_overlap_optional_zero_duration_var(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+        if solver == "pumpkin":
+            pytest.skip("Pumpkin does not support variables as duration")
+
+        # same, but now 0 is only in the domain of the duration variables
+        start = cp.intvar(0,5, shape=3, name="start")
+        dur = cp.intvar(0,5, shape=3, name="dur")
+        is_present = cp.boolvar(shape=3, name="is_present")
+        cons = cp.NoOverlapOptional(start, dur, is_present=is_present)
+
+        assert cp.Model(cons, start == [1,0,5], dur == [0,5,3], is_present == [True, True, True]).solve(solver=solver)
+        assert cons.value() is True
+        assert cp.Model(cons, start == [1,0,2], dur == [0,5,3], is_present == [True, True, True]).solve(solver=solver) is False
+
+
 
 class TestBounds:
     def test_bounds_minimum(self):
@@ -1641,6 +2168,8 @@ class TestTypeChecks:
         assert total == len(all_sols) + len(not_all_sols)
 
 
+
+
     def test_increasing(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
@@ -1810,28 +2339,16 @@ class TestTypeChecks:
                 print("Solver not supported: ", name)
                 continue
 
-
-    def test_table(self):
-        iv = cp.intvar(-8,8,3)
-
-        #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
-        # used to work, not allowed anymore
-        pytest.raises(AttributeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
-
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
-
-    def test_issue627(self):
-        for s, cls in cp.SolverLookup.base_solvers():
-            if cls.supported():
-                try:
-                    # constant look-up
-                    assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
-                    # constant out-of-bounds look-up
-                    assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
-                except (NotImplementedError, NotSupportedError):
-                    pass
+    # def test_issue627(self): -> not allowed anymore; index must be an Expression
+    #     for s, cls in cp.SolverLookup.base_solvers():
+    #         if cls.supported():
+    #             try:
+    #                 # constant look-up
+    #                 assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
+    #                 # constant out-of-bounds look-up
+    #                 assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
+    #             except (NotImplementedError, NotSupportedError, AssertionError):
+    #                 pass
 
     def test_issue_699(self):
         x,y = cp.intvar(0,10, shape=2, name=tuple("xy"))

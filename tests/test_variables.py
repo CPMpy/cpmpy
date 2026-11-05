@@ -2,7 +2,8 @@ import pytest
 
 import cpmpy as cp
 import numpy as np
-from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray, _gen_var_names
+from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
+from cpmpy.expressions.variables import _gen_var_names, _ignore_strict_variable_name_check
 
 
 class TestSolvers:
@@ -69,6 +70,13 @@ class TestSolvers:
         pytest.raises(ValueError, lambda: cp.boolvar(name=("x", "IV1", "y"), shape=3))
         pytest.raises(ValueError, lambda: cp.boolvar(name=[["x","y","z"],["a", "IV1", "b"]], shape=(2,3)))
 
+        # test non-strict mode
+        _BoolVarImpl.counter = 0 # reset counters
+        _IntVarImpl.counter = 0 # reset counters, will IV123 will compare with iv counter
+        with _ignore_strict_variable_name_check(): # should not raise errors anymore
+            cp.boolvar(name="BV123")
+            cp.boolvar(name="IV123")
+
 
     def test_invalid_iv(self):
 
@@ -84,6 +92,19 @@ class TestSolvers:
         pytest.raises(ValueError, lambda: cp.intvar(0, 10, name=("BV0", "x", "y"), shape=3))
         pytest.raises(ValueError, lambda: cp.intvar(0, 10, name=("x", "BV1", "y"), shape=3))
         pytest.raises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "BV0", "b"]], shape=(2,3)))
+
+        # test non-strict mode
+        _BoolVarImpl.counter = 0 # reset counters, will BV123 will compare with bv counter
+        _IntVarImpl.counter = 0 # reset counters
+        with _ignore_strict_variable_name_check(): # should not raise errors anymore
+            cp.intvar(0, 10, name="BV123")
+            cp.intvar(0, 10, name="IV123")
+
+    def test_ignore_strict_variable_name_check_nested(self):
+        with _ignore_strict_variable_name_check():
+            with pytest.raises(RuntimeError, match="cannot be nested"):
+                with _ignore_strict_variable_name_check():
+                    pass
 
     def test_clear(self):
         def n_none(v):

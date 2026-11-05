@@ -13,7 +13,7 @@ Model class
 - :meth:`model.maximize(obj) <cpmpy.model.Model.maximize>` or :meth:`model.minimize(obj) <cpmpy.model.Model.minimize>` -- Set the objective (an :mod:`Expression <cpmpy.expressions>`).
 - :meth:`model.solve() <cpmpy.model.Model.solve>` -- Solve the model with the default solver, returns True/False.
 - :meth:`model.solveAll() <cpmpy.model.Model.solveAll>` -- Solve and enumerate all solutions, returns number of solutions.
-- :meth:`model.status() <cpmpy.model.Model.status>` -- Get the status of the last solver run.
+- :meth:`model.status() <cpmpy.model.Model.status>` -- Get the status of the last solver run (exit status, ``runtime``, ``solve_time``).
 - :meth:`model.objective_value() <cpmpy.model.Model.objective_value>` -- Get the objective value obtained during the last solver run.
 
 Solvers
@@ -98,6 +98,8 @@ Global Constraints
         InDomain
         Xor
         Cumulative
+        Reservoir
+        ReservoirOptional
         Precedence
         NoOverlap
         GlobalCardinalityCount
@@ -121,7 +123,7 @@ Guidelines and tips
 - Do not ``from cpmpy import *``, the implicit overloading of any/all and sum may break or slow down other libraries.
 - Explicitly use CPMpy versions of built-in functions (``cp.sum``, ``cp.all``, etc.).
 - Use global constraints/global functions where possible, some solvers will be much faster.
-- Stick to integer constants; floats and fractional numbers are not supported.
+- Stick to integer constants in constraints and model objectives (some solvers support FloatSum but its very limited)
 - For maintainability, use logical code organization and comments to explain your constraints.
 
 

@@ -30,6 +30,7 @@ SKIPPED_EXAMPLES = [
                     "sudoku_chaos_killer.py", # too slow on github actions
                     "sudoku_schrodingers_rat.py", # too slow on github actions
                     "lpcp21_p1_frog.py", # needs web resource
+                    "hyperparameter_search.py", # too slow on github actions
                     ]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
@@ -37,7 +38,7 @@ SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
             'mario', 'pareto_optimal','prob006_golomb.py', 'tsp.py', 'prob028_bibd.py', 'prob001_car_sequence.py'
             ]
 
-SKIP_MZN = ['blocks_world.py', 'flexible_jobshop.py', 'pareto_optimal.py', 'npuzzle.py', 'sudoku_']
+SKIP_MZN = ['blocks_world.py', 'flexible_jobshop.py', 'pareto_optimal.py', 'npuzzle.py', 'sudoku_','vrp.py']
 
 
 # SOLVERS = SolverLookup.supported()

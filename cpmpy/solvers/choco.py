@@ -51,7 +51,7 @@ import warnings
 
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import Cumulative, DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
@@ -62,7 +62,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 from ..transformations.negation import push_down_negation
 from ..transformations.reification import reify_rewrite
 from ..exceptions import ChocoBoundsException, NotSupportedError
@@ -84,8 +84,8 @@ class CPM_choco(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                    "table", 'negative_table', "short_table", "regular", "InDomain",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "allequal",
+                                    "table", 'negative_table', "short_table", "regular", "indomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
                                     "lex_lesseq", "lex_less", "mdd",
@@ -195,14 +195,14 @@ class CPM_choco(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         # translate exit status
         # A) Found a solution
         if sol is not None:
             # COP
             if self.has_objective():
-                if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
+                if time_limit is None or self.cpm_status.solve_time < time_limit: # solved to optimality
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
                 else: # solved, but optimality not proven
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -210,7 +210,7 @@ class CPM_choco(SolverInterface):
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         # B) Found unsat
-        elif time_limit is None or self.cpm_status.runtime < time_limit: # proven unsat
+        elif time_limit is None or self.cpm_status.solve_time < time_limit: # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         # C) Timeout
         else:
@@ -276,17 +276,17 @@ class CPM_choco(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         if len(sols): # solutions found
             if (len(sols) == solution_limit): # matched the set limit (if given)
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            elif (time_limit is None) or (self.cpm_status.runtime < time_limit): # found all solutions
+            elif (time_limit is None) or (self.cpm_status.solve_time < time_limit): # found all solutions
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else: # reached timeout
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else: # no solutions found
-            if (time_limit is None) or (self.cpm_status.runtime < time_limit): # unsat problem
+            if (time_limit is None) or (self.cpm_status.solve_time < time_limit): # unsat problem
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             else: # timeout
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
@@ -360,7 +360,8 @@ class CPM_choco(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
-        obj, decomp_cons = decompose_objective(expr,
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
@@ -368,7 +369,7 @@ class CPM_choco(SolverInterface):
         # make objective function non-nested
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
 
-        self.add(decomp_cons + obj_cons)
+        self.add(safe_cons + decomp_cons + obj_cons)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
@@ -391,7 +392,7 @@ class CPM_choco(SolverInterface):
         return self._to_var(vals)
 
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -400,14 +401,15 @@ class CPM_choco(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"nd_element"})
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
@@ -422,7 +424,7 @@ class CPM_choco(SolverInterface):
 
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_choco":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -435,10 +437,11 @@ class CPM_choco(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -457,9 +460,8 @@ class CPM_choco(SolverInterface):
         """
         Get a solver's constraint by a supported CPMpy constraint
 
-        :param cpm_expr: CPMpy expression
-        :type cpm_expr: Expression
-
+        Arguments:
+            cpm_expr (Expression): CPMpy expression
         """
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
@@ -567,12 +569,10 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {"alldifferent", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
-                elif cpm_expr.name == 'alldifferent_except0':
-                    return self.chc_model.all_different_except_0(chc_args)
                 elif cpm_expr.name == 'allequal':
                     return self.chc_model.all_equal(chc_args)
                 elif cpm_expr.name == "circuit":
@@ -596,6 +596,10 @@ class CPM_choco(SolverInterface):
 #                    return self.chc_model.lex_chain_less(chc_args)
 
             # but not all
+            elif cpm_expr.name == 'alldifferent_except_0':
+                assert (len(cpm_expr.args) == 2) # args = [array, [0]]
+                assert (cpm_expr.args[1] == [0])
+                return self.chc_model.all_different_except_0(self._to_vars(cpm_expr.args[0]))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
@@ -648,7 +652,7 @@ class CPM_choco(SolverInterface):
                 _HandleWrapper.__init__(chc_mdd, chc_handle)
                 return self.chc_model.mddc(self._to_vars(array), chc_mdd)
 
-            elif cpm_expr.name == 'InDomain':
+            elif cpm_expr.name == 'indomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)

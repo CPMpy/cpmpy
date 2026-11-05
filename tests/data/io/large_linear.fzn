@@ -1,0 +1,40 @@
+% ----------------------------------------------------------------------------------------------------
+% File written by CPMpy
+%     Format: 'fzn'
+%     CPMpy Version: 0.10.0
+% ----------------------------------------------------------------------------------------------------
+% SCIP STATISTICS
+% Problem name     : CPMpy Model
+% Variables        : 12 (0 binary, 12 integer, 0 implicit integer, 0 continuous)
+% Constraints      : 12
+
+%%%%%% Problem variables %%%%%%
+var 0..10: x5;
+var 0..10: x6;
+var 0..10: x0;
+var 0..10: x8;
+var 0..10: x2;
+var 0..10: x9;
+var 0..10: x3;
+var 0..10: x1;
+var 0..10: x7;
+var 0..10: x4;
+var 0..10: x10;
+var 0..10: x11;
+
+%%%%%% Problem constraints %%%%%%
+constraint int_lin_eq([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], 36);
+constraint int_lin_eq([1, 1], [x0, x1], 3);
+constraint int_lin_eq([1, 1], [x2, x3], 5);
+constraint int_lin_eq([1, 1], [x4, x5], 7);
+constraint int_lin_eq([1, 1], [x6, x7], 4);
+constraint int_lin_eq([1, 1], [x8, x9], 6);
+constraint int_lin_eq([1, 1], [x10, x11], 3);
+constraint int_lin_eq([1, 1], [x0, x2], 4);
+constraint int_lin_eq([1, 1], [x2, x4], 6);
+constraint int_lin_eq([1, 1], [x4, x6], 4);
+constraint int_lin_eq([1, 1], [x6, x8], 6);
+constraint int_lin_eq([1, 1], [x8, x10], 4);
+
+%%%%%% Objective function %%%%%%
+solve maximize int_float_lin([6.0, 7.0, 1.0, 9.0, 3.0, 10.0, 4.0, 2.0, 8.0, 5.0, 11.0, 12.0], [], [x5, x6, x0, x8, x2, x9, x3, x1, x7, x4, x10, x11], []);

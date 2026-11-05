@@ -31,9 +31,11 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
             list of Expressions
     """
     newlist: list[Expression] = []
+    changed = False
     for expr in lst_of_expr:
-        changed, newexpr = _push_down_negation_expr(expr)
-        if changed:
+        changed_expr, newexpr = _push_down_negation_expr(expr)
+        if changed_expr:
+            changed = True
             if toplevel and newexpr.name == "and":
                 for b in newexpr.args:
                     if isinstance(b, Expression):
@@ -45,8 +47,22 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
                 newlist.append(newexpr)
         else:
             newlist.append(expr)
+    
+    if not changed:
+        return lst_of_expr
     return newlist
 
+def push_down_negation_objective(expr: Expression) -> Expression:
+    """
+    Push down negation into the objective expression.
+    """
+    assert isinstance(expr, Expression), "push_down_negation_objective: expected a single expression as objective but got {expr}"
+
+    changed, newexpr = _push_down_negation_expr(expr)
+    if changed:
+        return newexpr
+    else:
+        return expr
 
 def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
     """
@@ -237,7 +253,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
 
         elif expr.name == "and":
             # ~(x & y) :: ~x | ~y -- negate all arguments
-            # copy experession to avoid init checks and keep _has_subexpr
+            # copy expression to avoid init checks and keep _has_subexpr
             new_op = copy.copy(expr)
             new_op.name = "or"
             new_op.update_args([recurse_negation(a) for a in expr.args])
@@ -245,7 +261,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
         
         elif expr.name == "or":
             # ~(x | y) :: ~x & ~y -- negate all arguments
-            # copy experession to avoid init checks and keep _has_subexpr
+            # copy expression to avoid init checks and keep _has_subexpr
             new_op = copy.copy(expr)
             new_op.name = "and"
             new_op.update_args([recurse_negation(a) for a in expr.args])
@@ -270,13 +286,3 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
     else:
         raise ValueError(f"Unsupported expression to negate: {expr}")
 
-
-def negated_normal(expr):
-    """
-    .. deprecated:: 0.9.16
-          Please use :func:`recurse_negation()` instead.
-    """
-    warnings.warn("Deprecated, use `recurse_negation()` instead which will negate and push down all negations in "
-                  "the expression (or use `push_down_negation` on the full expression tree); will be removed in "
-                  "stable version", DeprecationWarning)
-    return recurse_negation(expr)

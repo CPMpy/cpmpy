@@ -56,20 +56,8 @@ def diamond_free(N=10):
     model += matrix == matrix.T
 
     # Symmetry breaking
-    # lexicographic ordering of rows
-    for r in range(N - 1):
-        b = boolvar(N + 1)
-        model += b[0] == 1
-        model += b == ((matrix[r] <= matrix[r + 1]) &
-                       ((matrix[r] < matrix[r + 1]) | b[1:] == 1))
-        model += b[-1] == 0
-    # lexicographic ordering of cols
-    for c in range(N - 1):
-        b = boolvar(N + 1)
-        model += b[0] == 1
-        model += b == ((matrix.T[c] <= matrix.T[c + 1]) &
-                       ((matrix.T[c] < matrix.T[c + 1]) | b[1:] == 1))
-        model += b[-1] == 0
+    model += LexChainLess(matrix)  # lexicographic ordering of rows
+    model += LexChainLess(matrix.T)  # lexicographic ordering of cols
 
     return model, matrix
 
