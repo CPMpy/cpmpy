@@ -102,7 +102,7 @@ class CPM_z3(SolverInterface):
         except PackageNotFoundError:
             return None
         
-    def __init__(self, cpm_model=None, subsolver="sat"):
+    def __init__(self, cpm_model=None, subsolver="sat", _from_model=False):
         """
         Constructor of the native solver object
 
@@ -132,7 +132,7 @@ class CPM_z3(SolverInterface):
         self.obj_handle = None
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="z3", cpm_model=cpm_model)
+        super().__init__(name="z3", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):

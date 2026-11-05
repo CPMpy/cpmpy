@@ -87,18 +87,17 @@ class CPM_scip(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None, incremental=True):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         if not self.supported():
             raise ModuleNotFoundError(
                 "CPM_scip: Install SCIPOptSuite and the python package 'pyscipopt' to use this solver interface.")
         assert subsolver is None, "SCIP does not support subsolvers"
         import pyscipopt as scip
 
-        self.incremental = incremental
         self.scip_model = scip.Model()
         self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
         self.objective_value_ = None
-        super().__init__(name="scip", cpm_model=cpm_model)
+        super().__init__(name="scip", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -184,7 +183,8 @@ class CPM_scip(SolverInterface):
         # transformed space, and just leave the original model. All solutions are kept, 
         # and the user can now change the model as they will. The downside is that potentially 
         # useful information for speeding up the next optimisation call is thrown out.
-        if self.incremental:
+        # Skip when _from_model: the solver object is discarded after this call anyway.
+        if not self._from_model:
             self.scip_model.freeTransform()
 
         return has_sol
@@ -393,10 +393,10 @@ class CPM_scip(SolverInterface):
         else:
             raise NotImplementedError(cpm_expr)
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         warnings.warn("Solution enumeration is not implemented in PySCIPOpt, defaulting to CPMpy's naive implementation")
         # Issues to track for future reference:
         # - https://github.com/scipopt/PySCIPOpt/issues/549 and
         # - https://github.com/scipopt/PySCIPOpt/issues/248
-        return super().solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
+        return super().solveAll(display, time_limit, solution_limit, **kwargs)
 

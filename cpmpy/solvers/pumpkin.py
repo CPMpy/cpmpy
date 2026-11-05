@@ -104,7 +104,7 @@ class CPM_pumpkin(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None, proof=None, seed=None):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None, seed=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -144,7 +144,7 @@ class CPM_pumpkin(SolverInterface):
         self._solhint = None
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="pumpkin", cpm_model=cpm_model)
+        super().__init__(name="pumpkin", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):

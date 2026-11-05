@@ -187,20 +187,11 @@ class Model(object):
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
-        if isinstance(solver, str):
-            name = solver.split(":", 1)[0]
-        elif isinstance(solver, type) and issubclass(solver, SolverInterface):
-            name = solver.__name__.removeprefix("CPM_").lower()
-        else:
-            name = None
-
-        init_kwargs = {"incremental": False} if name in ("exact", "scip") else {}
-
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
-            s = solver(self, **init_kwargs)
+            s = solver(self, _from_model=True)
         else:
-            s = SolverLookup.get(solver, self, **init_kwargs)
+            s = SolverLookup.get(solver, self, _from_model=True)
 
         # call solver
         ret = s.solve(time_limit=time_limit, **kwargs)
@@ -228,12 +219,12 @@ class Model(object):
 
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
-            s = solver(self)
+            s = solver(self, _from_model=True)
         else:
-            s = SolverLookup.get(solver, self)
+            s = SolverLookup.get(solver, self, _from_model=True)
 
         # call solver
-        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True, **kwargs)
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret

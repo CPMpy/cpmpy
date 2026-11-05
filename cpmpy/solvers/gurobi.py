@@ -126,7 +126,7 @@ class CPM_gurobi(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -145,7 +145,7 @@ class CPM_gurobi(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
-        super().__init__(name="gurobi", cpm_model=cpm_model)
+        super().__init__(name="gurobi", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -625,7 +625,7 @@ class CPM_gurobi(SolverInterface):
         # Return `soft_con` if its representing Gurobi constraint is in the IIS
         return [soft_con for soft_con, grb_soft_con in zip(soft_cons, grb_soft_cons) if in_iis(grb_soft_con)]
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -637,7 +637,6 @@ class CPM_gurobi(SolverInterface):
                         default/None: nothing displayed
                 time_limit: stop after this many seconds (default: None)
                 solution_limit: stop after this many solutions (default: None)
-                call_from_model: whether the method is called from a CPMpy Model instance or not
                 any other keyword argument
 
             Returns: number of solutions found

@@ -125,7 +125,7 @@ class CPM_gcs(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -149,7 +149,7 @@ class CPM_gcs(SolverInterface):
         self.veripb_return_code = False
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
+        super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -264,7 +264,7 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False,
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None,
                  prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
                  verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
@@ -275,7 +275,6 @@ class CPM_gcs(SolverInterface):
                                                 default/None: nothing displayed
                 solution_limit:                 stop after this many solutions (default: None)
                 time_limit (float, optional):   maximum solve time in seconds (default: None)
-                call_from_model:                whether the method is called from a CPMpy Model instance or not
                 prove:                          whether to produce a VeriPB proof (.opb model file and .pbp proof file).
                 proof_name:                     name for the the proof files.
                 proof_location:                 location for the proof files (default to current working directory).

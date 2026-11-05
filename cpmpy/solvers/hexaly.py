@@ -110,7 +110,7 @@ class CPM_hexaly(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -135,7 +135,7 @@ class CPM_hexaly(SolverInterface):
         self.is_satisfaction = True
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="hexaly", cpm_model=cpm_model)
+        super().__init__(name="hexaly", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -451,7 +451,7 @@ class CPM_hexaly(SolverInterface):
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
 
     
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -471,7 +471,7 @@ class CPM_hexaly(SolverInterface):
             raise ValueError("Hexaly does not support exhaustive search to find all solutions. "
                              "Set time limit to do a limited search")
 
-        return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
+        return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, **kwargs)
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):

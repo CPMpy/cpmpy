@@ -110,7 +110,7 @@ class CPM_ortools(SolverInterface):
             return None
 
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -140,7 +140,7 @@ class CPM_ortools(SolverInterface):
         self.assumption_dict = None
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="ortools", cpm_model=cpm_model)
+        super().__init__(name="ortools", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -288,7 +288,7 @@ class CPM_ortools(SolverInterface):
                 cpm_var._value = None
         return has_sol
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -298,7 +298,6 @@ class CPM_ortools(SolverInterface):
                 display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping. 
                         default/None: nothing displayed
                 solution_limit: stop after this many solutions (default: None)
-                call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: 
                 number of solutions found

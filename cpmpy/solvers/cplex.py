@@ -133,7 +133,7 @@ class CPM_cplex(SolverInterface):
         except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -150,7 +150,7 @@ class CPM_cplex(SolverInterface):
         self.cplex_model = Model()
         self._obj_offset = 0
 
-        super().__init__(name="cplex", cpm_model=cpm_model)
+        super().__init__(name="cplex", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -526,7 +526,7 @@ class CPM_cplex(SolverInterface):
 
             self.cplex_model.add_mip_start(warmstart)
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit: Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit: Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
