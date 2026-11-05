@@ -100,7 +100,7 @@ class CPM_pysdd(SolverInterface):
             return None
 
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -126,7 +126,7 @@ class CPM_pysdd(SolverInterface):
         self.pysdd_root = self.pysdd_manager.true()
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="pysdd", cpm_model=cpm_model)
+        super().__init__(name="pysdd", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -186,7 +186,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -197,7 +197,6 @@ class CPM_pysdd(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit, solution_limit, kwargs: not used
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: 
                 number of solutions found            

@@ -254,7 +254,7 @@ class CPM_minizinc(SolverInterface):
     # variable names must have this pattern
     mzn_name_pattern = re.compile('^[A-Za-z][A-Za-z0-9_]*$')
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -294,7 +294,7 @@ class CPM_minizinc(SolverInterface):
         self.objective_ = None
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
+        super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -1011,7 +1011,7 @@ class CPM_minizinc(SolverInterface):
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -1022,7 +1022,6 @@ class CPM_minizinc(SolverInterface):
                                     default/None: nothing displayed
                 time_limit:         stop after this many seconds (default: None)
                 solution_limit:     stop after this many solutions (default: None)
-                call_from_model:    whether the method is called from a CPMpy Model instance or not
                 **kwargs:           any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
 
             Returns: 

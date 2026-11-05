@@ -102,7 +102,7 @@ class CPM_highs(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -124,7 +124,7 @@ class CPM_highs(SolverInterface):
         self.objective_ = None
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="highs", cpm_model=cpm_model)
+        super().__init__(name="highs", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):

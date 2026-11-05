@@ -121,7 +121,7 @@ class CPM_gcs(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None, proof=None):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -145,7 +145,7 @@ class CPM_gcs(SolverInterface):
         self.veripb_return_code = False
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
+        super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -267,7 +267,7 @@ class CPM_gcs(SolverInterface):
 
         return callback
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Run the Glasgow Constraint Solver, and get a number of solutions, with optional solution callbacks. 
 

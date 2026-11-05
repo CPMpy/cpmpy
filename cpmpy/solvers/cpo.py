@@ -131,7 +131,7 @@ class CPM_cpo(SolverInterface):
         except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -149,7 +149,7 @@ class CPM_cpo(SolverInterface):
         docp = self.get_docp()
         assert subsolver is None
         self.cpo_model = docp.model.CpoModel()
-        super().__init__(name="cpo", cpm_model=cpm_model)
+        super().__init__(name="cpo", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -278,7 +278,7 @@ class CPM_cpo(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
@@ -289,7 +289,6 @@ class CPM_cpo(SolverInterface):
                          Default is None, meaning nothing is displayed.
                 time_limit: Stop after this many seconds. Default is None.
                 solution_limit: Stop after this many solutions. Default is None.
-                call_from_model: Whether the method is called from a CPMpy Model instance or not.
                 **kwargs: Any other keyword arguments.
 
             Returns:

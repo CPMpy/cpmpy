@@ -818,6 +818,11 @@ class TestSolvers:
 class TestSupportedSolvers:
     _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3", "hexaly", "minizinc", "highs"})
 
+    def test_from_model_flag(self, solver):
+        # SolverLookup.get() constructs for reuse; Model.solve() sets _from_model=True
+        s = cp.SolverLookup.get(solver)
+        assert s._from_model is False
+
     def test_installed_solvers(self, solver):
         # basic model
         v = cp.boolvar(3)

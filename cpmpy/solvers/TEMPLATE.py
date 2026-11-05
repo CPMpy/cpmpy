@@ -150,7 +150,7 @@ class CPM_template(SolverInterface):
         # if requested subsolver does not exist, raise ValueError
         pass
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -174,7 +174,7 @@ class CPM_template(SolverInterface):
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
         #           internally, the constructor relies on `add()` which uses the above solver native object(s)
-        super().__init__(name="TEMPLATE", cpm_model=cpm_model)
+        super().__init__(name="TEMPLATE", cpm_model=cpm_model, _from_model=_from_model)
 
 
     @property
@@ -521,7 +521,7 @@ class CPM_template(SolverInterface):
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
@@ -532,7 +532,6 @@ class CPM_template(SolverInterface):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
