@@ -5,7 +5,7 @@ from cpmpy.transformations.normalize import toplevel_list
 def mcs(soft, hard=[], solver="ortools"):
     """
         Compute Minimal Correction Subset of unsatisfiable model.
-        Removing these contraints will result in a satisfiable model.
+        Removing these constraints will result in a satisfiable model.
         Computes a subset of constraints which minimizes the total number of constraints to be removed
 
         :param: soft: list of soft constraints that may be part of the minimal correction subset
@@ -34,7 +34,7 @@ def mcs_opt(soft, hard, weights=1, solver="ortools"):
 def mcs_grow(soft, hard, solver="ortools"):
     """
         Computes correction subset without requirement of optimization support
-        Relies on assumptions so incremental solvers are adviced.
+        Relies on assumptions so incremental solvers are advised.
         Can be faster in some cases compared to optimal correction subset
 
         :param: soft: list of soft constraints that may be part of the minimal correction subset
@@ -48,8 +48,8 @@ def mcs_grow(soft, hard, solver="ortools"):
 
 def mcs_grow_naive(soft, hard, solver="ortools"):
     """
-        Compute Minimal Correction Subset of unsatsifiable model.
-        Computes a subset-minimal set of constraints by greedily removing contraints.
+        Compute Minimal Correction Subset of unsatisfiable model.
+        Computes a subset-minimal set of constraints by greedily removing constraints.
         Can be used when solver does not support assumptions
         No guarantees on optimality, but can be faster in some cases
 

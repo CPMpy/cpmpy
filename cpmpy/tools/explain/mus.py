@@ -7,11 +7,13 @@
     - Native MUS for given solvers:
         - Exact: deletion-based MUS extraction
         - Gurobi: IIS-based MUS extraction
+        - CPO: MUS extraction with CP constraints
         - Cplex: IIS-based MUS extractions
 """
 import warnings
 import numpy as np
 import cpmpy as cp
+from cpmpy.exceptions import NotSupportedError
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
@@ -28,10 +30,10 @@ def mus(soft, hard=[], solver="ortools"):
 
         Each constraint is an arbitrary CPMpy expression, so it can
         also be sublists of constraints (e.g. constraint groups),
-        contain aribtrary nested expressions, global constraints, etc.
+        contain arbitrary nested expressions, global constraints, etc.
 
         Will extract an unsat core and then shrink the core further
-        by repeatedly ommitting one assumption variable.
+        by repeatedly omitting one assumption variable.
 
         :param: soft: soft constraints, list of expressions
         :param: hard: hard constraints, optional, list of expressions
@@ -138,7 +140,7 @@ def ocus(soft, hard=[], weights=None, meta_constraint=True, solver="ortools", hs
         Find an optimal and constrained MUS according to a linear objective function.
         By not providing a weightvector, this function will return the smallest mus.
         Works by iteratively generating correction subsets and computing optimal hitting sets to those enumerated sets.
-        For better performance of the algorithm, use an incemental solver to compute the hitting sets such as Gurobi.
+        For better performance of the algorithm, use an incremental solver to compute the hitting sets such as Gurobi.
 
         Assumption-based implementation for solvers that support s.solve(assumptions=...)
         More naive version available as `optimal_mus_naive` to use with other solvers.
@@ -164,8 +166,11 @@ def ocus(soft, hard=[], weights=None, meta_constraint=True, solver="ortools", hs
     dmap = dict(zip(assump, soft)) # map assumption variables to constraints
 
     s = cp.SolverLookup.get(solver, model)
-    if do_solution_hint and hasattr(s, 'solution_hint'): # algo is constructive, so favor large subsets
-        s.solution_hint(assump, [1]*len(assump))
+    if do_solution_hint:
+        try:
+            s.solution_hint(assump, [1]*len(assump)) # algo is constructive, so favor large subsets
+        except NotSupportedError: # not all solvers support solution hinting
+            pass
 
     assert s.solve(assumptions=assump) is False
 

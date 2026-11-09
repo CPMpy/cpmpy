@@ -335,6 +335,13 @@ class TestVarsLhs:
         cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
         assert str(cp.BoolVal(False)) == str(cons)
 
+    def test_trivial_unsat_keeps_later_constraints(self):
+        # A trivially false comparison should not abort linearization of the rest
+        x = cp.intvar(0, 3, name="x")
+        y = cp.boolvar(name="y")
+        lin = linearize_constraint([x >= 10, y, x <= 2])
+        assert str(lin) == "[boolval(False), y >= 1, sum(x) <= 2]"
+
     def test_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
         rhs = 15

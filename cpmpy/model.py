@@ -11,7 +11,7 @@
     to it. Processing only starts when :meth:`solve() <cpmpy.model.Model.solve>` is called, and this does not modify
     the constraints or objective stored in the model.
 
-    A model can be solved multiple times, and constraints can be added inbetween solve calls.
+    A model can be solved multiple times, and constraints can be added in between solve calls.
     Note that constraints are added using :meth:`.add(...) <cpmpy.model.Model.add>` or using the ``+=`` operator (implemented by :meth:`__add__()`).
 
     See the full list of functions below.
@@ -28,13 +28,14 @@
 from __future__ import annotations
 import copy
 import warnings
+import time
 from typing import Optional
 
 from .exceptions import NotSupportedError
 from .expressions.core import Expression, NestedBoolExprLike
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, Callback
+from .solvers.solver_interface import ExitStatus, SolverInterface, SolverStatus, Callback
 
 import pickle
 
@@ -190,6 +191,10 @@ class Model(object):
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("time_limit must be positive")
+
+        t0 = time.time()
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
@@ -197,9 +202,20 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solve(time_limit=time_limit, **kwargs)
+        if time_limit is not None:
+            remaining_time_limit = time_limit - (time.time() - t0)
+            if remaining_time_limit <= 0:
+                self.cpm_status.runtime = time.time() - t0
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                return False
+        else:
+            remaining_time_limit = None
+
+            
+        ret = s.solve(time_limit=remaining_time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
+        self.cpm_status.runtime = time.time() - t0
         return ret
 
     def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
@@ -236,7 +252,8 @@ class Model(object):
         """
             Returns the status of the latest solver run on this model
 
-            Status information includes exit status (optimality) and runtime.
+            Status information includes exit status (optimality), total runtime
+            (including transformation time) and solve time (time spent in the solver itself).
 
             Returns:
                 an object of :class:`SolverStatus`
@@ -322,7 +339,7 @@ def _update_variable_counters(model: Model):
                 pass
 
     if (_BoolVarImpl.counter > 0 and bv_counter > 0) or (_IntVarImpl.counter > 0 and iv_counter > 0):
-        warnings.warn(f"Model contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
+        warnings.warn(f"Model contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loading this model to avoid issues with duplicate variables.")
     # update counters for future variables
     _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
     _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)

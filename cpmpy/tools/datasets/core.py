@@ -427,7 +427,7 @@ class FileDataset(Dataset):
     def open(cls, instance: os.PathLike) -> io.TextIOBase:
         """
         How an instance file from the dataset should be opened.
-        Especially usefull when files come compressed and won't work with
+        Especially useful when files come compressed and won't work with
         Python standard library's 'open', e.g. '.xz', '.lzma'.
 
         Arguments:

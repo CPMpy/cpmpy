@@ -53,7 +53,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal, Nested
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist, is_int
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -130,7 +130,7 @@ class CPM_hexaly(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_hexaly: Install the python package 'cpmpy[hexaly]' to use this solver interface.") 
         elif not self.license_ok():
-            raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occured during license check. Make sure your license is activated!")
+            raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occurred during license check. Make sure your license is activated!")
 
         from hexaly.optimizer import HexalyOptimizer
 
@@ -169,7 +169,7 @@ class CPM_hexaly(SolverInterface):
             - iteration_limit: max number of iterations
             - verbosity: verbosity level
 
-            full list of parameters availble at:
+            full list of parameters available at:
             https://www.hexaly.com/docs/last/pythonapi/optimizer/hxparam.html
         """
         from hexaly.optimizer import HxObjectiveDirection
@@ -200,11 +200,12 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # new status, translate runtime
+        t0 = time.time()
         self.hex_model.close() # model must be closed
         self.hex_solver.solve()
         self.hex_sol = self.hex_solver.get_solution()
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
+        self.cpm_status.solve_time = time.time() - t0 # wallclock time in (float) seconds
 
         # unregister solution callback
         if callback is not None:

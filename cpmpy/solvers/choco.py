@@ -84,7 +84,7 @@ class CPM_choco(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "allequal",
                                     "table", 'negative_table', "short_table", "regular", "indomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
@@ -195,14 +195,14 @@ class CPM_choco(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         # translate exit status
         # A) Found a solution
         if sol is not None:
             # COP
             if self.has_objective():
-                if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
+                if time_limit is None or self.cpm_status.solve_time < time_limit: # solved to optimality
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
                 else: # solved, but optimality not proven
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -210,7 +210,7 @@ class CPM_choco(SolverInterface):
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         # B) Found unsat
-        elif time_limit is None or self.cpm_status.runtime < time_limit: # proven unsat
+        elif time_limit is None or self.cpm_status.solve_time < time_limit: # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         # C) Timeout
         else:
@@ -276,17 +276,17 @@ class CPM_choco(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         if len(sols): # solutions found
             if (len(sols) == solution_limit): # matched the set limit (if given)
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            elif (time_limit is None) or (self.cpm_status.runtime < time_limit): # found all solutions
+            elif (time_limit is None) or (self.cpm_status.solve_time < time_limit): # found all solutions
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else: # reached timeout
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else: # no solutions found
-            if (time_limit is None) or (self.cpm_status.runtime < time_limit): # unsat problem
+            if (time_limit is None) or (self.cpm_status.solve_time < time_limit): # unsat problem
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             else: # timeout
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
@@ -569,12 +569,10 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {"alldifferent", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
-                elif cpm_expr.name == 'alldifferent_except0':
-                    return self.chc_model.all_different_except_0(chc_args)
                 elif cpm_expr.name == 'allequal':
                     return self.chc_model.all_equal(chc_args)
                 elif cpm_expr.name == "circuit":
@@ -598,6 +596,10 @@ class CPM_choco(SolverInterface):
 #                    return self.chc_model.lex_chain_less(chc_args)
 
             # but not all
+            elif cpm_expr.name == 'alldifferent_except_0':
+                assert (len(cpm_expr.args) == 2) # args = [array, [0]]
+                assert (cpm_expr.args[1] == [0])
+                return self.chc_model.all_different_except_0(self._to_vars(cpm_expr.args[0]))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
