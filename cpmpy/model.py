@@ -32,7 +32,7 @@ import time
 from typing import Callable, Literal, Optional
 
 from .exceptions import NotSupportedError
-from .expressions.core import Expression, NestedBoolExprLike
+from .expressions.core import Expression, NestedBoolExprLike, Operator
 from .expressions.python_builtins import all as cpm_all
 from .expressions.utils import is_any_list, flatlist
 from .solvers.utils import SolverLookup
@@ -125,9 +125,10 @@ class Model(object):
         Context manager that attaches a human-readable description to constraints added inside the block.
 
         If a single constraint is added, the description is set on that constraint.
+        If that constraint already has a description, it is kept and wrapped in a conjunction that carries the new description.
         If several constraints are added, they are wrapped in a conjunction (``and``) and the description is set on that conjunction.
 
-        Nested ``description()`` blocks on the same model are not supported.
+        Nested ``description()`` blocks on the same model each keep their own description. An inner block stays a child of the outer conjunction.
 
         Arguments:
             txt (str): description text
@@ -143,9 +144,11 @@ class Model(object):
                 with m.description("at most three items"):
                     m += sum(x) <= 3
 
-                with m.description("first item implies the next two"):
-                    m += x[0].implies(x[1])
-                    m += x[0].implies(x[2])
+                with m.description("packing rules"):
+                    m += sum(x) <= 3
+                    with m.description("first item implies the next two"):
+                        m += x[0].implies(x[1])
+                        m += x[0].implies(x[2])
         """
         return _DescriptionContext(self, txt, override_print, full_print) 
 
@@ -389,8 +392,6 @@ class _DescriptionContext:
 
     def __enter__(self) -> "_DescriptionContext":
         self._prev_add = self.model.add
-        if getattr(self._prev_add, "__func__", None) is not Model.add:
-            raise RuntimeError("Cannot nest model.description() context managers")
         setattr(self.model, "add", self.add)  # constraints added to the model are now buffered here
         return self
 
@@ -409,6 +410,9 @@ class _DescriptionContext:
             return False
         if len(cons) == 1:
             wrapped = cons[0]
+            # avoid merging this description with a nested one
+            if isinstance(wrapped, Expression) and wrapped._description is not None:
+                wrapped = Operator("and", [wrapped])
         else:
             wrapped = cpm_all(cons)
         if isinstance(wrapped, Expression):
