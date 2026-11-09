@@ -802,7 +802,8 @@ class Operator(Expression):
                     l = len(a.args)
                     arg_list[i:i+1] = a.args
                     i += l
-                i += 1
+                else:
+                    i += 1
 
         super().__init__(name, tuple(arg_list))
 
