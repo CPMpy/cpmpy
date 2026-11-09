@@ -43,7 +43,7 @@ class SolverInterface(object):
 
     supported_global_constraints: frozenset[str] = frozenset()  # global constraints supported by the solver (e.g., AllDifferent...)
     supported_reified_global_constraints: frozenset[str] = frozenset()  # global constraints supported in reified context
-    supported_half_reified_global_constraints: frozenset[str] = frozenset()  # global constraints supported only as toplevel `BE -> Global`
+    supported_half_reified_global_constraints: frozenset[str] = frozenset()  # global constraints supported as toplevel `BE -> Global`, superset of the reified ones
 
     # REQUIRED functions:
     @staticmethod

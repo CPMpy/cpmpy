@@ -184,13 +184,17 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
                     a0 = expr.args[0]
                     newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s], csemap=csemap, do_simplify=False))
                     continue
-                # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
+                # 2) if rhs is a global, make lhs a var instead of reifying the global :: BV->global, BV==a0
+                elif isinstance(expr.args[1], cp.expressions.globalconstraints.GlobalConstraint):
+                    lhs,lcons = get_or_make_var(expr.args[0], csemap=csemap)
+                    rhs,rcons = normalized_boolexpr(expr.args[1], csemap=csemap)
+                # 3) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
                 elif expr.args[0].name == 'or':
                     a0s = expr.args[0].args
                     a1 = expr.args[1]
                     newlist.extend(flatten_constraint([recurse_negation(a1).implies(recurse_negation(a0)) for a0 in a0s], csemap=csemap, do_simplify=False))
                     continue
-                # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
+                # 3b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
                 elif expr.args[0].name == '->':
                     a01,a02 = expr.args[0].args
                     a1 = expr.args[1]

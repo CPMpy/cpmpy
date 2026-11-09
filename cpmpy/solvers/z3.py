@@ -81,6 +81,7 @@ class CPM_z3(SolverInterface):
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mul", "mod"})
     supported_reified_global_constraints = supported_global_constraints
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
     @staticmethod
     def supported():
@@ -382,6 +383,7 @@ class CPM_z3(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 
