@@ -79,7 +79,7 @@ from ..expressions.core import Comparison, Expression, ListLike, Operator, BoolV
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, InDomain, Regular, Circuit, ShortTable
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_boolexpr, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import IntVarEnc, _encode_int_var
 
 
@@ -664,7 +664,8 @@ def get_linear_positive_decompositions():
 def linearize_reified_variables(constraints:list[Expression], 
                                 min_values:int=3,
                                 csemap:Optional[CSEMap]=None,
-                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
+                                ivarmap:Optional[dict[str, IntVarEnc]] = None,
+                                channel:bool = False) -> list[Expression]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and
     reified (BV <-> (x >= val)) implications with order encoding when a variable
@@ -674,6 +675,8 @@ def linearize_reified_variables(constraints:list[Expression],
     If ivarmap is None, both consistency constraints and channeling constraints are posted.
     If ivarmap is not None, the encoding is added to ivarmap and only (the domain constraint) is posted; 
     the solver can then choose to eliminate the variables, or post the channeling constraints itself anyway.
+    If channel is True, the channeling constraints of newly encoded variables are posted too, so a persistent
+    ivarmap can be used to post each encoding only once over multiple calls.
 
     If both BV <-> (x == val) and BV <-> (x >= val) are present, choose the
     encoding type that occurs most often for that variable. Ties prefer the
@@ -691,7 +694,14 @@ def linearize_reified_variables(constraints:list[Expression],
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
 
-    var_vals, var_bounds = csemap.get_reified_varvalbounds()
+    # only the variables reified in these constraints
+    reified_vars: dict[str, _IntVarImpl] = {}  # name -> var
+    for con in constraints:
+        if con.name == "==" and isinstance(con.args[1], _BoolVarImpl):
+            lhs = con.args[0]
+            if getattr(lhs, "name", None) in ("==", ">=") and isinstance(lhs.args[0], _IntVarImpl) and is_num(lhs.args[1]):
+                reified_vars.setdefault(lhs.args[0].name, lhs.args[0])
+    var_vals, var_bounds = csemap.get_reified_varvalbounds(reified_vars.values())
 
     # decide the encoding to use for each variable
     var_encodings = dict() # var -> (encoding, vals)
@@ -723,7 +733,7 @@ def linearize_reified_variables(constraints:list[Expression],
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
-        if ivarmap is None:
+        if ivarmap is None or channel:
             # also post the var=wsum mapping
             terms, k = enc.encode_term()
             # var == wsum + k :: var - wsum == k
