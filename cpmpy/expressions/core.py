@@ -797,12 +797,13 @@ class Operator(Expression):
             i = 0 # length can change
             while i < len(arg_list):
                 a = arg_list[i]
-                if isinstance(a, Operator) and a.name == name:
+                if isinstance(a, Operator) and a.name == name and a._description is None:
                     # merge args in at this position
                     l = len(a.args)
                     arg_list[i:i+1] = a.args
                     i += l
-                i += 1
+                else:
+                    i += 1
 
         super().__init__(name, tuple(arg_list))
 

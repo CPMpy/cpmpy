@@ -726,6 +726,43 @@ class TestBounds:
         assert repr(cons) == "(a) or (b)"
         assert str(cons) == "either a or b should be true, but not both -- (a) or (b)"
 
+        # variables: description must not replace the unique name
+        x = cp.boolvar(name="x")
+        x.set_description("a flag")
+        assert x.name == "x"
+        assert repr(x) == "x"
+        assert str(x) == "a flag"
+
+        y = cp.intvar(0, 5, name="y")
+        y.set_description("an integer", full_print=True)
+        assert y.name == "y"
+        assert repr(y) == "y"
+        assert str(y) == "an integer -- y"
+
+    def test_nested_and_respects_description(self):
+        # undescribed conjunctions are flattened, including ones that used to be skipped
+        a, b, c, d = cp.boolvar(shape=4, name=tuple("abcd"))
+        assert repr((a & b) & (c & d)) == "and(a, b, c, d)"
+
+        # a described child stays put, so only the undescribed sibling is merged
+        x = cp.intvar(1, 10, name=tuple("abc"), shape=3)
+        leaf1 = (x[0] >= 3) & (x[0] <= 5)
+        leaf2 = (x[1] >= 3) & (x[1] <= 5)
+        leaf2.set_description("leaf2")
+        cons = leaf1 & leaf2
+        assert repr(cons) == "and(a >= 3, a <= 5, (b >= 3) and (b <= 5))"
+        assert cons.args[2] is leaf2
+        assert leaf2._description.text == "leaf2"
+
+        # both children described: neither is merged
+        leaf1 = (x[0] >= 3) & (x[0] <= 5)
+        leaf2 = (x[1] >= 3) & (x[1] <= 5)
+        leaf1.set_description("leaf1")
+        leaf2.set_description("leaf2")
+        cons = leaf1 & leaf2
+        assert repr(cons) == "(leaf1) and (leaf2)"
+        assert cons.args == (leaf1, leaf2)
+
 
     def test_dtype(self):
 
