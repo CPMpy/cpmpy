@@ -220,15 +220,68 @@ class TestModelDescription:
         assert b._description is not None
 
     def test_nested_same_model(self):
-        x = cp.boolvar(shape=5)
+        x, y = cp.intvar(1, 10, shape=2, name=tuple("xy"))
         m = cp.Model()
-        with m.description("packing rules"):
-            m += cp.sum(x) <= 3
-            with pytest.raises(RuntimeError, match="Cannot nest"):
-                with m.description("first item implies the next two"):
-                    m += x[0].implies(x[1])
+        with m.description("foo"):
+            m += x + y <= 10
+            with m.description("bar"):
+                m += x == 4
+                m += y != 1
         assert len(m.constraints) == 1
-        assert str(m.constraints[0]) == "packing rules"
+        foo = m.constraints[0]
+        assert str(foo) == "foo"
+        assert foo.name == "and"
+        assert foo.args[0]._description is None
+        bar = foo.args[1]
+        assert str(bar) == "bar"
+        assert bar.name == "and"
+        assert len(bar.args) == 2
+        assert bar.args[0].name == "=="
+        assert bar.args[1].name == "!="
+        assert m.solve()
+
+    def test_nested_block_is_only_child(self):
+        a, b = cp.boolvar(name="a"), cp.boolvar(name="b")
+        m = cp.Model()
+        with m.description("foo"):
+            with m.description("bar"):
+                m += a
+                m += b
+        assert len(m.constraints) == 1
+        foo = m.constraints[0]
+        assert str(foo) == "foo"
+        assert foo.args[0].args == (a, b)
+        assert str(foo.args[0]) == "bar"
+        assert a._description is None
+        assert b._description is None
+
+    def test_nested_single_constraint(self):
+        a = cp.boolvar(name="a")
+        m = cp.Model()
+        with m.description("foo"):
+            with m.description("bar"):
+                m += a
+        assert len(m.constraints) == 1
+        foo = m.constraints[0]
+        assert str(foo) == "foo"
+        assert foo.args == (a,)
+        assert str(a) == "bar"
+        assert a.name == "a"
+
+    def test_nested_exception_drops_buffer(self):
+        m = cp.Model()
+        a = cp.boolvar(name="a")
+        try:
+            with m.description("outer"):
+                m += a
+                with m.description("inner"):
+                    m += a == 1
+                    raise ValueError("boom")
+        except ValueError:
+            pass
+        assert len(m.constraints) == 0
+        m += a
+        assert m.constraints[0] is a
 
     def test_nested_different_models(self):
         m1, m2 = cp.Model(), cp.Model()
@@ -243,6 +296,51 @@ class TestModelDescription:
         assert len(m2.constraints) == 1
         assert str(m2.constraints[0]) == "on m2"
         assert b.name == "b"
+
+    def test_plain_ands_are_merged(self):
+        a, b, c, d = cp.boolvar(shape=4, name=tuple("abcd"))
+        m = cp.Model()
+        with m.description("group"):
+            m += a & b
+            m += c & d
+        assert len(m.constraints) == 1
+        wrapped = m.constraints[0]
+        assert str(wrapped) == "group"
+        assert repr(wrapped) == "and(a, b, c, d)"
+
+    def test_described_children_are_kept(self):
+        x = cp.intvar(1, 10, name=tuple("abc"), shape=3)
+        m = cp.Model()
+        leaf1 = (x[0] >= 3) & (x[0] <= 5)
+        leaf2 = (x[1] >= 3) & (x[1] <= 5)
+        leaf1.set_description("leaf1")
+        leaf2.set_description("leaf2")
+        with m.description("cons"):
+            m += leaf1
+            m += leaf2
+        assert len(m.constraints) == 1
+        wrapped = m.constraints[0]
+        assert str(wrapped) == "cons"
+        assert repr(wrapped) == "(leaf1) and (leaf2)"
+        assert wrapped.args == (leaf1, leaf2)
+        assert leaf1._description.text == "leaf1"
+        assert leaf2._description.text == "leaf2"
+
+    def test_only_described_and_is_kept(self):
+        x = cp.intvar(1, 10, name=tuple("abc"), shape=3)
+        m = cp.Model()
+        leaf1 = (x[0] >= 3) & (x[0] <= 5)
+        leaf2 = (x[1] >= 3) & (x[1] <= 5)
+        leaf2.set_description("leaf2")
+        with m.description("cons"):
+            m += leaf1
+            m += leaf2
+        assert len(m.constraints) == 1
+        wrapped = m.constraints[0]
+        assert str(wrapped) == "cons"
+        assert repr(wrapped) == "and(a >= 3, a <= 5, (b >= 3) and (b <= 5))"
+        assert wrapped.args[2] is leaf2
+        assert leaf2._description.text == "leaf2"
 
 
   
