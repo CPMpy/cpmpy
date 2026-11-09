@@ -667,7 +667,7 @@ class CPM_ortools(SolverInterface):
                 self.add(task_cons)
 
                 if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
-                    # OR-Tools has strict semantics for NoOverlap, post as Cumulative instead
+                    # OR-Tools has strict semantics, see 'no_overlap'
                     return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
                 return self.ort_model.AddNoOverlap(tasks)
 
