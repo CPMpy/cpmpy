@@ -2422,6 +2422,8 @@ class NoOverlapOptional(GlobalConstraint):
             start, duration, end, is_present = self.args
             cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
 
+        cons += [implies(p, d >= 0) for d, p in zip(duration, is_present)]  # enforce non-negative durations when present
+
         for (s1, d1, e1, p1), (s2, d2, e2, p2) in all_pairs(zip(start, duration, end, is_present)):
             cons += [implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))]
         return cons, []

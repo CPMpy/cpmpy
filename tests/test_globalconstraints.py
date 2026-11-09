@@ -1924,6 +1924,24 @@ class TestGlobal:
         assert cons.value() is True
         assert cp.Model(cons, start == [1,0,2], dur == [0,5,3], is_present == [True, True, True]).solve(solver=solver) is False
 
+    def test_no_overlap_optional_negative_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+        if solver == "pumpkin":
+            pytest.skip("Pumpkin does not support variables as duration")
+
+        # a present task can not have a negative duration, an absent task can
+        start = cp.intvar(0,5, shape=2, name="start")
+        dur = cp.intvar(-2,2, shape=2, name="dur")
+        end = cp.intvar(-2,7, shape=2, name="end")
+        is_present = cp.boolvar(shape=2, name="is_present")
+        for cons in [cp.NoOverlapOptional(start, dur, is_present=is_present), cp.NoOverlapOptional(start, dur, end, is_present)]:
+            for c in [cons, cp.all(cons.decompose()[0])]:
+                assert not cp.Model(c, dur[0] == -1, is_present[0]).solve(solver=solver)
+                assert cp.Model(c, dur[0] == -1, ~is_present[0]).solve(solver=solver)
+
 
 
 class TestBounds:
