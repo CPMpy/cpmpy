@@ -400,6 +400,12 @@ class TestSolvers:
         # modulo
         assert  cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc")
 
+        # nested arguments of div, mod and pow
+        y = cp.intvar(0, 5, shape=2)
+        assert  cp.Model([ y[0] // (y[1] + 1) == 2, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) % (y[1] + 1) == 0, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) ** 2 == 36, y == [5, 1] ]).solve(solver="minizinc")
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="MiniZinc not installed")
@@ -1334,6 +1340,9 @@ class TestSupportedSolvers:
 @pytest.mark.generate_constraints.with_args(numexprs)
 @pytest.mark.flaky(reruns=3)
 def test_objective_numexprs(solver, constraint):
+
+    if constraint.name.startswith("reservoir") and solver == "z3":
+        pytest.skip("Decomposition of reservoir triggers upstream z3 bug: https://github.com/Z3Prover/z3/issues/11024")
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     lb, ub = constraint.get_bounds()
