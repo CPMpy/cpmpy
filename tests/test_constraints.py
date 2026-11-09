@@ -22,7 +22,7 @@ ALL_SOLS = False # test whether all solutions returned by the solver satisfy the
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse","Circuit", "CircuitArcs",
     "Table", 'NegativeTable', "ShortTable", "Regular", "MDD",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "Reservoir", "ReservoirOptional", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
@@ -164,6 +164,10 @@ def global_constraints(solver):
             continue
         elif name == "Inverse":
             yield cp.Inverse(NUM_ARGS, [1,0,2])
+        elif name == "CircuitArcs":
+            b = cp.boolvar(shape=(3, 3), name="arc")
+            arcs = [(i, j, b[i, j]) for i in range(3) for j in range(3) if i != j]
+            yield cp.CircuitArcs(arcs)
         elif name == "Table":
             yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
             yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
