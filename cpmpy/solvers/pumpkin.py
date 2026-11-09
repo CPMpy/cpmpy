@@ -46,10 +46,10 @@ from packaging.version import Version
 
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
 from ..expressions.globalconstraints import Cumulative, GlobalConstraint, NoOverlap
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
-from ..expressions.utils import is_num, is_int, is_any_list, get_bounds
+from ..expressions.utils import is_num, is_int, is_any_list, get_bounds, materialize_generators
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
@@ -624,7 +624,7 @@ class CPM_pumpkin(SolverInterface):
             raise ValueError("Unexpected constraint:", cpm_expr)
 
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pumpkin":
+    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_pumpkin":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -638,11 +638,14 @@ class CPM_pumpkin(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
 
             Returns:
                 self
         """
+        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
+        cpm_expr = materialize_generators(cpm_expr)
+
         if self.pum_solver.is_inconsistent():
             return self # cannot post any more constraints once inconsistency is reached
 
