@@ -93,17 +93,22 @@ class CPM_hermax(SolverInterface):
 
     # CP-level globals Hermax encodes natively
     supported_global_constraints = frozenset({
-        "alldifferent", "cumulative", "increasing", "lex_less", "table", "negative_table", "min", "max", "element",
+        "alldifferent", "alldifferent_except_0", "alldifferent_except_n", "allequal_except_n",
+        "cumulative", "increasing", "lex_less", "lex_lesseq", "precedence",
+        "table", "negative_table", "regular", "mdd",
+        "min", "max", "element", "abs", "mul",
     })
-    supported_reified_global_constraints = frozenset({"alldifferent", "table", "negative_table"})
+    supported_reified_global_constraints = frozenset({
+        "alldifferent", "lex_less", "lex_lesseq", "cumulative", "table", "negative_table",
+    })
 
     @staticmethod
     def supported():
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.3.0"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.3.0 "
+            if her_version is None or Version(her_version) < Version("1.3.2"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.3.2 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -173,9 +178,9 @@ class CPM_hermax(SolverInterface):
         """
         if not self.supported():
             her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.3.0"):
+            if her_version is not None and Version(her_version) < Version("1.3.2"):
                 raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.3.0 "
+                    f"CPM_hermax: CPMpy requires Hermax version >=1.3.2 "
                     f"but you have version {her_version}"
                 )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
@@ -549,6 +554,11 @@ class CPM_hermax(SolverInterface):
                     return self.her_model.min(self._int_vector(lhs.args)) == self._int_var(rhs)
                 if lhs.name == "max":
                     return self.her_model.max(self._int_vector(lhs.args)) == self._int_var(rhs)
+                if lhs.name == "abs":
+                    return self.her_model.abs(self._int_var(lhs.args[0])) == self._int_var(rhs)
+                if lhs.name == "mul":
+                    x, y = lhs.args
+                    return self.her_model.product(self._int_var(x), self._int_var(y)) == self._int_var(rhs)
                 if lhs.name == "element":
                     arr, idx = lhs.args
                     if is_num(idx):
@@ -596,6 +606,25 @@ class CPM_hermax(SolverInterface):
             if cpm_con.name == "lex_less":
                 x, y = cpm_con.args
                 return self._int_vector(x).lexicographic_less_than(self._int_vector(y))
+            if cpm_con.name == "lex_lesseq":
+                x, y = cpm_con.args
+                return self._int_vector(x).lexicographic_less_or_equal(self._int_vector(y))
+            if cpm_con.name in ("alldifferent_except_0", "alldifferent_except_n"):
+                arr, excluded = cpm_con.args
+                return self.her_model.all_different_except(self._int_vars(arr), [int(v) for v in excluded])
+            if cpm_con.name == "allequal_except_n":
+                arr, excluded = cpm_con.args
+                return self.her_model.all_equal_except(self._int_vars(arr), [int(v) for v in excluded])
+            if cpm_con.name == "precedence":
+                arr, values = cpm_con.args
+                return self.her_model.precedence(self._int_vars(arr), [int(v) for v in values])
+            if cpm_con.name == "regular":
+                arr, transitions, start, accepting = cpm_con.args
+                return self.her_model.regular(self._int_vars(arr), [(a, int(v), b) for a, v, b in transitions],
+                                              start, list(accepting))
+            if cpm_con.name == "mdd":
+                transitions = [(a, int(v), b) for a, arcs in cpm_con.mapping.items() for v, b in arcs.items()]
+                return self.her_model.mdd(self._int_vars(cpm_con.args[0]), transitions, cpm_con.root_node)
             if cpm_con.name == "table":
                 return self._hermax_table(cpm_con)
             if cpm_con.name == "negative_table":
@@ -603,10 +632,9 @@ class CPM_hermax(SolverInterface):
             if cpm_con.name == "cumulative":
                 if len(cpm_con.args) == 4:
                     start, dur, demand, cap = cpm_con.args
+                    end = None
                 else:
                     start, dur, end, demand, cap = cpm_con.args
-                    for s, d, e in zip(start, dur, end):
-                        self.add(s + d == e)
 
                 if not all(is_num(d) for d in dur):
                     raise NotSupportedError("Hermax Cumulative only supports fixed durations")
@@ -616,12 +644,17 @@ class CPM_hermax(SolverInterface):
                     raise NotSupportedError("Hermax Cumulative only supports fixed capacity")
 
                 hm_starts = [self._int_var(s) for s in start]
-                return self.her_model.cumulative(
+                hm_con = self.her_model.cumulative(
                     hm_starts,
                     [int(d) for d in dur],
                     [int(h) for h in demand],
                     int(cap),
                 )
+                # conjoin the end constraints so the whole group can be reified
+                if end is not None:
+                    for s, d, e in zip(hm_starts, dur, end):
+                        hm_con = hm_con & (self.her_model.sum_var([s, self._int_var(d)]) == self._int_var(e))
+                return hm_con
             raise NotImplementedError(f"Hermax: unsupported global {cpm_con}")
 
         raise NotImplementedError(f"Hermax: unexpected constraint {cpm_con}")
@@ -653,7 +686,7 @@ class CPM_hermax(SolverInterface):
         """
         arr, table = cpm_con.args
         allowed = [tuple(int(v) for v in row) for row in table]
-        return self.her_model.table([self._int_var(v) for v in arr], allowed=allowed)
+        return self.her_model.table(self._int_vars(arr), allowed=allowed)
 
     def _hermax_false(self):
         """
@@ -664,9 +697,15 @@ class CPM_hermax(SolverInterface):
             self.her_model &= ~self._false_lit
         return self._false_lit
 
+    def _int_vars(self, cpm_args):
+        """
+            Returns a list of Hermax IntVars for a list of CPMpy variables and/or constants.
+        """
+        return [self._int_var(a) for a in cpm_args]
+
     def _int_vector(self, cpm_args):
         """
             Returns a Hermax IntVector for a list of CPMpy variables and/or constants.
         """
-        return self.her_model.vector([self._int_var(a) for a in cpm_args])
+        return self.her_model.vector(self._int_vars(cpm_args))
 
