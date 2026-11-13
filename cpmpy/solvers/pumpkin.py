@@ -75,7 +75,8 @@ class CPM_pumpkin(SolverInterface):
     supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
                                               "min", "max", "abs", "mul", "div", "element"})
     supported_reified_global_constraints = frozenset()
-    supported_half_reified_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain"})
+    supported_half_reified_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
+                                                           "mul", "div", "abs", "min", "max", "element"})
 
     @staticmethod
     def supported():
@@ -385,7 +386,7 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(cpm_cons,
-                                 supported=self.supported_half_reified_global_constraints | {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max", "element"},
+                                 supported=self.supported_half_reified_global_constraints | {"or", "sum", "wsum", "sub"},
                                  csemap=self._csemap)
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant

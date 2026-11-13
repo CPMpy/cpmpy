@@ -601,7 +601,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
             supported: set of supported global constraints and global functions
             supported_reified: set of supported reified global constraints
             csemap: map of expressions to an auxiliary variable
-            supported_half_reified: set of global constraints supported when half-reified at the toplevel (``BE -> Global``), defaults to `supported_reified`
+            supported_half_reified: set of global constraints supported when half-reified at the toplevel (``BE -> Global``), in addition to `supported_reified`
 
         returns:
             list of expressions
