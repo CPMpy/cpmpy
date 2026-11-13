@@ -2367,7 +2367,6 @@ class NoOverlapOptional(GlobalConstraint):
 
         The constraint enforces that all present tasks are scheduled without overlapping, and for each present task, the constraint enforces that:
         - duration >= 0
-        - demand >= 0
         - start + duration == end
 
         if the task is not present, it does not enforce any of the above.
@@ -2413,17 +2412,19 @@ class NoOverlapOptional(GlobalConstraint):
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
-        cons = []
+        cons: list[Expression] = []
 
         if len(self.args) == 3:
             start, duration, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
             start, duration, end, is_present = self.args
-            cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
+            cons.extend(implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start)))
+
+        cons.extend(implies(p, d >= 0) for d, p in zip(duration, is_present))  # enforce non-negative durations when present
 
         for (s1, d1, e1, p1), (s2, d2, e2, p2) in all_pairs(zip(start, duration, end, is_present)):
-            cons += [implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))]
+            cons.append(implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1])))
         return cons, []
 
     def value(self) -> Optional[bool]:
