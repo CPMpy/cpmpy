@@ -2412,7 +2412,7 @@ class NoOverlapOptional(GlobalConstraint):
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
-        cons = []
+        cons: list[Expression] = []
 
         if len(self.args) == 3:
             start, duration, is_present = self.args
