@@ -247,7 +247,7 @@ def global_constraints(solver):
             dur = [1,4,3]
             yield cp.NoOverlap(s, dur, e)
             yield cp.NoOverlap(s, dur)
-            if solver != "pumpkin": # only supports with fixed durations
+            if solver not in ("pumpkin", "hermax"): # only supports with fixed durations
                 yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
                 yield cp.NoOverlap(s, cp.intvar(1, 5, shape=3))
             continue

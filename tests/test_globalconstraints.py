@@ -1856,8 +1856,8 @@ class TestGlobal:
             pytest.skip("pysdd does not support integer variables")
         if solver == "rc2":
             pytest.skip("rc2 only supports optimization")
-        if solver == "pumpkin":
-            pytest.skip("Pumpkin does not support variables as duration")
+        if solver in ("pumpkin", "hermax"):
+            pytest.skip(f"{solver} does not support variables as duration")
 
         # same, but now 0 is only in the domain of the duration variables
         start = cp.intvar(0,5, shape=3, name="start")

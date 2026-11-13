@@ -48,7 +48,7 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, Cumulative
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.utils import is_num, is_int, is_boolexpr
 from ..transformations.get_variables import get_variables
@@ -97,12 +97,12 @@ class CPM_hermax(SolverInterface):
     # CP-level globals Hermax encodes natively
     supported_global_constraints = frozenset({
         "alldifferent", "alldifferent_except_0", "alldifferent_except_n", "allequal_except_n",
-        "cumulative", "increasing", "lex_less", "lex_lesseq", "precedence",
+        "cumulative", "no_overlap", "increasing", "lex_less", "lex_lesseq", "precedence",
         "table", "negative_table", "regular", "mdd",
         "min", "max", "element", "abs", "mul",
     })
     supported_reified_global_constraints = frozenset({
-        "alldifferent", "lex_less", "lex_lesseq", "cumulative", "table", "negative_table",
+        "alldifferent", "lex_less", "lex_lesseq", "cumulative", "no_overlap", "table", "negative_table",
     })
 
     @staticmethod
@@ -622,6 +622,13 @@ class CPM_hermax(SolverInterface):
                 return self._hermax_table(cpm_con)
             if cpm_con.name == "negative_table":
                 return self._hermax_table(cpm_con).implies(self._hermax_false())
+            if cpm_con.name == "no_overlap":  # post as Cumulative with capacity 1
+                if len(cpm_con.args) == 2:
+                    start, dur = cpm_con.args
+                    return self._hermax_expr(Cumulative(start, dur, demand=1, capacity=1))
+                else:
+                    start, dur, end = cpm_con.args
+                    return self._hermax_expr(Cumulative(start, dur, end, demand=1, capacity=1))
             if cpm_con.name == "cumulative":
                 if len(cpm_con.args) == 4:
                     start, dur, demand, cap = cpm_con.args
@@ -635,6 +642,8 @@ class CPM_hermax(SolverInterface):
                     raise NotSupportedError("Hermax Cumulative only supports fixed demands")
                 if not is_num(cap):
                     raise NotSupportedError("Hermax Cumulative only supports fixed capacity")
+                if any(d < 0 for d in dur) or any(h < 0 for h in demand):
+                    return False  # negative durations or demands are infeasible
 
                 hm_starts = [self._int_var(s) for s in start]
                 hm_con = self.her_model.cumulative(
