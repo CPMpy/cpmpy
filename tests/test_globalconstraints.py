@@ -1275,6 +1275,23 @@ class TestGlobal:
         assert cp.Model(cons.decompose(how="task"), active == True).solve(solver=solver)
         assert cp.Model(cons.decompose(how="time"), active == True).solve(solver=solver)
 
+    def test_cumulative_optional_negative_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+
+        # a present task can not have a negative duration, an absent task can
+        start = cp.intvar(0,5, shape=2, name="start")
+        dur = cp.intvar(-2,2, shape=2, name="dur")
+        end = cp.intvar(-2,7, shape=2, name="end")
+        is_present = cp.boolvar(shape=2, name="is_present")
+        for cons in [cp.CumulativeOptional(start, dur, demand=1, capacity=1, is_present=is_present),
+                     cp.CumulativeOptional(start, dur, end, demand=1, capacity=1, is_present=is_present)]:
+            for c in [cons, cp.all(cons.decompose(how="task")[0]), cp.all(cons.decompose(how="time")[0])]:
+                assert not cp.Model(c, dur[0] == -1, is_present[0]).solve(solver=solver)
+                assert cp.Model(c, dur[0] == -1, ~is_present[0]).solve(solver=solver)
+
     def test_reservoir_value(self):
         start = cp.intvar(0, 5, shape=3, name="start")
         cons = cp.Reservoir(start, [2, -1, -3], -3, 2)
@@ -1929,8 +1946,6 @@ class TestGlobal:
             pytest.skip("pysdd does not support integer variables")
         if solver == "rc2":
             pytest.skip("rc2 only supports optimization")
-        if solver == "pumpkin":
-            pytest.skip("Pumpkin does not support variables as duration")
 
         # a present task can not have a negative duration, an absent task can
         start = cp.intvar(0,5, shape=2, name="start")
