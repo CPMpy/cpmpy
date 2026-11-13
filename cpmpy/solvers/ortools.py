@@ -1017,8 +1017,18 @@ try:
                 # might use any, so populate all (user) variables with their values
                 self._cpm_vars = solver.user_vars
 
+            # OR-Tools enumerates all variables, skip solutions that only differ in auxiliary variables
+            self._ort_user_vars = solver.solver_vars(list(solver.user_vars))
+            has_aux_vars = len(solver.ort_model.Proto().variables) > len(self._ort_user_vars)
+            self._seen = set() if has_aux_vars else None
+
         def on_solution_callback(self):
             """Called on each new solution."""
+            if self._seen is not None:
+                sol = tuple(self.Value(v) for v in self._ort_user_vars)
+                if sol in self._seen:
+                    return
+                self._seen.add(sol)
             super().on_solution_callback()
             if len(self._cpm_vars):
                 # populate values before printing
