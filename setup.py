@@ -20,7 +20,7 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 
 
 solver_dependencies = {
-    "ortools": ["ortools>=9.12"],
+    "ortools": ["ortools>=9.15"],
     "z3": ["z3-solver>=5.0.0"],
     "choco": ["pychoco>=0.2.1,<0.3.0"],  # 0.3.0 breaks CPMpy tests
     "exact": ["exact>=2.1.0"], # older versions (<2.2.1) are bugged on py3.13
@@ -69,7 +69,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'ortools>=9.3.10497,!=9.9.*,!=9.10.*,!=9.11.*',
+        'ortools>=9.15',
         'numpy>=1.5',
         'setuptools',
         'packaging', # to check solver versions

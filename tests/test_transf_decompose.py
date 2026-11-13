@@ -4,6 +4,7 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import flatlist
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
 from cpmpy.transformations.linearize import decompose_linear
 
@@ -387,3 +388,64 @@ class TestTransfDecomp:
         assert str(decomposed) == "[(boolval(True)) or (boolval(True))]"
 
         assert cp.Model(cons).solve(solver="ortools")
+
+    def test_decompose_half_reified(self):
+        ivs = [cp.intvar(1, 9, name=n) for n in "xyz"]
+        bv = cp.boolvar(name="bv")
+        alldiff = cp.AllDifferent(ivs)
+        supported = {"alldifferent"}
+        half_reified = {"alldifferent"}
+
+        # half-reified at the toplevel: kept
+        cons = [bv.implies(alldiff)]
+        assert str(decompose_in_tree(cons, supported=supported, supported_half_reified=half_reified)) == str(cons)
+        cons = [(~bv).implies(alldiff)]
+        assert str(decompose_in_tree(cons, supported=supported, supported_half_reified=half_reified)) == str(cons)
+
+        # full reification, negation and other nested contexts: still decomposed
+        for cons in [[bv == alldiff], [~alldiff], [alldiff | bv], [alldiff.implies(bv)]]:
+            assert str(decompose_in_tree(cons, supported=supported, supported_half_reified=half_reified)) == \
+                   str(decompose_in_tree(cons, supported=supported))
+
+        # supported_reified globals are also supported half-reified
+        cons = [bv == alldiff]
+        assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified)) == str(cons)
+        cons = [cp.AllEqual(ivs[:2]).implies(alldiff)]
+        assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified)) == \
+               "[((x) == (y)) -> (alldifferent(x,y,z))]"
+
+    def test_decompose_half_reified_args(self):
+        x, y, z = [cp.intvar(1, 9, name=n) for n in "xyz"]
+        bv = cp.boolvar(name="bv")
+
+        # unsupported globals in the condition or in the arguments are decomposed, the half-reified global is kept
+        cons = [bv.implies(cp.AllDifferent([cp.max([x, y]), y, z]))]
+        decomposed = decompose_in_tree(cons, supported={"alldifferent"}, supported_half_reified={"alldifferent"})
+        assert str(decomposed[0]) == "(bv) -> (alldifferent(IV0,y,z))"
+        assert all(not isinstance(e, GlobalFunction) for c in decomposed for e in flatlist(c.args))
+
+        # a condition that is not a Boolean variable is decomposed in place, flattening then replaces it by a variable
+        cons = [cp.AllEqual([x, y]).implies(cp.AllDifferent([x, y, z]))]
+        decomposed = decompose_in_tree(cons, supported={"alldifferent"}, supported_half_reified={"alldifferent"})
+        assert str(decomposed) == "[((x) == (y)) -> (alldifferent(x,y,z))]"
+        assert str(flatten_constraint(decomposed)) == "[(BV0) -> (alldifferent(x,y,z)), ((x) == (y)) == (BV0)]"
+        cons = [(cp.AllEqual([x, y]) | bv).implies(cp.AllDifferent([x, y, z]))]
+        decomposed = decompose_in_tree(cons, supported={"alldifferent"}, supported_half_reified={"alldifferent"})
+        assert str(flatten_constraint(decomposed)) == "[(BV2) -> (alldifferent(x,y,z)), ((x) == (y)) == (BV1), ((BV1) or (bv)) == (BV2)]"
+
+        # also when the half-reified global is created by another decomposition
+        class MyHalfReifGlobal(GlobalConstraint):
+            def __init__(self, bv, args):
+                super().__init__("my_half_reif_global", (bv, args))
+
+            def decompose(self):
+                bv, args = self.args
+                return [bv.implies(cp.AllDifferent(args))], []
+
+        cons = [MyHalfReifGlobal(bv, [x, y, z])]
+        decomposed = decompose_in_tree(cons, supported={"alldifferent"}, supported_half_reified={"alldifferent"})
+        assert str(decomposed) == "[(bv) -> (alldifferent(x,y,z))]"
+
+        # and through decompose_linear
+        cons = [bv.implies(cp.AllDifferent([x, y, z]))]
+        assert str(decompose_linear(cons, supported={"alldifferent"}, supported_half_reified={"alldifferent"})) == str(cons)

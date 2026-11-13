@@ -76,6 +76,7 @@ class CPM_hexaly(SolverInterface):
     supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "pow", "element", "nvalue", "nvalue_except",  # no mod, CPMpy rounds towards zero
                                                    "alldifferent", "xor"}) 
     supported_reified_global_constraints = frozenset({"alldifferent", "xor"})
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
 
     @staticmethod
@@ -370,6 +371,7 @@ class CPM_hexaly(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 

@@ -75,6 +75,8 @@ class CPM_pumpkin(SolverInterface):
     supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
                                               "min", "max", "abs", "mul", "div", "element"})
     supported_reified_global_constraints = frozenset()
+    supported_half_reified_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
+                                                           "mul", "div", "abs", "min", "max", "element"})
 
     @staticmethod
     def supported():
@@ -378,12 +380,14 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints - self.disabled_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints - self.disabled_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints - self.disabled_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max"}
-        cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif, csemap=self._csemap) # reified element not supported yet
+        cpm_cons = reify_rewrite(cpm_cons,
+                                 supported=self.supported_half_reified_global_constraints | {"or", "sum", "wsum", "sub"},
+                                 csemap=self._csemap)
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons

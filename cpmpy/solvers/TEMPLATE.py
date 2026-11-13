@@ -82,9 +82,12 @@ class CPM_template(SolverInterface):
     # [GUIDELINE] list all supported global constraints and global functions
     #           (e.g., 'alldifferent', 'max', 'element', ...)
     supported_global_constraints = frozenset({'alldifferent', 'max', 'element', 'div'})
-    # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
-    #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
+    # [GUIDELINE] list all global constraints supported in (fully) reified context
+    #           (e.g., 'alldifferent' if your solver supports `b == AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
+    # [GUIDELINE] list all global constraints supported in half-reified context, in addition to the reified ones
+    #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
+    supported_half_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -414,6 +417,7 @@ class CPM_template(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification

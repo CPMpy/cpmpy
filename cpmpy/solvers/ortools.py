@@ -52,7 +52,7 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, BoolExprLike, ListLike
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
@@ -89,6 +89,9 @@ class CPM_ortools(SolverInterface):
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
+    supported_half_reified_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "regular",
+                                                           "reservoir", "reservoir_optional", "circuit", "inverse",
+                                                           "cumulative", "cumulative_optional", "no_overlap", "no_overlap_optional"})
 
     @staticmethod
     def supported():
@@ -461,9 +464,10 @@ class CPM_ortools(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons, supported=self.supported_half_reified_global_constraints | {'sum', 'wsum'}, csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # everything that can create
@@ -499,12 +503,7 @@ class CPM_ortools(SolverInterface):
         return self
     __add__ = add  # avoid redirect in superclass
 
-    # TODO: 'reifiable' is an artefact from the early days
-    # only 3 constraints support it (and,or,sum),
-    # we can just add reified support for those and not need `reifiable` or returning the constraint
-    # then we can remove _post_constraint and have its code inside the for loop of `add()`
-    # like for other solvers
-    def _post_constraint(self, cpm_expr, reifiable=False):
+    def _post_constraint(self, cpm_expr, condition=None):
         """
             Post a supported CPMpy constraint directly to the underlying solver's API
 
@@ -512,12 +511,12 @@ class CPM_ortools(SolverInterface):
             are applied in `transform()`.
 
             Returns the posted ortools 'Constraint', so that it can be used in reification
-            e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))
+            e.g. self._post_constraint(smth).onlyEnforceIf(self.solver_var(bvar))
 
         :param cpm_expr: CPMpy expression
         :type cpm_expr: Expression
 
-        :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
+        :param condition: Boolean variable that enforces `cpm_expr`
         """
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
@@ -536,8 +535,8 @@ class CPM_ortools(SolverInterface):
                 else:
                     # bv -> boolexpr
                     # the `reify_rewrite()` transformation ensures that only
-                    # the natively reifiable 'and', 'or' and 'sum' remain here
-                    return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
+                    # the natively reifiable 'and', 'or', 'sum' and half-reified globals remain here
+                    return self._post_constraint(cpm_expr.args[1], condition=cpm_expr.args[0]).OnlyEnforceIf(lhs)
             else:
                 raise NotImplementedError("Not a known supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
@@ -626,32 +625,19 @@ class CPM_ortools(SolverInterface):
                 array = self.solver_vars(array)
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting],
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
-            elif cpm_expr.name == "cumulative":
-                if len(cpm_expr.args) == 4:
-                    start, dur, demand, cap = cpm_expr.args
+            elif cpm_expr.name in ("cumulative", "cumulative_optional"):
+                if cpm_expr.name == "cumulative_optional":
+                    *args, is_present = cpm_expr.args
+                else:
+                    args, is_present = cpm_expr.args, None
+                if len(args) == 4:
+                    start, dur, demand, cap = args
                     end = None
                 else:
-                    start, dur, end, demand, cap = cpm_expr.args
-                
-                # ensure duration is non-negative
-                dur, dur_cons = get_nonneg_args(dur)
-                self.add(dur_cons)
-                # ensure demand is non-negative
-                demand, demand_cons = get_nonneg_args(demand)
-                self.add(demand_cons)
-                # make interval variables
-                tasks, task_cons = self._get_ort_intervals(start, dur, end)
-                self.add(task_cons)
+                    start, dur, end, demand, cap = args
+                is_present, pres_cons = self._get_task_presence(is_present, len(start), condition)
+                self.add(pres_cons)
 
-                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
-
-            elif cpm_expr.name == "cumulative_optional":
-                if len(cpm_expr.args) == 5:
-                    start, dur, demand, cap, is_present = cpm_expr.args
-                    end = None
-                else:
-                    start, dur, end, demand, cap, is_present = cpm_expr.args
-                
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur, is_present)
                 self.add(dur_cons)
@@ -661,39 +647,26 @@ class CPM_ortools(SolverInterface):
                 # make interval variables
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
-                
+
                 return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
 
-            elif cpm_expr.name == "no_overlap":
-                if len(cpm_expr.args) == 2:
-                    start, dur = cpm_expr.args
+            elif cpm_expr.name in ("no_overlap", "no_overlap_optional"):
+                if cpm_expr.name == "no_overlap_optional":
+                    *args, is_present = cpm_expr.args
+                else:
+                    args, is_present = cpm_expr.args, None
+                if len(args) == 2:
+                    start, dur = args
                     end = None
                 else:
-                    start, dur, end = cpm_expr.args
-
-                # ensure duration is non-negative
-                dur, dur_cons = get_nonneg_args(dur)
-                self.add(dur_cons)
-                # make interval variables
-                tasks, task_cons = self._get_ort_intervals(start, dur, end)
-                self.add(task_cons)
-
-                if any(lb <= 0 <= ub for lb, ub in zip(*get_bounds(dur))):
-                    # OR-Tools has strict semantics for NoOverlap, post as Cumulative instead
-                    return self.ort_model.AddCumulative(tasks, [1] * len(tasks), 1)
-                return self.ort_model.AddNoOverlap(tasks)
-
-            elif cpm_expr.name == "no_overlap_optional":
-                if len(cpm_expr.args) == 3:
-                    start, dur, is_present = cpm_expr.args
-                    end = None
-                else:
-                    start, dur, end, is_present = cpm_expr.args
+                    start, dur, end = args
+                is_present, pres_cons = self._get_task_presence(is_present, len(start), condition)
+                self.add(pres_cons)
 
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur, is_present)
                 self.add(dur_cons)
-                # make interval variables   
+                # make interval variables
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
 
@@ -768,6 +741,26 @@ class CPM_ortools(SolverInterface):
 
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+
+    def _get_task_presence(self, is_present: Optional[ListLike[BoolExprLike]], n: int,
+                           condition: Optional[_BoolVarImpl] = None) -> tuple[Optional[ListLike[BoolExprLike]], list[Expression]]:
+        """Helper function to make the `n` tasks only present when `condition` holds.
+        Optional tasks make the interval and non-negativity constraints conditional too,
+        which enforcing the constraint alone would not.
+        Returns the presence literals and the constraints defining them."""
+        if condition is None:
+            return is_present, []
+        if is_present is None:
+            return [condition] * n, []
+        presence, cons = [], []
+        for p in is_present:
+            if isinstance(p, BoolVal):
+                presence.append(condition if p else p)
+            else:
+                bv, bv_cons = get_or_make_var(p & condition, csemap=self._csemap)
+                cons += bv_cons
+                presence.append(bv)
+        return presence, cons
 
     def _get_ort_intervals(self, start, duration, end=None, is_present=None):
         """Helper function to create tasks variables for use in Cumulative and NoOverlap constraints."""

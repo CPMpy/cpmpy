@@ -104,6 +104,7 @@ class CPM_minizinc(SolverInterface):
                                               "precedence", "no_overlap",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "nd_element"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence", "regular"}
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
     required_version = (2, 8, 2)
 
@@ -628,6 +629,7 @@ class CPM_minizinc(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 
