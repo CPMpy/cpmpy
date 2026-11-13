@@ -199,7 +199,7 @@ class CPM_hermax(SolverInterface):
         # initialise the native solver object
         self.her_model = Model()
         self.her_solver = her_solver
-        self._objective = None
+        self.objective_ = None
         self._assumption_map = {}  # dimacs lit -> CPMpy assumption expr
         self._int_cache = {}  # constant or Boolean var name -> Hermax IntVar, see _int_var()
         self._false_lit = None  # see _hermax_false()
@@ -222,9 +222,6 @@ class CPM_hermax(SolverInterface):
             time_limit (float, optional): Maximum solve time in seconds.
                                           Must be positive when set.
 
-                                          Optimization (MaxSAT) may return a feasible
-                                          suboptimal solution when interrupted
-                                          (``interrupted_sat`` → FEASIBLE).
             assumptions:                  iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                           For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                           get_core() returns a small subset of assumption variables that are unsat together.
@@ -239,7 +236,8 @@ class CPM_hermax(SolverInterface):
         See https://hermax.readthedocs.io/ for the full list.
         """
         if "solver" in kwargs:
-            raise ValueError("Select the Hermax subsolver via the solver name, e.g. model.solve(solver='hermax:EvalMaxSAT') or cp.SolverLookup.get('hermax:EvalMaxSAT'), not via solve(solver=...).")
+            raise ValueError("The Hermax subsolver is fixed when the solver is created, select it via the solver name, "
+                             "e.g. model.solve(solver='hermax:EvalMaxSAT') or cp.SolverLookup.get('hermax:EvalMaxSAT')")
 
         if time_limit is not None:
             if time_limit <= 0:
@@ -250,7 +248,6 @@ class CPM_hermax(SolverInterface):
         hm_assumptions = None
         self._assumption_map = {}
         if assumptions is not None:
-            assumptions = list(assumptions)
             hm_assumptions = []
             for a in assumptions:
                 hm_a = self.solver_var(a)
@@ -281,11 +278,7 @@ class CPM_hermax(SolverInterface):
         elif status in ("interrupted", "unknown"):
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         elif status == "error":
-            # One-shot timed MaxSAT (PortfolioSolver + RC2) can report "error" when the
-            # worker is killed at the limit without a model; treat as UNKNOWN then.
-            self.cpm_status.exitstatus = (
-                ExitStatus.UNKNOWN if time_limit is not None else ExitStatus.ERROR
-            )
+            self.cpm_status.exitstatus = ExitStatus.ERROR
         else:
             raise ValueError(f"Unknown Hermax status: {result.status!r}, please report on github...")
 
@@ -295,7 +288,7 @@ class CPM_hermax(SolverInterface):
             for cpm_var in self.user_vars:
                 cpm_var._value = result.assignment[self.solver_var(cpm_var)]
             if self.has_objective():
-                self.objective_value_ = int(self._objective.value())
+                self.objective_value_ = int(self.objective_.value())
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -317,7 +310,7 @@ class CPM_hermax(SolverInterface):
 
         sat = getattr(self.her_model._inc_state, "sat_solver", None)
         if sat is None or not hasattr(sat, "get_core"):
-            raise NotSupportedError("Hermax: no unsat core available (solve under assumptions with a SAT backend first)")
+            raise NotSupportedError("Hermax: no unsat core available, the last solve did not use a SAT backend that supports core extraction")
 
         dimacs_core = sat.get_core() or []
         core = []
@@ -336,8 +329,7 @@ class CPM_hermax(SolverInterface):
         """
         if isinstance(cpm_var, _NumVarImpl):
             name = cpm_var.name
-            revar = self._varmap.get(name)
-            if revar is not None:
+            if (revar := self._varmap.get(name)) is not None:
                 return revar
 
             # not yet created, make a new solver var
@@ -404,8 +396,8 @@ class CPM_hermax(SolverInterface):
             Each call replaces the Hermax objective via ``model.obj.set(...)``.
 
             Arguments:
-                expr: Expression, the CPMpy expression that represents the objective function
-                minimize: Bool, whether it is a minimization problem (True) or maximization (False)
+                expr (Expression): the CPMpy expression that represents the objective function
+                minimize (bool): whether it is a minimization problem (True) or maximization (False)
         """
         get_variables(expr, self.user_vars)
 
@@ -420,14 +412,14 @@ class CPM_hermax(SolverInterface):
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 
         self.add(safe_cons + decomp_cons + flat_cons)
-        self._objective = obj
+        self.objective_ = obj
 
         hm_obj = self._make_numexpr(obj)
         # Hermax only minimizes; obj.set() replaces any previous objective
         self.her_model.obj.set(hm_obj if minimize else (-1) * hm_obj)
 
     def has_objective(self):
-        return self._objective is not None
+        return self.objective_ is not None
 
     def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
@@ -476,8 +468,7 @@ class CPM_hermax(SolverInterface):
 
         for cpm_con in self.transform(cpm_expr):
             if isinstance(cpm_con, Operator) and cpm_con.name == "and":
-                for arg in cpm_con.args:
-                    self.add(arg)
+                self.add(cpm_con.args)
                 continue
 
             hm_con = self._hermax_expr(cpm_con)
@@ -561,14 +552,15 @@ class CPM_hermax(SolverInterface):
                     lb, ub = max(int(idx.lb), 0), min(int(idx.ub), len(arr) - 1)
                     if lb > ub:
                         return False
-                    if (lb, ub) != (idx.lb, idx.ub):
-                        key = (idx.name, lb, ub)
-                        if key not in self._int_cache:
-                            hm_inbounds = self.her_model.int(f"_cpm_idx_{idx.name}_{lb}_{ub}", lb, ub)
-                            self.her_model &= hm_inbounds == hm_idx
-                            self._int_cache[key] = hm_inbounds
-                        hm_idx = self._int_cache[key]
-                    return self._int_vector(arr)[hm_idx] == self._int_var(rhs)
+                    if (lb, ub) == (idx.lb, idx.ub):
+                        return self._int_vector(arr)[hm_idx] == self._int_var(rhs)
+                    key = (idx.name, lb, ub)
+                    if key not in self._int_cache:
+                        self._int_cache[key] = self.her_model.int(f"_cpm_idx_{idx.name}_{lb}_{ub}", lb, ub)
+                    hm_inbounds = self._int_cache[key]
+                    # element on the in-bounds index is defining, the index being in bounds is the value
+                    self.her_model &= self._int_vector(arr)[hm_inbounds] == self._int_var(rhs)
+                    return hm_inbounds == hm_idx
                 raise NotImplementedError(f"Hermax: unsupported global function {lhs}")
 
             # Hermax rejects Literal != Literal; encode as XOR via PB sum
