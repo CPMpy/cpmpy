@@ -25,7 +25,9 @@ class TestSolveAll:
         try:
             x = cp.boolvar(shape=32, name="x")
             m = cp.Model(cp.any(x))
-            # stop early (no need to enumerate all); FEASIBLE, not OPTIMAL
+            num_sols = m.solveAll(solver=solver, time_limit=1, solution_limit=limit)
+            assert m.status().exitstatus == ExitStatus.FEASIBLE
+
             num_sols = m.solveAll(solver=solver, solution_limit=10)
             assert num_sols == 10
             assert m.status().exitstatus == ExitStatus.FEASIBLE
@@ -37,7 +39,7 @@ class TestSolveAll:
             assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE)  # which of the two?
 
         except NotImplementedError:
-            pass  # not all solvers support solution limits
+            pass  # not all solvers support time/solution limits
 
         # making the problem unsat
         if solver != "pysdd":  # constraint not supported by pysdd
