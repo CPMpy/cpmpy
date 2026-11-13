@@ -122,7 +122,7 @@ class CPM_choco(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -153,7 +153,7 @@ class CPM_choco(SolverInterface):
         # for solving with assumption variables, TO-CHECK
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="choco", cpm_model=cpm_model)
+        super().__init__(name="choco", cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):
@@ -240,7 +240,7 @@ class CPM_choco(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 

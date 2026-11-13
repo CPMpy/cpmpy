@@ -177,7 +177,7 @@ class CPM_pysat(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None, proof=None):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -221,7 +221,7 @@ class CPM_pysat(SolverInterface):
         self.encoding = "auto"
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
+        super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):

@@ -63,18 +63,20 @@ class SolverInterface(object):
         """
         raise NotImplementedError("Implementation of 'version' is missing in solver interface. This should be fixed. If encountered, please report on GitHub.")
 
-    def __init__(self, name="dummy", cpm_model=None, subsolver=None):
+    def __init__(self, name="dummy", cpm_model=None, subsolver=None, _from_model=False):
         """
             Initialize solver interface
 
             - name: str: name of this solver
             - subsolver: string: not used/allowed here
             - cpm_model: CPMpy Model() object, optional: will post its constraints/objective
+            - _from_model: bool: True when constructed via ``Model.solve()`` / ``Model.solveAll()``
 
             Creates the following attributes:
             - name: str, name of the solver
             - cpm_status: SolverStatus(), the CPMpy status after a `solve()`
             - objective_value_: the value of the objective function after solving (or None)
+            - _from_model: whether the solver was constructed via ``Model.solve()`` / ``Model.solveAll()``
             - user_vars: set(), variables in the original (non-transformed) model,
                            for reverse mapping the values after `solve()`
             - _varmap: dict[str, Any], maps cpmpy variable names to native solver variables
@@ -84,6 +86,7 @@ class SolverInterface(object):
         self.name = name
         self.cpm_status = SolverStatus(self.name) # status of solving this model
         self.objective_value_: Optional[int] = None
+        self._from_model = _from_model
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
@@ -272,7 +275,7 @@ class SolverInterface(object):
             display()  # callback
     
     # OPTIONAL functions
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -284,7 +287,6 @@ class SolverInterface(object):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: 
@@ -293,7 +295,7 @@ class SolverInterface(object):
         if self.has_objective():
             raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
 
-        if not call_from_model:
+        if not self._from_model:
             warnings.warn("Adding constraints to solver object to find all solutions, "
                           "solver state will be invalid after this call!")
             

@@ -98,7 +98,7 @@ class CPM_pindakaas(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Initialize Pindakaas interface.
 
@@ -117,7 +117,7 @@ class CPM_pindakaas(SolverInterface):
         self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
-        super().__init__(name=name, cpm_model=cpm_model)
+        super().__init__(name=name, cpm_model=cpm_model, _from_model=_from_model)
 
     @property
     def native_model(self):

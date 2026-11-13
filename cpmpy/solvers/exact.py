@@ -118,7 +118,7 @@ class CPM_exact(SolverInterface):
             return None
 
 
-    def __init__(self, cpm_model=None, subsolver=None, **kwargs):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False, **kwargs):
         """
         Constructor of the native solver object
 
@@ -128,6 +128,8 @@ class CPM_exact(SolverInterface):
         Arguments:
             cpm_model: Model(), a CPMpy Model() (optional)
             subsolver: None
+            _from_model: if True (e.g. via Model.solve()), use runFull (faster one-shot).
+                If False (default), use toOptimum so the solver state can be reused.
 
         Exact takes options at initialization instead of solving.
         The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
@@ -154,7 +156,7 @@ class CPM_exact(SolverInterface):
         self.objective_is_min_ = True
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="exact", cpm_model=cpm_model)
+        super().__init__(name="exact", cpm_model=cpm_model, _from_model=_from_model)
         
     @property
     def native_model(self):
@@ -229,7 +231,13 @@ class CPM_exact(SolverInterface):
             
         # call the solver, with parameters
         start = time.time()
-        my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)
+        if self._from_model:
+            # one-shot: runFull is faster when the solver object is discarded afterwards
+            # as suggested by Jo: https://github.com/CPMpy/cpmpy/issues/896#issuecomment-4300137970
+            my_status = self.xct_solver.runFull(optimize=self.has_objective(), timeout=timeout)
+        else:
+            # incremental: toOptimum keeps solver state reusable (e.g. change objective)
+            my_status, _obj_val = self.xct_solver.toOptimum(timeout=timeout)
         end = time.time()
 
         # new status, translate runtime
@@ -266,11 +274,9 @@ class CPM_exact(SolverInterface):
         # True/False depending on self.cpm_status
         ret = self._solve_return(self.cpm_status)
         self._fillVars(has_solution=ret)
-        if self.has_objective():
-            if self.objective_is_min_:
-                self.objective_value_ = obj_val
-            else: # maximize, so actually negative value
-                self.objective_value_ = -obj_val
+        if self.has_objective() and ret:
+            # recompute from the CPMpy expression (do not trust Exact's reported obj value)
+            self.objective_value_ = self.objective_.value()
         
         return ret
 
@@ -283,7 +289,7 @@ class CPM_exact(SolverInterface):
             if timelim == 0: timelim = -1
         return timelim
 
-    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally, display the solutions.
 
@@ -292,7 +298,6 @@ class CPM_exact(SolverInterface):
                         default/None: nothing displayed
                 time_limit: stop after this many seconds (default: None)
                 solution_limit: stop after this many solutions (default: None)
-                call_from_model: whether the method is called from a CPMpy Model instance or not
                 any other keyword argument
 
             Returns: number of solutions found
@@ -312,7 +317,7 @@ class CPM_exact(SolverInterface):
 
         if self.has_objective():
             start = time.time()
-            if not call_from_model:
+            if not self._from_model:
                 warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
 
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective

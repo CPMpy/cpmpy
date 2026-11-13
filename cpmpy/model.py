@@ -197,9 +197,9 @@ class Model(object):
         t0 = time.time()
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
-            s = solver(self)
+            s = solver(self, _from_model=True)
         else:
-            s = SolverLookup.get(solver, self)
+            s = SolverLookup.get(solver, self, _from_model=True)
 
         # call solver
         if time_limit is not None:
@@ -238,12 +238,12 @@ class Model(object):
 
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
-            s = solver(self)
+            s = solver(self, _from_model=True)
         else:
-            s = SolverLookup.get(solver, self)
+            s = SolverLookup.get(solver, self, _from_model=True)
 
         # call solver
-        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True, **kwargs)
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret

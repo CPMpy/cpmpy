@@ -83,7 +83,7 @@ class CPM_rc2(CPM_pysat):
 
     """
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, _from_model=False):
         """
         Constructor of the native solver object
 
@@ -118,7 +118,7 @@ class CPM_rc2(CPM_pysat):
         self.encoding = "auto"
 
         # initialise everything else and post the constraints/objective (skip PySAT itself)
-        super(CPM_pysat, self).__init__(name="rc2", cpm_model=cpm_model)
+        super(CPM_pysat, self).__init__(name="rc2", cpm_model=cpm_model, _from_model=_from_model)
 
     def has_objective(self):
         return self.objective_ is not None
