@@ -54,6 +54,8 @@ class TestMUS:
     # shared test cases
     @pytest.mark.parametrize("variant", ALL)
     def test_circular(self, solver, variant):
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support multi-constraint transforms")
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
         cons = [
@@ -76,6 +78,8 @@ class TestMUS:
         """
         if solver == "cpo":
             pytest.skip("CPO does not support hard constraints")
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support hard constraints")
         bv = cp.boolvar(name="x")
         hard = [~bv]
         soft = [bv]
@@ -92,6 +96,8 @@ class TestMUS:
 
         if solver == "cpo":
             pytest.skip("CPO does not support hard constraints")
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support hard constraints")
 
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
@@ -106,6 +112,8 @@ class TestMUS:
 
     @pytest.mark.parametrize("variant", ALL)
     def single_soft_constraint(self, solver, variant):
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support multi-constraint transforms")
         x = cp.intvar(1, 2, shape=3, name="x")
         soft = [cp.AllDifferent(x)]
         self._test_mus(soft, hard=[], solver=solver, variant=variant,
@@ -113,6 +121,8 @@ class TestMUS:
 
     @pytest.mark.parametrize("variant", ALL)
     def test_wglobal(self, solver, variant):
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support multi-constraint transforms")
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
 
@@ -135,6 +145,8 @@ class TestMUS:
 
     @pytest.mark.parametrize("variant", ALL)
     def test_decomposed_global(self, solver, variant):
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support multi-constraint transforms")
 
         x = cp.intvar(1, 5, shape=3, name="x")
         cons = cp.AllDifferent(x)
@@ -152,6 +164,8 @@ class TestMUS:
 
         Reproducer from https://github.com/CPMpy/cpmpy/pull/986
         """
+        if solver == "scip" and variant == "mus_native":
+            pytest.skip("SCIP native MUS does not support multi-constraint transforms")
         x = cp.intvar(-10, 10, name="x")
         y = cp.intvar(-10, 10, name="y")
         soft = [
@@ -162,6 +176,74 @@ class TestMUS:
 
         self._test_mus(soft, hard=[], solver=solver, variant=variant,
                        verify_func=lambda ms: set(ms) == {soft[1], soft[2]})
+
+    @pytest.mark.parametrize("variant", ALL)
+    def test_linear_circular(self, solver, variant):
+        x = cp.intvar(0, 3, shape=3, name="x")
+        cons = [x[0] > x[1], x[1] > x[2], x[2] > x[0]]
+        self._test_mus(cons, hard=[], solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == set(cons))
+
+    @pytest.mark.parametrize("variant", ALL)
+    def test_redundant_bound(self, solver, variant):
+        x = cp.intvar(0, 5, name="x")
+        y = cp.intvar(0, 5, name="y")
+        cons = [
+            x >= 4,
+            y >= 4,
+            x + y <= 6,
+            x <= 5,
+        ]
+        self._test_mus(cons, hard=[], solver=solver, variant=variant,
+                       verify_func=lambda ms: set(ms) == set(cons[:3]))
+
+    @pytest.mark.parametrize("variant", ALL)
+    def test_binary_conflict(self, solver, variant):
+        x, y, z = cp.boolvar(name="x"), cp.boolvar(name="y"), cp.boolvar(name="z")
+        cons = [
+            x + y >= 2,
+            ~x,
+            ~y,
+            z,
+        ]
+
+        def verify(ms):
+            if z in ms or not set(ms).issubset(set(cons[:3])):
+                return False
+            if cp.Model(ms).solve():
+                return False
+            return all(cp.Model(ms[:i] + ms[i + 1:]).solve() for i in range(len(ms)))
+
+        self._test_mus(cons, hard=[], solver=solver, variant=variant, verify_func=verify)
+
+    @pytest.mark.parametrize("variant", ["mus_native"])
+    def test_sat_raises(self, solver, variant):
+        if not self._supported_solver(solver, variant):
+            pytest.skip(self._unsupported_reason(solver, variant))
+        x = cp.boolvar(name="x")
+        with pytest.raises(AssertionError, match="UNSAT"):
+            MUS_FUNCS[variant](soft=[x], hard=[], solver=solver)
+
+    @pytest.mark.parametrize("variant", ["mus_native"])
+    def test_hard_raises(self, solver, variant):
+        if solver not in ("cpo", "scip"):
+            pytest.skip(f"{solver} native MUS supports hard constraints")
+        if not self._supported_solver(solver, variant):
+            pytest.skip(self._unsupported_reason(solver, variant))
+        x = cp.boolvar(name="x")
+        with pytest.raises(ValueError, match="hard constraints"):
+            MUS_FUNCS[variant](soft=[x], hard=[~x], solver=solver)
+
+    @pytest.mark.parametrize("variant", ["mus_native"])
+    def test_multiple_transformed_raises(self, solver, variant):
+        if solver == "scip":
+            if not self._supported_solver(solver, variant):
+                pytest.skip(self._unsupported_reason(solver, variant))
+            x = cp.intvar(1, 2, shape=3, name="x")
+            with pytest.raises(ValueError, match="multiple transformed"):
+                MUS_FUNCS[variant](soft=[cp.AllDifferent(x)], solver=solver)
+        else:
+            pytest.skip(f"{solver} native MUS supports grouped constraints")
 
     # quickxplain-specific
     @pytest.mark.parametrize("variant", ["quickxplain", "quickxplain_naive"])
@@ -277,3 +359,4 @@ class TestMCS:
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
         assert len(mcs(cons)) == 1
+
