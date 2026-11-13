@@ -25,10 +25,6 @@
     See detailed installation instructions at:
     https://hermax.readthedocs.io/
 
-    .. note::
-        Solving with a ``time_limit`` stays incremental. Optimization (MaxSAT)
-        may return a feasible suboptimal solution when the limit is hit.
-
     The rest of this documentation is for advanced users.
 
     ===============
@@ -64,14 +60,21 @@ from ..transformations.negation import push_down_negation, push_down_negation_ob
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.linearize import decompose_linear, decompose_linear_objective
 
+def _subsolver_class(subsolver: str):
+    """
+        Hermax solver class of a subsolver, preferring the incremental one when both modules have it.
+    """
+    import hermax.incremental as her_inc
+    import hermax.non_incremental as her_ni
+    return getattr(her_inc if subsolver in her_inc.__all__ else her_ni, subsolver)
+
 @lru_cache(maxsize=None)
 def _subsolver_available(subsolver: str) -> bool:
     """
         Whether a Hermax subsolver can be instantiated (e.g. MaxHS requires a build with CPLEX).
     """
-    import hermax.non_incremental as her_ni
     try:
-        solver = getattr(her_ni, subsolver)()
+        solver = _subsolver_class(subsolver)()
     except Exception:
         return False
     solver.close()
@@ -127,8 +130,9 @@ class CPM_hermax(SolverInterface):
                 list of solver names
         """
         if CPM_hermax.supported():
+            import hermax.incremental as her_inc
             import hermax.non_incremental as her_ni
-            names = list(her_ni.__all__)
+            names = list(her_inc.__all__) + [n for n in her_ni.__all__ if n not in her_inc.__all__]
             if installed:
                 names = [n for n in names if _subsolver_available(n)]
             return names
@@ -145,17 +149,13 @@ class CPM_hermax(SolverInterface):
             subsolver (str): name of the subsolver
 
         Returns:
-            Version number of the subsolver if installed, else None
-
-        The subsolvers are compiled into the Hermax package, so this is the Hermax version.
+            None, Hermax does not expose the versions of its subsolvers
         """
         if subsolver.startswith("hermax:"):
             subsolver = subsolver[7:]  # strip 'hermax:'
         if subsolver not in CPM_hermax.solvernames(installed=False):
             raise ValueError(f"Unknown Hermax subsolver '{subsolver}', choose from {CPM_hermax.solvernames(installed=False)}")
-        if not _subsolver_available(subsolver):
-            return None
-        return CPM_hermax.version()
+        return None
 
     @staticmethod
     def version() -> Optional[str]:
@@ -177,19 +177,12 @@ class CPM_hermax(SolverInterface):
             subsolver (str, name of the hermax solver, e.g. EvalMaxSAT):  see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
-            her_version = CPM_hermax.version()
-            if her_version is not None and Version(her_version) < Version("1.3.2"):
-                raise ImportError(
-                    f"CPM_hermax: CPMpy requires Hermax version >=1.3.2 "
-                    f"but you have version {her_version}"
-                )
             raise ModuleNotFoundError("CPM_hermax: Install the python package 'hermax' to use this solver interface.")
 
         from hermax.model import Model
-        import hermax.non_incremental as her_ni
 
         # determine subsolver
-        if subsolver is None or subsolver == "hermax":
+        if subsolver is None:
             # default: hermax's built-in SAT/MaxSAT backends
             her_solver = None
             name = "hermax"
@@ -200,7 +193,7 @@ class CPM_hermax(SolverInterface):
                 raise ValueError(f"Unknown Hermax subsolver '{subsolver}', choose from {self.solvernames()}")
             if not _subsolver_available(subsolver):
                 raise NotSupportedError(f"Hermax subsolver '{subsolver}' is not available in your Hermax build, choose from {self.solvernames()}")
-            her_solver = getattr(her_ni, subsolver)
+            her_solver = _subsolver_class(subsolver)
             name = "hermax:" + subsolver
 
         # initialise the native solver object
