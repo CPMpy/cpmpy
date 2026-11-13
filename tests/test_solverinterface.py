@@ -266,13 +266,13 @@ def test_solver_vars(solver):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_time_limit(solver):
     """Test time limit functionality"""
-    solver_class = SolverLookup.lookup(solver)
-    solver = solver_class()
-    
     # Skip pysdd as it doesn't support time limits
     if solver == "pysdd":
         return
-    
+
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+
     bvar = cp.boolvar(shape=3)
     x, y, z = bvar
     solver += [x | y | z]
