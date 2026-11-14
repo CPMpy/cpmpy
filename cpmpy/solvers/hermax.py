@@ -48,7 +48,7 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import GlobalConstraint, Cumulative
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.utils import is_num, is_int, is_boolexpr
 from ..transformations.get_variables import get_variables
@@ -110,8 +110,8 @@ class CPM_hermax(SolverInterface):
         try:
             import hermax  # noqa: F401
             her_version = CPM_hermax.version()
-            if her_version is None or Version(her_version) < Version("1.3.2"):
-                warnings.warn(f"CPMpy requires Hermax version >=1.3.2 "
+            if her_version is None or Version(her_version) < Version("1.3.4"):
+                warnings.warn(f"CPMpy requires Hermax version >=1.3.4 "
                               f"but you have version {her_version}")
                 return False
             return True
@@ -614,36 +614,25 @@ class CPM_hermax(SolverInterface):
                 return self._hermax_table(cpm_con)
             if cpm_con.name == "negative_table":
                 return self._hermax_table(cpm_con).implies(self._hermax_false())
-            if cpm_con.name == "no_overlap":  # post as Cumulative with capacity 1
-                if len(cpm_con.args) == 2:
-                    start, dur = cpm_con.args
-                    return self._hermax_expr(Cumulative(start, dur, demand=1, capacity=1))
+            if cpm_con.name in ("no_overlap", "cumulative"):
+                if cpm_con.name == "no_overlap":
+                    start, dur, end = cpm_con.args if len(cpm_con.args) == 3 else (*cpm_con.args, None)
+                    demand = []
                 else:
-                    start, dur, end = cpm_con.args
-                    return self._hermax_expr(Cumulative(start, dur, end, demand=1, capacity=1))
-            if cpm_con.name == "cumulative":
-                if len(cpm_con.args) == 4:
-                    start, dur, demand, cap = cpm_con.args
-                    end = None
-                else:
-                    start, dur, end, demand, cap = cpm_con.args
+                    start, dur, end, demand, cap = cpm_con.args if len(cpm_con.args) == 5 \
+                        else (cpm_con.args[0], cpm_con.args[1], None, *cpm_con.args[2:])
+                if any(is_num(a) and a < 0 for a in [*dur, *demand]):
+                    return False  # negative durations or demands are infeasible, Hermax rejects fixed ones
 
-                if not all(is_num(d) for d in dur):
-                    raise NotSupportedError("Hermax Cumulative only supports fixed durations")
-                if not all(is_num(h) for h in demand):
-                    raise NotSupportedError("Hermax Cumulative only supports fixed demands")
-                if not is_num(cap):
-                    raise NotSupportedError("Hermax Cumulative only supports fixed capacity")
-                if any(d < 0 for d in dur) or any(h < 0 for h in demand):
-                    return False  # negative durations or demands are infeasible
-
+                # constants are passed as ints, so Hermax can use its fixed-argument encodings
                 hm_starts = [self._int_var(s) for s in start]
-                hm_con = self.her_model.cumulative(
-                    hm_starts,
-                    [int(d) for d in dur],
-                    [int(h) for h in demand],
-                    int(cap),
-                )
+                hm_dur = [int(d) if is_num(d) else self._int_var(d) for d in dur]
+                if cpm_con.name == "no_overlap":
+                    hm_con = self.her_model.no_overlap(hm_starts, hm_dur)
+                else:
+                    hm_demand = [int(h) if is_num(h) else self._int_var(h) for h in demand]
+                    hm_cap = int(cap) if is_num(cap) else self._int_var(cap)
+                    hm_con = self.her_model.cumulative(hm_starts, hm_dur, hm_demand, hm_cap)
                 # conjoin the end constraints so the whole group can be reified
                 if end is not None:
                     for s, d, e in zip(hm_starts, dur, end):
