@@ -52,7 +52,7 @@ def get_gcnf_cases():
     yield soft, hard
 
 
-@pytest.mark.requires("pindakaas")
+@pytest.mark.requires_dependency("pindakaas")
 class TestToGcnf:
     def idfn(val):
         return f"{val}"
