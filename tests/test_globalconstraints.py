@@ -1857,7 +1857,7 @@ class TestGlobal:
         if solver == "rc2":
             pytest.skip("rc2 only supports optimization")
         if solver == "pumpkin":
-            pytest.skip(f"{solver} does not support variables as duration")
+            pytest.skip(f"Pumpkin does not support variables as duration")
 
         # same, but now 0 is only in the domain of the duration variables
         start = cp.intvar(0,5, shape=3, name="start")
