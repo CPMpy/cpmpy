@@ -160,7 +160,7 @@ def test_minimize(solver):
 
     try:
         solver.minimize(ivar)
-    except NotImplementedError:
+    except (NotImplementedError, NotSupportedError):
         return
 
     assert hasattr(solver, "objective_value_")
@@ -192,7 +192,7 @@ def test_maximize(solver):
 
     try:
         solver.maximize(ivar)
-    except NotImplementedError:
+    except (NotImplementedError, NotSupportedError):
         return
 
     assert solver.solve()
@@ -324,6 +324,9 @@ def test_has_objective(solver):
             slv.maximize(ivar)
             assert slv.has_objective()
     except NotImplementedError:
+        # Solver doesn't support objectives
+        assert not slv.has_objective()
+    except NotSupportedError:
         # Solver doesn't support objectives
         assert not slv.has_objective()
 
