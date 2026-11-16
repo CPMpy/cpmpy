@@ -1856,7 +1856,7 @@ class TestGlobal:
             pytest.skip("pysdd does not support integer variables")
         if solver == "rc2":
             pytest.skip("rc2 only supports optimization")
-        if solver in ("pumpkin", "hermax"):
+        if solver == "pumpkin":
             pytest.skip(f"{solver} does not support variables as duration")
 
         # same, but now 0 is only in the domain of the duration variables
@@ -2372,14 +2372,14 @@ def test_issue801_expr_in_cumulative(solver):
     bv = cp.boolvar(shape=3,name="bv")
 
     assert cp.Model(cp.NoOverlap(bv * start, dur, end)).solve(solver=solver)
-    if solver not in ("pumpkin", "hermax"): #  only support integers as duration, not variables
+    if solver != "pumpkin": #  only support integers as duration, not variables
         assert cp.Model(cp.NoOverlap(bv * start,bv * dur, end)).solve(solver=solver)
     assert cp.Model(cp.NoOverlap(bv * start, dur, bv * end)).solve(solver=solver)
 
     # also for cumulative
     assert cp.Model(cp.Cumulative(bv * start, dur, end,1, 3)).solve(solver=solver)
     assert cp.Model(cp.Cumulative(bv * start, dur, bv * end, 1, 3)).solve(solver=solver)
-    if solver not in ("pumpkin", "hermax"): # only support integers as duration, demand or capacity, not variables
+    if solver != "pumpkin": # only support integers as duration, demand or capacity, not variables
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
