@@ -132,7 +132,7 @@ class CPM_hermax(SolverInterface):
         if CPM_hermax.supported():
             import hermax.incremental as her_inc
             import hermax.non_incremental as her_ni
-            names = list(her_inc.__all__) + [n for n in her_ni.__all__ if n not in her_inc.__all__]
+            names = list(dict.fromkeys([*her_inc.__all__, *her_ni.__all__]))  # ordered dedupe
             if installed:
                 names = [n for n in names if _subsolver_available(n)]
             return names
