@@ -89,9 +89,7 @@ class CPM_ortools(SolverInterface):
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
-    supported_half_reified_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "regular",
-                                                           "reservoir", "reservoir_optional", "circuit", "inverse",
-                                                           "cumulative", "cumulative_optional", "no_overlap", "no_overlap_optional"})
+    supported_half_reified_global_constraints = supported_global_constraints
 
     @staticmethod
     def supported():

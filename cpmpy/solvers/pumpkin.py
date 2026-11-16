@@ -75,8 +75,7 @@ class CPM_pumpkin(SolverInterface):
     supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
                                               "min", "max", "abs", "mul", "div", "element"})
     supported_reified_global_constraints = frozenset()
-    supported_half_reified_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "indomain",
-                                                           "mul", "div", "abs", "min", "max", "element"})
+    supported_half_reified_global_constraints = supported_global_constraints
 
     @staticmethod
     def supported():
