@@ -808,11 +808,11 @@ class TestSolvers:
         assert sum(xi.value() for xi in x) in (2, 4)
 
     @pytest.mark.requires_solver("hermax")
-    def test_hermax(self, solver):
+    def test_hermax(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         m = cp.Model(cp.AllDifferent(x), cp.sum(x) == 6)
         m.minimize(x[0])
-        assert m.solve(solver=solver)
+        assert m.solve(solver="hermax")
         assert len(set(xi.value() for xi in x)) == 3
         assert sum(xi.value() for xi in x) == 6
         assert m.objective_value() == x[0].value()
