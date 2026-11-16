@@ -16,3 +16,4 @@ Expression transformations (:mod:`cpmpy.transformations`)
 .. .. include:: ./transformations/reification.rst
 .. .. include:: ./transformations/safening.rst
 .. .. include:: ./transformations/to_cnf.rst
+.. .. include:: ./transformations/to_gcnf.rst
