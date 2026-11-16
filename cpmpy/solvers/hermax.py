@@ -39,7 +39,7 @@
 import time
 import warnings
 from functools import lru_cache
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from packaging.version import Version
 
@@ -60,13 +60,22 @@ from ..transformations.negation import push_down_negation, push_down_negation_ob
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.linearize import decompose_linear, decompose_linear_objective
 
-def _subsolver_class(subsolver: str):
+if TYPE_CHECKING:
+    from hermax.core.ipamir_solver_interface import IPAMIRSolver
+
+
+@lru_cache(maxsize=1)
+def _subsolvers() -> dict[str, type["IPAMIRSolver"]]:
     """
-        Hermax solver class of a subsolver, preferring the incremental one when both modules have it.
+        Name -> Hermax IPAMIR solver class. When a name exists in both modules,
+        the incremental class wins.
     """
     import hermax.incremental as her_inc
     import hermax.non_incremental as her_ni
-    return getattr(her_inc if subsolver in her_inc.__all__ else her_ni, subsolver)
+    subsolvers = {name: getattr(her_inc, name) for name in her_inc.__all__}
+    for name in her_ni.__all__:
+        subsolvers.setdefault(name, getattr(her_ni, name))
+    return subsolvers
 
 @lru_cache(maxsize=None)
 def _subsolver_available(subsolver: str) -> bool:
@@ -74,7 +83,7 @@ def _subsolver_available(subsolver: str) -> bool:
         Whether a Hermax subsolver can be instantiated (e.g. MaxHS requires a build with CPLEX).
     """
     try:
-        solver = _subsolver_class(subsolver)()
+        solver = _subsolvers()[subsolver]()
     except Exception:
         return False
     solver.close()
@@ -130,9 +139,7 @@ class CPM_hermax(SolverInterface):
                 list of solver names
         """
         if CPM_hermax.supported():
-            import hermax.incremental as her_inc
-            import hermax.non_incremental as her_ni
-            names = list(dict.fromkeys([*her_inc.__all__, *her_ni.__all__]))  # ordered dedupe
+            names = list(_subsolvers())
             if installed:
                 names = [n for n in names if _subsolver_available(n)]
             return names
@@ -184,16 +191,16 @@ class CPM_hermax(SolverInterface):
         # determine subsolver
         if subsolver is None:
             # default: hermax's built-in SAT/MaxSAT backends
-            her_solver = None
+            her_solver: Optional[type["IPAMIRSolver"]] = None
             name = "hermax"
         else:
             if subsolver.startswith("hermax:"):
                 subsolver = subsolver[7:]  # strip 'hermax:'
-            if subsolver not in self.solvernames(installed=False):
+            if subsolver not in _subsolvers():
                 raise ValueError(f"Unknown Hermax subsolver '{subsolver}', choose from {self.solvernames()}")
             if not _subsolver_available(subsolver):
                 raise NotSupportedError(f"Hermax subsolver '{subsolver}' is not available in your Hermax build, choose from {self.solvernames()}")
-            her_solver = _subsolver_class(subsolver)
+            her_solver = _subsolvers()[subsolver]
             name = "hermax:" + subsolver
 
         # initialise the native solver object
