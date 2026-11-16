@@ -400,6 +400,12 @@ class TestSolvers:
         # modulo
         assert  cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc")
 
+        # nested arguments of div, mod and pow
+        y = cp.intvar(0, 5, shape=2)
+        assert  cp.Model([ y[0] // (y[1] + 1) == 2, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) % (y[1] + 1) == 0, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) ** 2 == 36, y == [5, 1] ]).solve(solver="minizinc")
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="MiniZinc not installed")
@@ -582,6 +588,42 @@ class TestSolvers:
 
         with open(proof_file+".proof", "r") as f:
             assert f.readline()[:-1] == "pseudo-Boolean proof version 1.1"# check header of proof-file
+
+    @staticmethod
+    def _hard_random_3sat(n=250, ratio=4.5):
+        # random 3-SAT near the phase transition, not decided by Exact within several seconds
+        rng = np.random.default_rng(0)
+        x = cp.boolvar(shape=n)
+        return [cp.any([x[v] if rng.random() < .5 else ~x[v] for v in rng.choice(n, 3, replace=False)])
+                for _ in range(int(n * ratio))]
+
+    @pytest.mark.requires_solver("exact")
+    def test_exact_timeout_no_stale_solution(self, solver):
+        # Exact's hasSolution() remains True after an earlier solve,
+        # a timeout without new solution should not report the old one
+        o = cp.intvar(0, 10, name="o")
+        s = cp.SolverLookup.get(solver)
+        s.minimize(o)
+        assert s.solve()
+        assert s.status().exitstatus == ExitStatus.OPTIMAL
+
+        s += self._hard_random_3sat()
+        assert not s.solve(time_limit=1)
+        assert s.status().exitstatus == ExitStatus.UNKNOWN
+        assert o.value() is None
+        assert s.objective_value() is None
+
+    @pytest.mark.requires_solver("exact")
+    def test_exact_timeout_objective_value(self, solver):
+        # Exact's toOptimum() returns 0 as objective value on timeout
+        b = cp.boolvar(name="b")
+        o = cp.intvar(1, 10, name="o")
+        cons = [b.implies(c) for c in self._hard_random_3sat()]  # b=1 not decided within time limit
+        s = cp.SolverLookup.get(solver, cp.Model(cons, maximize=b + o))
+        assert s.solve(time_limit=1)
+        assert s.status().exitstatus == ExitStatus.FEASIBLE
+        assert s.objective_value() == (b + o).value()
+        assert s.objective_value() >= 1
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
