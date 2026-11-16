@@ -701,18 +701,28 @@ class CPM_exact(SolverInterface):
     def tunable_params(cls):
         """
             Suggestion of tunable hyperparameters of the solver.
+            Exact only accepts parameters at initialisation, see `cp.SolverLookup.get("exact", model, **params)`.
+            Options are documented in https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
         """
         return {
+            # conflict analysis
             'ca-multweaken': [0, 1],
             'ca-cancelingunknowns': [0, 1],
-            # 'ca-weakenfully': [0, 1], # not released yet
-            # 'ca-subsetsum': [0, 10000, 1000000], # not released yet
+            'ca-min': [0, 1],
+            'ca-weaken-nonimplying': [0, 1],
+            'ca-multiply': [0, 1],
+            # branching heuristic
+            'var-weight': [0.5, 0.99, 1],  # 0.5 = ACIDS, 1 = VMTF
+            'var-objective': [0, 1],
+            # optimisation
+            'opt-coreguided': [0, 1],
+            'opt-ratio': [0, 0.5, 1],  # 0 = top-down, 1 = fully bottom-up
+            'opt-reusecores': [0, 1],
+            # presolve / inprocessing
             'inp-purelits': [0, 1],
             'inp-dombreaklim': [-1, 0, 100, 10000],
             'inp-probing': [0, 1],
             'inp-atmostone': [0, 0.1, 0.5, 1],
-            # 'inp-liftsymb': [0, 1, 2] # not released yet
-
         }
 
     @classmethod
@@ -720,11 +730,16 @@ class CPM_exact(SolverInterface):
         return {
             'ca-multweaken': 1,
             'ca-cancelingunknowns': 0,
-            # 'ca-weakenfully': 0, # not released yet
-            # 'ca-subsetsum': 1000000, # not released yet
+            'ca-min': 1,
+            'ca-weaken-nonimplying': 0,
+            'ca-multiply': 1,
+            'var-weight': 0.99,
+            'var-objective': 0,
+            'opt-coreguided': 1,
+            'opt-ratio': 0.5,
+            'opt-reusecores': 1,
             'inp-purelits': 1,
-            'inp-dombreaklim': -1,
+            'inp-dombreaklim': 0,
             'inp-probing': 1,
             'inp-atmostone': 0.1,
-            # 'inp-liftsymb': 2 # not released yet
         }

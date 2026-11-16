@@ -60,20 +60,23 @@ class ParameterTuner:
         # Init solver
         if verbose >= 1:
             print(f"Running {self.solvername} with default parameters")
-        solver = _run_solver(self.solvername, self.model, self.best_params, time_limit)
+        solver = _run_solver(self.solvername, self.model, {**self.best_params, **fix_params}, time_limit)
         if not _has_finished(solver):
             raise TimeoutError("Time's up before solving init solver call")
 
         self.base_runtime = solver.status().solve_time
         self.best_runtime = self.base_runtime
-        self._best_config = {}
+        # do not tune parameters that are fixed
+        tunables = {key: values for key, values in self.all_params.items() if key not in fix_params}
+        self._param_order = list(tunables.keys())
+        self._best_config = self._params_to_np([self.best_params])[0] # start the search around the defaults
         if verbose >= 1:
             print(f" - took {self.best_runtime:.1f} seconds")
 
 
 
         # Get all possible hyperparameter configurations
-        combos = list(param_combinations(self.all_params))
+        combos = list(param_combinations(tunables)) if len(tunables) else []
         combos_np = self._params_to_np(combos)
 
         # Ensure random start
@@ -107,7 +110,8 @@ class ParameterTuner:
                 print(f"Starting trial {i+1}/{max_tries}, cap: {timeout:.1f}s  -- remaining configs: {len(combos_np)}" + f" budget: {time_limit-(time.time()-start_time):.1f}s" if time_limit else "")
             # run solver
             solver = _run_solver(self.solvername, self.model, params_dict, timeout)
-            if _has_finished(solver):
+            # solvers can overshoot their time limit, so also check that the run was actually faster
+            if _has_finished(solver) and solver.status().solve_time < self.best_runtime:
                 self.best_runtime = solver.status().solve_time
                 # update surrogate
                 self._best_config = params_np
@@ -121,7 +125,7 @@ class ParameterTuner:
         self.best_params = self._np_to_params(self._best_config)
         self.best_params.update(fix_params)
         if verbose >= 2:
-            print("Best runtime: {self.best_runtime} for params {self.best_params}")
+            print(f"Best runtime: {self.best_runtime} for params {self.best_params}")
 
         return self.best_params
 
@@ -172,7 +176,7 @@ class GridSearchTuner(ParameterTuner):
         # Init solver
         if verbose >= 1:
             print(f"Running {self.solvername} with default parameters")
-        solver = _run_solver(self.solvername, self.model, self.best_params, time_limit)
+        solver = _run_solver(self.solvername, self.model, {**self.best_params, **fix_params}, time_limit)
         if not _has_finished(solver):
             raise TimeoutError("Time's up before solving init solver call")
 
@@ -181,8 +185,9 @@ class GridSearchTuner(ParameterTuner):
         self.best_runtime = self.base_runtime
         if verbose >= 1:
             print(f" - took {self.best_runtime:.1f} seconds")
-        # Get all possible hyperparameter configurations
-        combos = list(param_combinations(self.all_params))
+        # Get all possible hyperparameter configurations, without the parameters that are fixed
+        tunables = {key: values for key, values in self.all_params.items() if key not in fix_params}
+        combos = list(param_combinations(tunables)) if len(tunables) else []
         shuffle(combos) # test in random order
 
         if max_tries is not None:
@@ -204,7 +209,8 @@ class GridSearchTuner(ParameterTuner):
                 print(f"Starting trial {i+1}/{len(combos)}, cap: {timeout:.1f}s" + f" budget: {time_limit-(time.time()-start_time):.1f}s" if time_limit else "")
             # run solver
             solver = _run_solver(self.solvername, self.model, params_dict, timeout)
-            if _has_finished(solver):
+            # solvers can overshoot their time limit, so also check that the run was actually faster
+            if _has_finished(solver) and solver.status().solve_time < self.best_runtime:
                 self.best_runtime = solver.status().solve_time
                 # update surrogate
                 self.best_params = params_dict
@@ -216,6 +222,7 @@ class GridSearchTuner(ParameterTuner):
             if time_limit is not None and (time.time() - start_time) >= time_limit:
                 break
 
+        self.best_params = {**self.best_params, **fix_params} # copy, do not modify the user-provided defaults
         if verbose >= 2:
             print(f"Best runtime: {self.best_runtime:.1f} for params {self.best_params}")
 
@@ -234,15 +241,16 @@ def _run_solver(solvername, model, params, time_limit):
         SolverInterface
             The solver after solving, to inspect its status.
     """
-    if isinstance(model, list):
-        solver = MultiSolver(solvername, model)
-        solver.solve(**params, time_limit=time_limit)
-    elif solvername.split(":")[0] in _INIT_PARAM_SOLVERS:
-        solver = SolverLookup.get(solvername, model, **params)
-        solver.solve(time_limit=time_limit)
+    if solvername.split(":")[0] in _INIT_PARAM_SOLVERS:
+        init_params, solve_params = params, {}
     else:
-        solver = SolverLookup.get(solvername, model)
-        solver.solve(**params, time_limit=time_limit)
+        init_params, solve_params = {}, params
+
+    if isinstance(model, list):
+        solver = MultiSolver(solvername, model, **init_params)
+    else:
+        solver = SolverLookup.get(solvername, model, **init_params)
+    solver.solve(**solve_params, time_limit=time_limit)
     return solver
 
 def _has_finished(solver):
@@ -285,7 +293,7 @@ class MultiSolver(SolverInterface):
         Aggregated solver status. Tracks runtime and per-solver exit statuses.
     """
 
-    def __init__(self,solvername,models):
+    def __init__(self, solvername, models, **kwargs):
         """
         Initialize a MultiSolver with the given list of solvers.
         Parameters
@@ -294,12 +302,15 @@ class MultiSolver(SolverInterface):
             Name of the solver backend (e.g., "ortools", "gurobi").
         models : list of Model
             The models to create solver instances for.
+        **kwargs : dict
+            Additional arguments passed to each solver's constructor
+            (e.g., parameters of solvers that only accept them at initialisation, such as Exact).
         """
 
         self.name = solvername
         self.solvers = []
         for mdl in models:
-            self.solvers.append(SolverLookup.get(solvername,mdl))
+            self.solvers.append(SolverLookup.get(solvername, mdl, **kwargs))
 
     def solve(self, time_limit=None, **kwargs):
         """
