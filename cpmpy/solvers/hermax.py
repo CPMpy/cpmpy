@@ -243,8 +243,8 @@ class CPM_hermax(SolverInterface):
         See https://hermax.readthedocs.io/ for the full list.
         """
         if "solver" in kwargs:
-            raise ValueError("The Hermax subsolver is fixed when the solver is created, select it via the solver name, "
-                             "e.g. model.solve(solver='hermax:EvalMaxSAT') or cp.SolverLookup.get('hermax:EvalMaxSAT')")
+            raise ValueError("The Hermax subsolver is fixed when the solver is created, select it in the constructor, "
+                             "e.g. CPM_hermax(solver='hermax:EvalMaxSAT') or cp.SolverLookup.get('hermax:EvalMaxSAT')")
 
         if time_limit is not None:
             if time_limit <= 0:
