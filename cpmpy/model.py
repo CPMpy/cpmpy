@@ -32,7 +32,7 @@ import time
 from typing import Optional
 
 from .exceptions import NotSupportedError
-from .expressions.core import Expression, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from .expressions.core import Expression, NestedBoolExprLike, ConstraintsLike
 from .expressions.utils import is_any_list, materialize_generators
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import ExitStatus, SolverInterface, SolverStatus, Callback
@@ -44,12 +44,12 @@ class Model(object):
     CPMpy Model object, contains the constraint and objective expressions
     """
 
-    def __init__(self, *args: NestedBoolExprLikeOrGen, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
+    def __init__(self, *args: ConstraintsLike, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
         """
             Arguments of constructor:
 
             Arguments:
-                *args (NestedBoolExprLikeOrGen): constraints passed to :meth:`add`
+                *args (ConstraintsLike): constraints passed to :meth:`add`
                 minimize (Expression): The objective to minimize
                 maximize (Expression): The objective to maximize
 
@@ -81,12 +81,12 @@ class Model(object):
             self.minimize(minimize)
 
         
-    def add(self, con: NestedBoolExprLikeOrGen) -> "Model":
+    def add(self, con: ConstraintsLike) -> "Model":
         """
         Add one or more constraints to the model.
 
         Arguments:
-            con (NestedBoolExprLikeOrGen): Boolean constraint expression or constant, or nested list/tuple/generator thereof
+            con (ConstraintsLike): Boolean constraint expression or constant, or nested list/tuple/generator thereof
 
         Returns:
             self

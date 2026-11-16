@@ -68,12 +68,12 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import MinizincNameException, MinizincBoundsException, MinizincPathException, NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, MDD, Regular
 from ..expressions.globalfunctions import Multiplication, FloatSum
-from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args, materialize_generators
+from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -613,13 +613,13 @@ class CPM_minizinc(SolverInterface):
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Decompose globals not supported (and flatten globalfunctions)
             ensure it is a list of constraints
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -631,7 +631,7 @@ class CPM_minizinc(SolverInterface):
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_minizinc":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_minizinc":
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
 
@@ -645,13 +645,13 @@ class CPM_minizinc(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
-        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
-        cpm_expr = materialize_generators(cpm_expr)
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
 
         get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints

@@ -52,11 +52,11 @@ from typing import Optional, Iterable
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
-from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison, materialize_generators
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -361,7 +361,7 @@ class CPM_z3(SolverInterface):
             self.obj_handle = self.z3_solver.maximize(z3_obj)
             self._minimize = False # record direction of optimisation
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -371,7 +371,7 @@ class CPM_z3(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -385,7 +385,7 @@ class CPM_z3(SolverInterface):
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_z3":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_z3":
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
@@ -399,13 +399,13 @@ class CPM_z3(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
-        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
-        cpm_expr = materialize_generators(cpm_expr)
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
 
         # all variables are user variables, handled in `solver_var()`
         # unless their constraint gets simplified away, so lets collect them anyway

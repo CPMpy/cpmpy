@@ -48,10 +48,10 @@ from typing import Iterable, Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from ..expressions.core import Expression, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_bool, is_int, argvals, is_any_list, materialize_generators
+from ..expressions.utils import is_bool, is_int, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -286,7 +286,7 @@ class CPM_pysdd(SolverInterface):
 
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -298,7 +298,7 @@ class CPM_pysdd(SolverInterface):
             For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -313,7 +313,7 @@ class CPM_pysdd(SolverInterface):
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_pysdd":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_pysdd":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -327,13 +327,13 @@ class CPM_pysdd(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
-        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
-        cpm_expr = materialize_generators(cpm_expr)
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
 
         newvars = get_variables(cpm_expr)
 

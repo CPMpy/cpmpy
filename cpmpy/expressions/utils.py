@@ -42,7 +42,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
+    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression, BoolVal, NestedBoolExprLike, ConstraintsLike
     from cpmpy.expressions.variables import NDVarArray
 
 NP_TYPES: Final = frozenset({
@@ -110,7 +110,7 @@ def is_any_list(arg) -> TypeGuard[list | tuple | np.ndarray]:
     """
     return isinstance(arg, (list, tuple, np.ndarray))
 
-def materialize_generators(arg: "NestedBoolExprLikeOrGen") -> "NestedBoolExprLike":
+def materialize_generators(arg: "ConstraintsLike") -> "NestedBoolExprLike":
     """ recursively replace generator expressions in `arg` (at any list/tuple nesting level) by lists
 
         Allows writing `m.add(x != 3 for x in Y)` instead of `m.add([x != 3 for x in Y])`.

@@ -56,7 +56,7 @@ from packaging.version import Version
 from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, NestedBoolExprLikeOrGen
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
@@ -67,7 +67,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int, materialize_generators
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int
 from ..exceptions import NotSupportedError
 
 import numpy as np
@@ -502,7 +502,7 @@ class CPM_exact(SolverInterface):
 
         return xcfvars, self.fix(xrhs)
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
         Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -512,7 +512,7 @@ class CPM_exact(SolverInterface):
         See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
         Arguments:
-            cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+            cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
         Returns:
             list[Expression]: transformed constraints
@@ -551,7 +551,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr):  # helper function (Multiplication is GlobalFunction name 'mul')
         return isinstance(cpm_expr, Multiplication)
 
-    def add(self, cpm_expr: NestedBoolExprLikeOrGen) -> "CPM_exact":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_exact":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -565,13 +565,13 @@ class CPM_exact(SolverInterface):
             are auxiliary variables created by transformations.
 
         Arguments:
-            cpm_expr (NestedBoolExprLikeOrGen): CPMpy expression, or a collection thereof
+            cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
         Returns:
             self
         """
-        # support generator expressions, e.g. `add(x != 3 for x in Y)`, by turning them into lists
-        cpm_expr = materialize_generators(cpm_expr)
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
 
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
