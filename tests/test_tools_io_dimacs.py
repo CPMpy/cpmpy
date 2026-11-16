@@ -253,6 +253,25 @@ class TestWriteCNF:
 
         assert expected <= _annotation_names(text)
 
+    @pytest.mark.parametrize(
+        "encoding,annotate,expected",
+        [
+            pytest.param("order", SugarAnnotator(), {"p!x,2", "px,3"}, id="sugar-order"),
+            pytest.param("direct", SugarAnnotator(), {"px=1", "px!=2", "px=3"}, id="sugar-direct"),
+            pytest.param("order", VeriPBAnnotator(), {"x_lt_2", "x_ge_3"}, id="veripb-order"),
+            pytest.param("direct", VeriPBAnnotator(), {"x_eq_1", "x_ne_2", "x_eq_3"}, id="veripb-direct"),
+        ],
+    )
+    def test_annotate_negated_encoding_literals(self, encoding, annotate, expected):
+        # the reified comparison is reused by the encoding as a negated literal
+        x, y, z = cp.intvar(1, 3, name="x"), cp.intvar(0, 3, name="y"), cp.intvar(0, 3, name="z")
+        cond = (x < 2) if encoding == "order" else (x != 2)
+        model = cp.Model(cond == (y == z), y != z)
+
+        text = write_dimacs(model, encoding=encoding, annotate_bool=annotate, header="")
+
+        assert expected <= _annotation_names(text)
+
 
 # --------------------------------------------------------------------------- #
 #                              Real instance                                  #

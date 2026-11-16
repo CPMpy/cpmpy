@@ -28,6 +28,7 @@ List of classes
 from abc import ABC, abstractmethod
 from typing import Any
 
+from cpmpy.expressions.variables import NegBoolView
 from cpmpy.transformations.int2bool import IntVarEnc, IntVarEncDirect, IntVarEncOrder, IntVarEncLog
 
 
@@ -104,17 +105,18 @@ class SugarAnnotator(BooleanEncodingAnnotator):
 
             src = info["source_name"]
 
+            neg = info["negated"]
             if info["encoding"] == "order":
-                # Sugar order encoding: px,a means x <= a
-                name = f"p{src},{info['threshold']}"
+                # Sugar order encoding: px,a means x <= a, p!x,a its negation
+                name = f"p{'!' if neg else ''}{src},{info['threshold']}"
 
             elif info["encoding"] == "direct":
-                # Sugar-like direct encoding: px=a means x = a
-                name = f"p{src}={info['value']}"
+                # Sugar-like direct encoding: px=a means x = a, px!=a means x != a
+                name = f"p{src}{'!=' if neg else '='}{info['value']}"
 
             elif info["encoding"] == "binary":
-                # Sugar-like binary/log encoding: px#i means bit i of x
-                name = f"p{src}#{info['bit']}"
+                # Sugar-like binary/log encoding: px#i means bit i of x, p!x#i its negation
+                name = f"p{'!' if neg else ''}{src}#{info['bit']}"
 
             else:
                 name = _safe_name(v)
@@ -175,11 +177,11 @@ class VeriPBAnnotator(BooleanEncodingAnnotator):
                 else:
                     names.append(_veripb_safe_name(vname))
             elif info["encoding"] == "order":
-                names.append(f"{_veripb_safe_name(info['source_name'])}_ge_{info['threshold']}")
+                names.append(f"{_veripb_safe_name(info['source_name'])}_{'lt' if info['negated'] else 'ge'}_{info['threshold']}")
             elif info["encoding"] == "binary":
-                names.append(f"{_veripb_safe_name(info['source_name'])}_bit{info['bit']}")
+                names.append(f"{_veripb_safe_name(info['source_name'])}_{'nbit' if info['negated'] else 'bit'}{info['bit']}")
             elif info["encoding"] == "direct":
-                names.append(f"{_veripb_safe_name(info['source_name'])}_eq_{info['value']}")
+                names.append(f"{_veripb_safe_name(info['source_name'])}_{'ne' if info['negated'] else 'eq'}_{info['value']}")
             else:
                 names.append(_veripb_safe_name(_safe_name(v)))
         return names
@@ -197,35 +199,26 @@ def _build_reverse_map(ivarmap: dict[str, IntVarEnc]) -> dict[int, dict[str, Any
     """
     Build a reverse lookup from BoolVar object ID to decode info.
 
-    Returns: dict {id(BoolVar) -> {"source_name": str, "encoding": str, ...}}
+    Returns: dict {id(BoolVar) -> {"source_name": str, "negated": bool, "encoding": str, ...}}
     """
     reverse = {}
     for _var_name, enc in ivarmap.items():
         orig_name = enc._x.name
-        if isinstance(enc, IntVarEncOrder):
-            # xs[i] represents the condition  x >= lb + 1 + i
-            for i, bv in enumerate(enc._xs):
-                reverse[id(bv)] = {
-                    "source_name": orig_name,
-                    "encoding": "order",
-                    "threshold": enc._x.lb + 1 + i,
-                }
-        elif isinstance(enc, IntVarEncDirect):
-            # xs[i] represents the condition  x == lb + i
-            for i, bv in enumerate(enc._xs):
-                reverse[id(bv)] = {
-                    "source_name": orig_name,
-                    "encoding": "direct",
-                    "value": enc._x.lb + i,
-                }
-        elif isinstance(enc, IntVarEncLog):
-            # xs[i] is the bit at position i (value contribution: 2^i, offset by lb)
-            for i, bv in enumerate(enc._xs):
-                reverse[id(bv)] = {
-                    "source_name": orig_name,
-                    "encoding": "binary",
-                    "bit": i,
-                }
+        for i, bv in enumerate(enc._xs):
+            if isinstance(enc, IntVarEncOrder):
+                # xs[i] represents the condition  x >= lb + 1 + i
+                info = {"encoding": "order", "threshold": enc._x.lb + 1 + i}
+            elif isinstance(enc, IntVarEncDirect):
+                # xs[i] represents the condition  x == lb + i
+                info = {"encoding": "direct", "value": enc._x.lb + i}
+            elif isinstance(enc, IntVarEncLog):
+                # xs[i] is the bit at position i (value contribution: 2^i, offset by lb)
+                info = {"encoding": "binary", "bit": i}
+            else:
+                continue
+            # a negated literal annotates its underlying variable with the negated condition
+            negated = isinstance(bv, NegBoolView)
+            reverse[id(bv._bv if negated else bv)] = {"source_name": orig_name, "negated": negated, **info}
     return reverse
 
     

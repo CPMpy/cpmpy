@@ -143,3 +143,18 @@ class TestTransInt2Bool:
          SOL_IN: {cons_sols}
          SOL_OU: {flat_sols}
         """
+
+    @pytest.mark.requires_solver("pindakaas", "pysat")
+    @pytest.mark.parametrize("encoding", ["order", "direct"])
+    def test_user_var_with_negated_encoding_literal(self, solver, encoding):
+        # the reified comparison is reused by the encoding of x as a negated literal
+        x, y, z = intvar(0, 3), intvar(0, 3), intvar(0, 3)
+        cond = (x < 1) if encoding == "order" else (x != 1)
+        model = cp.Model(cond == (y == z), y != z)
+
+        s = SolverLookup.get(solver)
+        s.encoding = encoding
+        s += model.constraints
+        assert s.solve()
+        assert x.value() is not None
+        assert model.constraints[0].value() and model.constraints[1].value()
