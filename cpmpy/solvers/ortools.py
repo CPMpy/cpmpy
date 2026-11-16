@@ -89,7 +89,7 @@ class CPM_ortools(SolverInterface):
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
-    supported_half_reified_global_constraints = supported_global_constraints - {"min", "max", "abs", "mul", "div", "mod", "pow", "element"}
+    supported_half_reified_global_constraints = supported_global_constraints
 
     @staticmethod
     def supported():
@@ -465,11 +465,10 @@ class CPM_ortools(SolverInterface):
                                      supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(cpm_cons, supported=self.supported_half_reified_global_constraints | {'sum', 'wsum'}, csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # everything that can create
-                                             # reified expr must go before this
         return cpm_cons
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_ortools":
