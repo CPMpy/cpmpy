@@ -29,7 +29,7 @@ class TestTransfDecomp:
                          "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
                          "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
-        assert str(decompose_in_tree(cons, supported={"alldifferent"}, supported_reified={"alldifferent"})) ==str(cons)
+        assert str(decompose_in_tree(cons, supported={"alldifferent"}, supported_half_reified={"alldifferent"})) ==str(cons)
 
         cons = [cp.AllDifferent(ivs).implies(bv)]
         assert str(decompose_in_tree(cons)) == \
@@ -407,12 +407,15 @@ class TestTransfDecomp:
             assert str(decompose_in_tree(cons, supported=supported, supported_half_reified=half_reified)) == \
                    str(decompose_in_tree(cons, supported=supported))
 
-        # supported_reified globals are also supported half-reified
         cons = [bv == alldiff]
         assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified)) == str(cons)
         cons = [cp.AllEqual(ivs[:2]).implies(alldiff)]
-        assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified)) == \
+        assert str(decompose_in_tree(cons, supported=supported, supported_half_reified=half_reified)) == \
                "[((x) == (y)) -> (alldifferent(x,y,z))]"
+        # supported_reified does not imply supported_half_reified
+        cons = [bv.implies(alldiff)]
+        assert str(decompose_in_tree(cons, supported=supported, supported_reified=half_reified)) == \
+               str(decompose_in_tree(cons, supported=supported))
 
     def test_decompose_half_reified_args(self):
         x, y, z = [cp.intvar(1, 9, name=n) for n in "xyz"]
