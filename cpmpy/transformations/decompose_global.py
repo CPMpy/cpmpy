@@ -152,7 +152,9 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
                 changed = True
                 subexpr = expr.args[1]
-                if decompose_custom_positive is not None and subexpr.name in decompose_custom_positive:
+                if subexpr.name in supported and hasattr(subexpr, "reformulate_toplevel"):
+                    exprs, toplevel_exprs = subexpr.reformulate_toplevel()
+                elif decompose_custom_positive is not None and subexpr.name in decompose_custom_positive:
                     exprs, toplevel_exprs = decompose_custom_positive[subexpr.name](subexpr)
                 elif decompose_custom is not None and subexpr.name in decompose_custom:
                     exprs, toplevel_exprs = decompose_custom[subexpr.name](subexpr)
