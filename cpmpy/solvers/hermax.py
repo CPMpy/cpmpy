@@ -113,6 +113,10 @@ class CPM_hermax(SolverInterface):
     supported_reified_global_constraints = frozenset({
         "alldifferent", "lex_less", "lex_lesseq", "cumulative", "no_overlap", "table", "negative_table",
     })
+    supported_half_reified_global_constraints = supported_reified_global_constraints | frozenset({
+        "alldifferent_except_0", "alldifferent_except_n", "allequal_except_n", "increasing", "precedence",
+        "regular", "mdd",
+    })
 
     @staticmethod
     def supported():
@@ -445,12 +449,13 @@ class CPM_hermax(SolverInterface):
             cpm_cons,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
+            supported_half_reified=self.supported_half_reified_global_constraints,
             csemap=self._csemap,
         )
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(
             cpm_cons,
-            supported=frozenset({"or", "sum", "wsum", "sub"}) | self.supported_reified_global_constraints,
+            supported=frozenset({"or", "sum", "wsum", "sub"}) | self.supported_half_reified_global_constraints,
             csemap=self._csemap,
         )
         cpm_cons = only_numexpr_equality(
@@ -513,7 +518,7 @@ class CPM_hermax(SolverInterface):
                     return ~hm_bv | self._hermax_expr(subexpr)
                 if isinstance(subexpr, GlobalConstraint) and subexpr.name == "negative_table":
                     return self._hermax_table(subexpr).implies(~hm_bv)
-                if isinstance(subexpr, Comparison) or (isinstance(subexpr, GlobalConstraint) and subexpr.name in self.supported_reified_global_constraints):
+                if isinstance(subexpr, (Comparison, GlobalConstraint)):
                     hm_sub = self._hermax_expr(subexpr)
                     # Hermax may constant-fold a comparison to True/False once domains
                     # are fixed by earlier posts; literals have .only_if(), bools do not.

@@ -1,3 +1,3 @@
 numpy >= 1.5
-ortools >=9.12
+ortools >=9.15
 packaging # to check solver versions
