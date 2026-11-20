@@ -373,7 +373,7 @@ def get_or_make_var(expr, csemap=None):
         if new_var is None: # it's not in the map
             new_var, expr_eq_var = csemap.get_or_make_var(flatexpr)
         if flatexpr is not expr: # avoid additional hash call if expr was flat already
-            csemap.flat_map[expr] = new_var
+            csemap.store(expr, new_var)
 
 
     if expr_eq_var is not None:
