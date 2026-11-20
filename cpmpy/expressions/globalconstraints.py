@@ -109,6 +109,7 @@
         AllEqual
         AllEqualExceptN
         Circuit
+        CircuitArcs
         Inverse
         Table
         ShortTable
@@ -148,7 +149,7 @@ import cpmpy as cp
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray, _NumVarImpl
-from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_int, is_boolexpr, implies, argval
+from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_int, is_boolexpr, implies, argval, is_true_cst, is_false_cst
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -497,6 +498,203 @@ class Circuit(GlobalConstraint):
             idx = arr[idx]
 
         return len(visited) == len(self.args) and idx == 0
+
+
+class CircuitArcs(GlobalConstraint):
+    """
+    Enforces that the selected arcs form a circuit, where (i, j, lit) means node j is the successor of node i when lit is true.
+    Every node that appears in the arcs is visited exactly once. Nodes are represented with integers or strings.
+    """
+    def __init__(self, arcs: ListLike[tuple[int | str, int | str, BoolExprLike]]):
+        """
+        Arguments:
+            arcs (list[tuple[int | str, int | str, BoolExprLike]]): Arcs ``(source, destination, literal)``. Node ids are integers or strings.
+        """
+
+        if isinstance(arcs, np.ndarray):
+            flat_arcs = arcs.flatten()
+            num_arcs = len(flat_arcs) / 3
+            if not int(num_arcs) == num_arcs: # not divideable by 3
+                raise ValueError(f"CircuitArcs arcs must be triples (source, destination, literal), got {arcs}")
+            arcs = flat_arcs.reshape(int(num_arcs), 3)
+
+        src_ids: list[int | str] = []
+        dst_ids: list[int | str] = []
+        literals = []
+        for arc in arcs:
+            if not is_any_list(arc) or len(arc) != 3:
+                raise ValueError(f"CircuitArcs arcs must be triples (source, destination, literal), got {arc}")
+            src, dst, lit = arc
+            if not is_boolexpr(lit):
+                raise TypeError(f"CircuitArcs arc literal must be Boolean, got {lit}")
+            if isinstance(src, (bool, np.bool_)) or not isinstance(src, (str, int)):
+                raise TypeError(f"CircuitArcs source must be int or string, got {src}")
+            if isinstance(dst, (bool, np.bool_)) or not isinstance(dst, (str, int)):
+                raise TypeError(f"CircuitArcs destination must be int or string, got {dst}")
+
+            src_ids.append(src)
+            dst_ids.append(dst)
+            literals.append(lit)
+
+        # same restriction as standard Circuit: at least two nodes, no self-loops allowed.
+        if len(set(src_ids + dst_ids)) < 2:
+            raise ValueError(f"CircuitArcs must have at least two nodes in the graph, got {set(src_ids + dst_ids)}")
+
+        node_ids = src_ids + dst_ids
+        if any(isinstance(node, str) for node in node_ids) and any(not isinstance(node, str) for node in node_ids):
+            raise TypeError("CircuitArcs node ids must all be integers or all be strings")
+
+        super().__init__("circuit_arcs", tuple(literals))
+        self.tails = np.array(src_ids)
+        self.heads = np.array(dst_ids)
+        self.node_map = {node: i for i, node in enumerate(sorted(set(node_ids)))}
+
+    @property
+    def args(self) -> tuple[BoolExprLike,...]:
+        """ READ-ONLY, the well-typed arguments of this global constraint
+        """
+        return self._args
+
+    def _to_circuit(self, positive_only: bool = False) -> tuple[list[Expression], list[Expression]]:
+        """
+        Reformulate as a standard Circuit constraint.
+
+        When exactly one outgoing literal is true, the successor is that arc's head.
+        Otherwise the successor is the node itself, which :class:`Circuit` rejects.
+        ``positive_only`` channels each arc directly instead, which is enough when the reformulation is not negated.
+
+        Arguments:
+            positive_only (bool, default: False): Channel ``succ[src] == dst`` directly to each arc literal
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        literals = self.args
+        n = len(self.node_map)
+
+        graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(n)]
+        for src, dst, lit in zip(self.tails, self.heads, literals):
+            graph[self.node_map[src]].append((self.node_map[dst], lit))
+
+        succ = intvar(0, n - 1, shape=n)
+        cons: list[Expression] = [Circuit(succ)]
+        defining: list[Expression] = []
+        for src, outgoing in enumerate(graph):
+            outgoing_lits = [lit for _, lit in outgoing]
+            heads = [dst for dst, _ in outgoing]
+            if positive_only:
+                for dst, lit in outgoing:
+                    cons.append((succ[src] == dst) == lit)
+                cons.append(InDomain(succ[src], heads))
+                continue
+
+            # the literal picks the head; without it, sum == 1 would force every head at once
+            total = cp.sum(outgoing_lits) if len(outgoing_lits) > 0 else 0
+            defining.append(implies(total != 1, succ[src] == src))
+            for dst, lit in outgoing:
+                defining.append(implies((total == 1) & lit, succ[src] == dst))
+            defining.append(InDomain(succ[src], heads + [src]))
+
+        return cons, defining
+
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decompose to standard Circuit constraint.
+        This ensures the decomposition is also valid in negative context.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        return self._to_circuit()
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Sparse Miller-Tucker-Zemlin decomposition, valid only in a positive context.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+
+        literals = self.args
+        n = len(self.node_map)
+        order = cp.intvar(0, n - 1, shape=n)
+
+        constraining: list[Expression] = []
+        defining: list[Expression] = [cp.AllDifferent(order), order[0] == 0]
+
+        graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(n)]
+        inverse_graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(n)]
+        for src, dst, lit in zip(self.tails, self.heads, literals):
+            graph[self.node_map[src]].append((self.node_map[dst], lit))
+            inverse_graph[self.node_map[dst]].append((self.node_map[src], lit))
+
+        for (src, outgoing) in enumerate(graph):
+            outgoing_lits = []
+            for dst, lit in outgoing:
+                if src == dst:
+                    if isinstance(lit, Expression):
+                        constraining.append(lit == 0)
+                    elif is_true_cst(lit):
+                        constraining.append(BoolVal(False))
+                elif dst != 0 and not is_false_cst(lit):
+                    constraining.append(implies(lit, order[src] + 1 == order[dst]))
+                outgoing_lits.append(lit)
+            constraining.append(cp.sum(outgoing_lits) == 1)
+
+        # redundant constraint
+        for (dst, incoming) in enumerate(inverse_graph):
+            incoming_lits = [lit for _, lit in incoming]
+            constraining.append(cp.sum(incoming_lits) == 1)
+
+        return constraining, defining
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+
+        literals = argvals(self.args)
+        if any(lit is None for lit in literals):
+            return None
+
+        n = len(self.node_map)
+        graph: list[list[tuple[int, bool]]] = [[] for _ in range(n)]
+        for src, dst, lit in zip(self.tails, self.heads, literals):
+            graph[self.node_map[src]].append((self.node_map[dst], lit))
+
+        start = 0
+        visited = {start}
+        at = start
+        while 1:
+            to = None
+            i = -1
+            for i, (dst, lit) in enumerate(graph[at]):
+                if lit:
+                    to = dst
+                    break
+            if i >= 0 and any(taken for _, taken in graph[at][i + 1:]):
+                return False # two outgoing arcs
+
+            if to is None:
+                return False # no outgoing arcs
+
+            if to in visited:
+                break
+            visited.add(to)
+            at = to
+
+        if to != start:
+            return False # did not return to start
+
+        if len(visited) != n:
+            return False # did not visit all nodes
+
+        return True
+
+    def __repr__(self) -> str:
+        shown = ",".join(f"({i},{j},{lit})" for i, j, lit in zip(self.tails, self.heads, self.args))
+        return f"{self.name}([{shown}])"
 
 
 class Inverse(GlobalConstraint):
