@@ -1,3 +1,6 @@
+# Generated copy of skills/ for library-skills discovery (see skills/sync_into_package.py)
+cpmpy/.agents/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
