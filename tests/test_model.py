@@ -30,6 +30,14 @@ class TestModel:
         m += [] # should do nothing
         assert(len(m.constraints) == 0)
 
+    def test_generator(self):
+        iv = cp.intvar(1,3, shape=3)
+        # generator expressions get materialized into lists
+        m = cp.Model(x != 3 for x in iv)
+        m.add(x != 1 for x in iv)
+        m += [iv[0] <= iv[1], (x <= y for x, y in [(iv[1], iv[2])])]
+        assert not any(c.__class__.__name__ == "generator" for c in m.constraints)
+
     def test_io_nempty(self):
         fname = join(self.tempdir, "model")
         iv = cp.intvar(1,9, shape=3)

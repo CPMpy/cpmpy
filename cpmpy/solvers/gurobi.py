@@ -51,7 +51,7 @@ from cpmpy.transformations.negation import push_down_negation, push_down_negatio
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -376,7 +376,7 @@ class CPM_gurobi(SolverInterface):
 
         raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -386,7 +386,7 @@ class CPM_gurobi(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -411,7 +411,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_gurobi":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_gurobi":
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -425,11 +425,14 @@ class CPM_gurobi(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
       """
+      # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+      cpm_expr = toplevel_list(cpm_expr)
+
       from gurobipy import GRB
 
       # add new user vars to the set

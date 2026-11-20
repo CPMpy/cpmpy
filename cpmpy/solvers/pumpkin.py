@@ -46,7 +46,7 @@ from packaging.version import Version
 
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.globalconstraints import Cumulative, GlobalConstraint, NoOverlap
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.utils import is_num, is_int, is_any_list, get_bounds
@@ -358,7 +358,7 @@ class CPM_pumpkin(SolverInterface):
         return self._objective is not None
 
     # `__add__()` first calls `transform()`
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -368,7 +368,7 @@ class CPM_pumpkin(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -627,7 +627,7 @@ class CPM_pumpkin(SolverInterface):
             raise ValueError("Unexpected constraint:", cpm_expr)
 
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pumpkin":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_pumpkin":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -641,11 +641,14 @@ class CPM_pumpkin(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
+
         if self.pum_solver.is_inconsistent():
             return self # cannot post any more constraints once inconsistency is reached
 

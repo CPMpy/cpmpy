@@ -1120,6 +1120,13 @@ class TestGlobal:
         assert cp.Model(cp.Xor(bv)).solve(solver=solver)
         assert cp.Xor(bv).value()
 
+    def test_xor_generator(self, solver):
+        bv = cp.boolvar(5)
+        expr = cp.Xor(b for b in bv)
+        assert len(expr.args) == 5
+        assert cp.Model(expr).solve(solver=solver)
+        assert expr.value()
+
     def test_xor_with_constants(self, solver):
 
         bvs = cp.boolvar(shape=3)

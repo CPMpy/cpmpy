@@ -4,11 +4,12 @@
 
 import copy
 from collections.abc import Callable, Iterable
+from types import GeneratorType
 from typing import Any
 
 import numpy as np
 
-from ..expressions.core import BoolVal, Expression, Comparison, Operator, NestedBoolExprLike
+from ..expressions.core import BoolVal, Expression, Comparison, Operator, ConstraintsLike
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..exceptions import NotSupportedError
@@ -16,12 +17,12 @@ from ..expressions.globalconstraints import GlobalConstraint
 from .negation import recurse_negation
 
 
-def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> list[Expression]:
+def toplevel_list(cpm_expr: ConstraintsLike, merge_and: bool = True) -> list[Expression]:
     """
-    Unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
+    Unravels nested lists, (nested) generator expressions and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
 
     Arguments:
-        cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+        cpm_expr (ConstraintsLike): CPMpy expression, or (nested) list/tuple/generator thereof
         merge_and (bool):  if True then a toplevel 'and' will have its arguments merged at top level
     """
 
@@ -36,7 +37,7 @@ def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> list[
                     append(e) # presumably the most frequent case
             elif isinstance(e, np.ndarray):
                 unravel(e.flat, append)  # return iterator over flat elements
-            elif isinstance(e, (list, tuple, np.flatiter)):
+            elif isinstance(e, (list, tuple, np.flatiter, GeneratorType)):
                 unravel(e, append)
             elif e is False or e is np.False_:
                 append(BoolVal(False))

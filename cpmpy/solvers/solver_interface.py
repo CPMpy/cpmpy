@@ -25,7 +25,7 @@ import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike
+from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike, ConstraintsLike
 from ..expressions.variables import _NumVarImpl
 from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
@@ -202,7 +202,7 @@ class SolverInterface(object):
                 res.append(self.solver_var(cpm_var))
         return res
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -212,14 +212,14 @@ class SolverInterface(object):
             See the 'Adding a new solver' docs on readthedocs for more information.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
         """
         return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
+    def add(self, cpm_expr: ConstraintsLike) -> "SolverInterface":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -233,11 +233,14 @@ class SolverInterface(object):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
+
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
 
@@ -248,7 +251,7 @@ class SolverInterface(object):
         return self
     
     # needed here for subclasses that don't do the more direct `__add__ = add` in their class
-    def __add__(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
+    def __add__(self, cpm_expr: ConstraintsLike) -> "SolverInterface":
         return self.add(cpm_expr)
 
 
