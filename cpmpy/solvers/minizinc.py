@@ -477,6 +477,7 @@ class CPM_minizinc(SolverInterface):
         kwargs['all_solutions'] = True
 
         solution_count = 0
+        seen = set()  # the solver enumerates all variables, skip solutions that only differ in auxiliary variables
         # has an asynchronous generator
         async for mzn_result in mzn_inst.solutions(**kwargs):
             # was the last one
@@ -491,6 +492,11 @@ class CPM_minizinc(SolverInterface):
                     cpm_var._value = getattr(mznsol, sol_var)
                 else:
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
+
+            sol = tuple(v.value() for v in self.user_vars)
+            if sol in seen:
+                continue
+            seen.add(sol)
 
             # display if needed
             self.print_display(display)
