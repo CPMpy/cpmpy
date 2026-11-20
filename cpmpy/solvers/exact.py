@@ -697,3 +697,50 @@ class CPM_exact(SolverInterface):
         vals = flatlist(vals)
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
         self.xct_solver.setSolutionHints(list(zip(self.solver_vars(cpm_vars), vals)))
+
+    @classmethod
+    def tunable_params(cls):
+        """
+            Suggestion of tunable hyperparameters of the solver.
+            Exact only accepts parameters at initialisation, see `cp.SolverLookup.get("exact", model, **params)`.
+            Options are documented in https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
+        """
+        return {
+            # conflict analysis
+            'ca-multweaken': [0, 1],
+            'ca-cancelingunknowns': [0, 1],
+            'ca-min': [0, 1],
+            'ca-weaken-nonimplying': [0, 1],
+            'ca-multiply': [0, 1],
+            # branching heuristic
+            'var-weight': [0.5, 0.99, 1],  # 0.5 = ACIDS, 1 = VMTF
+            'var-objective': [0, 1],
+            # optimisation
+            'opt-coreguided': [0, 1],
+            'opt-ratio': [0, 0.5, 1],  # 0 = top-down, 1 = fully bottom-up
+            'opt-reusecores': [0, 1],
+            # presolve / inprocessing
+            'inp-purelits': [0, 1],
+            'inp-dombreaklim': [-1, 0, 100, 10000],
+            'inp-probing': [0, 1],
+            'inp-atmostone': [0, 0.1, 0.5, 1],
+        }
+
+    @classmethod
+    def default_params(cls):
+        return {
+            'ca-multweaken': 1,
+            'ca-cancelingunknowns': 0,
+            'ca-min': 1,
+            'ca-weaken-nonimplying': 0,
+            'ca-multiply': 1,
+            'var-weight': 0.99,
+            'var-objective': 0,
+            'opt-coreguided': 1,
+            'opt-ratio': 0.5,
+            'opt-reusecores': 1,
+            'inp-purelits': 1,
+            'inp-dombreaklim': 0,
+            'inp-probing': 1,
+            'inp-atmostone': 0.1,
+        }
