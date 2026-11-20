@@ -42,6 +42,7 @@ List of solver submodules
     pumpkin
     cplex
     hexaly
+    optal
     rc2
     hermax
     scip
@@ -80,6 +81,7 @@ from .pindakaas import CPM_pindakaas
 from .pumpkin import CPM_pumpkin
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
+from .optal import CPM_optal
 from .rc2 import CPM_rc2
 from .hermax import CPM_hermax
 from .scip import CPM_scip
@@ -96,6 +98,7 @@ __all__ = [
     "CPM_hexaly",
     "CPM_highs",
     "CPM_minizinc",
+    "CPM_optal",
     "CPM_ortools",
     "CPM_pindakaas",
     "CPM_pumpkin",

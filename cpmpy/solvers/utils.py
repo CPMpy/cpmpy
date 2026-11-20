@@ -34,6 +34,7 @@ from .cplex import CPM_cplex
 from .pindakaas import CPM_pindakaas
 from .highs import CPM_highs
 from .hexaly import CPM_hexaly
+from .optal import CPM_optal
 from .rc2 import CPM_rc2
 from .hermax import CPM_hermax
 
@@ -93,6 +94,7 @@ class SolverLookup():
                 ("pindakaas", CPM_pindakaas),
                 ("highs", CPM_highs),
                 ("hexaly", CPM_hexaly),
+                ("optal", CPM_optal),
                 ("rc2", CPM_rc2),
                 ("hermax", CPM_hermax),
                 ("scip", CPM_scip),
