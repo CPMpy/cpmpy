@@ -514,32 +514,53 @@ class NDVarArray(np.ndarray):
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
 
-        # index is single expression: direct element (1D only)
+        # index is single expression: direct element
         if isinstance(index, Expression):
-            if self.ndim != 1:
-                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
-            return cp.Element(self, index)
+            if self.ndim == 1:
+                return cp.Element(self, index)
+            index = (index,)  # e.g. arr[a] on a 2D array, same as arr[a, :]
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
 
-            if len(index) != self.ndim:
-                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
+            if len(index) > self.ndim:
+                raise IndexError(f"too many indices for array: array is {self.ndim}-dimensional, but {len(index)} were indexed")
+            index = index + (slice(None),) * (self.ndim - len(index))  # missing trailing indices are full slices
 
             # eliminate constant indices to reduce dimensionality
             selector = []
             new_indices = []
+            var_axes = []  # position of the axes indexed by an expression, in the reduced array
+            n_kept = 0
             for idx in index:
                 if isinstance(idx, Expression):
                     selector.append(slice(None))  # keep this axis (equivalent to `:` when used as index), to pass to element constraint
                     new_indices.append(idx)
+                    var_axes.append(n_kept)
+                    n_kept += 1
+                elif isinstance(idx, slice):
+                    selector.append(idx)  # constant slice, axis is kept in the result
+                    n_kept += 1
+                elif is_int(idx):
+                    selector.append(idx)  # constant index, axis is removed
                 else:
-                    selector.append(idx)  # constant index
+                    raise NotImplementedError(f"CPMpy does not support combining decision variable indices with index {idx}. If you really need this, please report on github.")
             arr = self[tuple(selector)]
 
-            if len(new_indices) == 1:
-                return cp.Element(arr, new_indices[0])
-            return cp.NDElement(arr, new_indices)
+            # move the axes indexed by an expression to the front, remaining (sliced) axes form the shape of the result
+            k = len(new_indices)
+            arr = np.moveaxis(arr, var_axes, list(range(k)))
+            out_shape = arr.shape[k:]
+
+            def make_element(sub):
+                if k == 1:
+                    return cp.Element(sub, new_indices[0])
+                return cp.NDElement(sub, new_indices)
+
+            if len(out_shape) == 0:
+                return make_element(arr)
+            # one element constraint per position in the sliced axes, e.g. arr[:, a] -> [arr[0, a], arr[1, a], ...]
+            return cpm_array([make_element(arr[(slice(None),) * k + pos]) for pos in np.ndindex(*out_shape)]).reshape(out_shape)
 
         # vectorized indexing: arr[idx_array] -> [arr[idx0], arr[idx1], ...] (shape of index)
         if isinstance(index, (list, np.ndarray)):
