@@ -8,7 +8,7 @@ from typing import List
 
 from ..expressions.core import BoolVal, Comparison, Expression, Operator
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..transformations.flatten_model import get_or_make_var
 from ..expressions.utils import is_int
 
@@ -474,6 +474,6 @@ def replace_int_user_vars(user_vars, ivarmap):
         if isinstance(x, _BoolVarImpl):
             bool_user_vars.add(x)
         else:
-            # extends set with encoding variables of `x`
-            bool_user_vars.update(ivarmap[x.name].vars())
+            # extends set with encoding variables of `x` (negated literals by their underlying variable)
+            bool_user_vars.update(v._bv if isinstance(v, NegBoolView) else v for v in ivarmap[x.name].vars())
     return bool_user_vars
