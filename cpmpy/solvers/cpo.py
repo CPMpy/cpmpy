@@ -78,6 +78,7 @@ class CPM_cpo(SolverInterface):
                                               'cumulative', 'cumulative_optional', 'no_overlap', 'no_overlap_optional',
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "nvalue"})
     supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
     _docp = None  # Static attribute to hold the docplex.cp module
 
@@ -444,6 +445,7 @@ class CPM_cpo(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         # no flattening required
         return cpm_cons

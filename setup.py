@@ -20,7 +20,7 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 
 
 solver_dependencies = {
-    "ortools": ["ortools>=9.12"],
+    "ortools": ["ortools>=9.15"],
     "z3": ["z3-solver>=5.0.0"],
     "choco": ["pychoco>=0.3.0"],  # table short-table API uses uvalue (renamed in 0.3.0)
     "exact": ["exact>=2.1.0,!=2.1.1,!=2.1.2"], # 2.1.1 and 2.1.2 (py3.13-only wheels) are broken, use >=2.2.1 on py3.13
@@ -70,7 +70,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'ortools>=9.3.10497,!=9.9.*,!=9.10.*,!=9.11.*',
+        'ortools>=9.15',
         'numpy>=1.5',
         'setuptools',
         'packaging', # to check solver versions
