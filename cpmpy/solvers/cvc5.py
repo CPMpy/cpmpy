@@ -288,7 +288,7 @@ class CPM_cvc5(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = time.time() - start_time
+        self.cpm_status.solve_time = time.time() - start_time
 
         # translate exit status
         if my_status == "sat":
@@ -440,11 +440,12 @@ class CPM_cvc5(SolverInterface):
                 break
 
             if time_limit is not None: # update remaining time
-                time_limit -= self.status().runtime
+                time_limit -= self.status().solve_time
         end = time.time()
 
         # update solver status
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
+        self.cpm_status.runtime = None  # status() copies solve_time onto runtime
         if solution_count:
             if solution_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
