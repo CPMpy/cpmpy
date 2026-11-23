@@ -504,6 +504,7 @@ class CircuitArcs(GlobalConstraint):
     """
     Enforces that the selected arcs form a circuit, where (i, j, lit) means node j is the successor of node i when lit is true.
     Every node that appears in the arcs is visited exactly once. Nodes are represented with integers or strings.
+    Parallel edges are currently not supported. If you need this, please report on GitHub with a usecase.
     """
     def __init__(self, arcs: ListLike[tuple[int | str, int | str, BoolExprLike]]):
         """
@@ -514,13 +515,14 @@ class CircuitArcs(GlobalConstraint):
         if isinstance(arcs, np.ndarray):
             flat_arcs = arcs.flatten()
             num_arcs = len(flat_arcs) / 3
-            if not int(num_arcs) == num_arcs: # not divideable by 3
+            if not int(num_arcs) == num_arcs: # not divisible by 3
                 raise ValueError(f"CircuitArcs arcs must be triples (source, destination, literal), got {arcs}")
             arcs = flat_arcs.reshape(int(num_arcs), 3)
 
         src_ids: list[int | str] = []
         dst_ids: list[int | str] = []
         literals = []
+        seen_arcs = set()
         for arc in arcs:
             if not is_any_list(arc) or len(arc) != 3:
                 raise ValueError(f"CircuitArcs arcs must be triples (source, destination, literal), got {arc}")
@@ -531,12 +533,15 @@ class CircuitArcs(GlobalConstraint):
                 raise TypeError(f"CircuitArcs source must be int or string, got {src}")
             if isinstance(dst, (bool, np.bool_)) or not isinstance(dst, (str, int)):
                 raise TypeError(f"CircuitArcs destination must be int or string, got {dst}")
+            if (src, dst) in seen_arcs:
+                raise ValueError(f"CircuitArcs does not support parallel edges, got {(src, dst)}")
+            seen_arcs.add((src, dst))
 
             src_ids.append(src)
             dst_ids.append(dst)
             literals.append(lit)
 
-        # same restriction as standard Circuit: at least two nodes, no self-loops allowed.
+        # same restriction as standard Circuit: at least two nodes
         if len(set(src_ids + dst_ids)) < 2:
             raise ValueError(f"CircuitArcs must have at least two nodes in the graph, got {set(src_ids + dst_ids)}")
 
@@ -548,6 +553,18 @@ class CircuitArcs(GlobalConstraint):
         self.tails = np.array(src_ids)
         self.heads = np.array(dst_ids)
         self.node_map = {node: i for i, node in enumerate(sorted(set(node_ids)))}
+        self._graph = self._arcs_graph()
+
+    def _arcs_graph(self) -> list[list[tuple[int, BoolExprLike]]]:
+        # normalized successor lists; literals are the current args, so this is rebuilt when they change
+        graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(len(self.node_map))]
+        for src, dst, lit in zip(self.tails, self.heads, self.args):
+            graph[self.node_map[src]].append((self.node_map[dst], lit))
+        return graph
+
+    def update_args(self, args: Iterable[Any], has_subexpr: Optional[bool] = None) -> None:
+        super().update_args(args, has_subexpr)
+        self._graph = self._arcs_graph() # rebuild the graph with new arc literals
 
     @property
     def args(self) -> tuple[BoolExprLike,...]:
@@ -563,37 +580,38 @@ class CircuitArcs(GlobalConstraint):
         Otherwise the successor is the node itself, which :class:`Circuit` rejects.
         ``positive_only`` channels each arc directly instead, which is enough when the reformulation is not negated.
 
+        This approach is prefered over decompose/decompose_positive for solvers that support Circuit natively.
+        
         Arguments:
             positive_only (bool, default: False): Channel ``succ[src] == dst`` directly to each arc literal
 
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        literals = self.args
         n = len(self.node_map)
-
-        graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(n)]
-        for src, dst, lit in zip(self.tails, self.heads, literals):
-            graph[self.node_map[src]].append((self.node_map[dst], lit))
-
         succ = intvar(0, n - 1, shape=n)
         cons: list[Expression] = [Circuit(succ)]
         defining: list[Expression] = []
-        for src, outgoing in enumerate(graph):
+        for src, outgoing in enumerate(self._graph):
             outgoing_lits = [lit for _, lit in outgoing]
             heads = [dst for dst, _ in outgoing]
             if positive_only:
                 for dst, lit in outgoing:
                     cons.append((succ[src] == dst) == lit)
+                # define valid successors
                 cons.append(InDomain(succ[src], heads))
-                continue
-
-            # the literal picks the head; without it, sum == 1 would force every head at once
-            total = cp.sum(outgoing_lits) if len(outgoing_lits) > 0 else 0
-            defining.append(implies(total != 1, succ[src] == src))
-            for dst, lit in outgoing:
-                defining.append(implies((total == 1) & lit, succ[src] == dst))
-            defining.append(InDomain(succ[src], heads + [src]))
+            
+            else: 
+                # circuit formulation should also work in negative context,
+                #  so we need to totally define the aux vars here.
+                sum_out = cp.sum(outgoing_lits) if len(outgoing_lits) > 0 else 0
+                # positive case
+                for dst, lit in outgoing:
+                    defining.append(implies((sum_out == 1) & lit, succ[src] == dst))
+                # negative case
+                defining.append(implies(sum_out != 1, succ[src] == src))
+                # define valid successors
+                defining.append(InDomain(succ[src], heads + [src]))
 
         return cons, defining
 
@@ -609,26 +627,27 @@ class CircuitArcs(GlobalConstraint):
 
     def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Sparse Miller-Tucker-Zemlin decomposition, valid only in a positive context.
+        Decompose to standard Circuit constraint, only valid in a positive context.
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        return self._to_circuit(positive_only=True)
+
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Sparse Miller-Tucker-Zemlin decomposition, only valid in a positive context.
 
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
-        literals = self.args
         n = len(self.node_map)
         order = cp.intvar(0, n - 1, shape=n)
 
         constraining: list[Expression] = []
         defining: list[Expression] = [cp.AllDifferent(order), order[0] == 0]
 
-        graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(n)]
-        inverse_graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(n)]
-        for src, dst, lit in zip(self.tails, self.heads, literals):
-            graph[self.node_map[src]].append((self.node_map[dst], lit))
-            inverse_graph[self.node_map[dst]].append((self.node_map[src], lit))
-
-        for (src, outgoing) in enumerate(graph):
+        for (src, outgoing) in enumerate(self._graph):
             outgoing_lits = []
             for dst, lit in outgoing:
                 if src == dst:
@@ -641,7 +660,12 @@ class CircuitArcs(GlobalConstraint):
                 outgoing_lits.append(lit)
             constraining.append(cp.sum(outgoing_lits) == 1)
 
-        # redundant constraint
+        # inverse graph, lists incoming edges for each node
+        inverse_graph: list[list[tuple[int, BoolExprLike]]] = [[] for _ in range(n)]
+        for src, outgoing in enumerate(self._graph):
+            for dst, lit in outgoing:
+                inverse_graph[dst].append((src, lit))
+
         for (dst, incoming) in enumerate(inverse_graph):
             incoming_lits = [lit for _, lit in incoming]
             constraining.append(cp.sum(incoming_lits) == 1)
@@ -659,21 +683,17 @@ class CircuitArcs(GlobalConstraint):
             return None
 
         n = len(self.node_map)
-        graph: list[list[tuple[int, bool]]] = [[] for _ in range(n)]
-        for src, dst, lit in zip(self.tails, self.heads, literals):
-            graph[self.node_map[src]].append((self.node_map[dst], lit))
-
         start = 0
         visited = {start}
         at = start
         while 1:
             to = None
             i = -1
-            for i, (dst, lit) in enumerate(graph[at]):
-                if lit:
+            for i, (dst, lit) in enumerate(self._graph[at]):
+                if argval(lit):
                     to = dst
                     break
-            if i >= 0 and any(taken for _, taken in graph[at][i + 1:]):
+            if i >= 0 and any(argval(taken) for _, taken in self._graph[at][i + 1:]):
                 return False # two outgoing arcs
 
             if to is None:
