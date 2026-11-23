@@ -457,6 +457,9 @@ class NegBoolView(_BoolVarImpl):
         """
         self._bv.clear()
 
+    def _format(self, canonical: bool) -> str:
+        return f"~{self._bv.name}"
+
     def __invert__(self) -> Expression:
         return self._bv
 
