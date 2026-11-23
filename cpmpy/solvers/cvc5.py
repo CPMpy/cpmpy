@@ -281,7 +281,8 @@ class CPM_cvc5(SolverInterface):
         if assumptions is not None:
             assumptions = list(assumptions)  # iterable to ordered list
             cvc5_assum_vars = self.solver_vars(assumptions)
-            self.assumption_dict = {cvc5_var: cpm_var for (cpm_var, cvc5_var) in zip(assumptions, cvc5_assum_vars)}
+            # key by the native term: get_core() looks these up in getUnsatAssumptions()
+            self.assumption_dict = {cvc5_var.ast: cpm_var for (cpm_var, cvc5_var) in zip(assumptions, cvc5_assum_vars)}
         else:
             cvc5_assum_vars = []
             self.assumption_dict = {}  # no assumptions used in this call, avoid a stale core in get_core()
@@ -757,10 +758,7 @@ class CPM_cvc5(SolverInterface):
         assert (self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE), "Can only extract core form UNSAT model"
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
-        import cvc5.pythonic as cvc5
-
-        return [self.assumption_dict[cvc5.BoolRef(term, self.cvc5_solver.ctx)]
-                for term in self.cvc5_solver.solver.getUnsatAssumptions()]
+        return [self.assumption_dict[term] for term in self.cvc5_solver.solver.getUnsatAssumptions()]
 
     def verify(self, verifier: str = "carcara", verifier_args: list[str] = ["check"], time_limit: Optional[float] = None, display_output: bool = False):
         """
