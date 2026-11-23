@@ -27,6 +27,9 @@ Available formats
    * - ``dimacs``
      - ✓
      - ✓
+   * - ``gdimacs``
+     - ✓
+     - ✓
    * - ``fzn``
      - ✓
      - ✓
@@ -71,6 +74,7 @@ Format-specific loaders and writers:
     :maxdepth: 1
 
     io/dimacs
+    io/gdimacs
     io/jsplib
     io/nurserostering
     io/opb

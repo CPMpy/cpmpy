@@ -41,6 +41,7 @@ def _writer_model():
 
 
 def _assert_unsat(model):
+    __tracebackhide__ = True
     assert not model.solve()
     assert model.status().exitstatus == ExitStatus.UNSATISFIABLE
 
