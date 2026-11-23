@@ -2,6 +2,7 @@ import unittest
 import pytest
 import cpmpy as cp
 from cpmpy.solvers.rc2 import CPM_rc2
+from utils import skip_on_missing_pblib
 
 # Check if RC2 is available
 rc2_available = CPM_rc2.supported()
@@ -73,6 +74,7 @@ class TestRC2Transform(unittest.TestCase):
         self.assertEqual(xs, [self.xs[0], self.xs[1], ~self.xs[2]])  # last variable should be negated
         self.assertEqual(const, -4)  # constant should include the flipped weight
     
+    @skip_on_missing_pblib()
     def test_transform_objective_linear_combination_bool_plus_const(self):
         """Test objective transformation with linear combination plus constant"""
         # Test 3*xs[0] + 2*xs[1] + 1*xs[2] + 12 -> flat_obj (IV6) + 12
@@ -111,6 +113,7 @@ class TestRC2Transform(unittest.TestCase):
         self.assertEqual(weights, [1,2,3]*3)  # unary encoding weights
         self.assertEqual(len(xs), 9)  # unary encoding variables
     
+    @skip_on_missing_pblib()
     def test_transform_objective_linear_combination_int_plus_const(self):
         """Test objective transformation with linear combination of integer variables plus constant"""
         # Test 3*ys[0] + 2*ys[1] - 4*ys[2] + 12 -> flat_obj (IV8) + 12
@@ -128,6 +131,7 @@ class TestRC2Transform(unittest.TestCase):
         self.assertEqual(len(weights), 1+3+1+3)
         self.assertEqual(const, 4)
     
+    @skip_on_missing_pblib()
     def test_transform_objective_mixed_vars_plus_const(self):
         """Test objective transformation with mixed variables plus constant"""
         # Test 3 + xs[0] + ys[0] + 2*xs[1] - 3*ys[1] - 12 -> flat_obj (IV9) + -12

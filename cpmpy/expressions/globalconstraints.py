@@ -887,6 +887,8 @@ class Regular(GlobalConstraint):
         
         if not is_any_list(transitions):
             raise TypeError("The second argument of a regular constraint should be a list of transitions")
+        if len(transitions) == 0:
+            raise ValueError("Regular constraint must be given at least one transition")
         _node_type = type(transitions[0][0])
         for s,v,e in transitions:
             if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
@@ -931,13 +933,16 @@ class Regular(GlobalConstraint):
         lb, ub = min(lbs), max(ubs)
 
         transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+        n_states = len(self.nodes)
 
         if complete:
             # add a sink node for transitions that are not defined. When the Regular constraint is in positive context, this is not needed
-            sink = len(self.nodes)
-            self.nodes.append(sink)
-            self.node_map[sink] = sink
+            # The sink only exists in normalized ids: it is not added to self.nodes/self.node_map (solver interfaces read those),
+            # and a user node id may coincide with the sink's normalized id.
+            sink = n_states
+            n_states += 1
             transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
+            transitions.extend([[sink, v, sink] for v in range(lb, ub + 1)])
 
         id_start = self.node_map[start]
         start_transitions = [[v, e] for s, v, e in transitions if s == id_start]
@@ -945,7 +950,8 @@ class Regular(GlobalConstraint):
             return [cp.BoolVal(False)], [] # no transition leaves the start node, cannot be satisfied
 
         # keep track of current state when traversing the array
-        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
+        # shape must be a tuple: intvar(..., shape=1) returns a scalar, not an array
+        state_vars = intvar(0, n_states-1, shape=(len(arr),))
         # optimization: we know the entry node of the automaton, results in smaller table
         cons: list[Expression] = [Table([arr[0], state_vars[0]], start_transitions)]
         # define the rest of the automaton using transition table
@@ -2367,7 +2373,6 @@ class NoOverlapOptional(GlobalConstraint):
 
         The constraint enforces that all present tasks are scheduled without overlapping, and for each present task, the constraint enforces that:
         - duration >= 0
-        - demand >= 0
         - start + duration == end
 
         if the task is not present, it does not enforce any of the above.
@@ -2413,17 +2418,19 @@ class NoOverlapOptional(GlobalConstraint):
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
-        cons = []
+        cons: list[Expression] = []
 
         if len(self.args) == 3:
             start, duration, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
             start, duration, end, is_present = self.args
-            cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
+            cons.extend(implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start)))
+
+        cons.extend(implies(p, d >= 0) for d, p in zip(duration, is_present))  # enforce non-negative durations when present
 
         for (s1, d1, e1, p1), (s2, d2, e2, p2) in all_pairs(zip(start, duration, end, is_present)):
-            cons += [implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))]
+            cons.append(implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1])))
         return cons, []
 
     def value(self) -> Optional[bool]:

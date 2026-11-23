@@ -22,8 +22,8 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 solver_dependencies = {
     "ortools": ["ortools>=9.12"],
     "z3": ["z3-solver>=5.0.0"],
-    "choco": ["pychoco>=0.2.1,<0.3.0"],  # 0.3.0 breaks CPMpy tests
-    "exact": ["exact>=2.1.0"], # older versions (<2.2.1) are bugged on py3.13
+    "choco": ["pychoco>=0.3.0"],  # table short-table API uses uvalue (renamed in 0.3.0)
+    "exact": ["exact>=2.1.0,!=2.1.1,!=2.1.2"], # 2.1.1 and 2.1.2 (py3.13-only wheels) are broken, use >=2.2.1 on py3.13
     "minizinc": ["minizinc>=0.7.0"],
     "pysat": ["python-sat>=1.8.dev4,<1.9dev17"],
     "gurobi": ["gurobipy>=11.0.0"],
@@ -35,7 +35,8 @@ solver_dependencies = {
     "pindakaas": ["pindakaas>=0.5.0,<0.6.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
     "scip": ["pyscipopt>=6.1"],
-    "rc2": ["python-sat>=1.9.dev5,<1.9dev17", "pypblib"]
+    "rc2": ["python-sat>=1.9.dev5,<1.9dev17", "pypblib"],
+    "hermax": ["hermax>=1.3.4"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 

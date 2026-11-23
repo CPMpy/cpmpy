@@ -752,6 +752,58 @@ class TestGlobal:
         cp.Model(constraining + defining).solveAll(solver=solver, display=lambda: linear_sols.add(tuple(argvals(x))), **kwargs)
         assert linear_sols == solutions
 
+    def test_regular_decompose_does_not_mutate(self):
+        # the sink node of the complete decomposition must not leak into the constraint's node bookkeeping,
+        # which solver interfaces (choco, minizinc, ortools) read directly
+        x = cp.intvar(0, 1, shape=3)
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "b"), ("b", 0, "b")], "a", ["b"])
+        nodes, node_map = list(reg.nodes), dict(reg.node_map)
+        reg.decompose()
+        reg.decompose()
+        assert reg.nodes == nodes
+        assert reg.node_map == node_map
+
+    def test_regular_single_variable(self, solver):
+        x = cp.intvar(0, 2, name="x")
+        reg = cp.Regular([x], [("a", 1, "b"), ("a", 2, "a")], "a", ["b"])
+
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10)
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        true_sols, false_sols = set(), set()
+        cp.Model(reg).solveAll(solver=solver, display=lambda: true_sols.add(x.value()), **kwargs)
+        cp.Model(~reg).solveAll(solver=solver, display=lambda: false_sols.add(x.value()), **kwargs)
+        assert true_sols == {1}
+        assert false_sols == {0, 2}
+
+        # complete decomposition directly
+        value, defining = reg.decompose()
+        sols = set()
+        cp.Model(defining + [~cp.all(value)]).solveAll(display=lambda: sols.add(x.value()))
+        assert sols == {0, 2}
+
+    def test_regular_no_accepting(self, solver):
+        x = cp.intvar(0, 1, shape=2)
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "a")], "a", [])
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10)
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        assert not cp.Model(reg).solve(solver=solver)
+        assert cp.Model(~reg).solveAll(solver=solver, **kwargs) == 4
+
+    def test_regular_no_transitions(self):
+        x = cp.intvar(0, 1, shape=2)
+        with pytest.raises(ValueError):
+            cp.Regular(x, [], "a", ["a"])
+
     def test_regular_linear_positive_reif(self):
         x = cp.intvar(0, 1, shape=4, name="x")
         b = cp.boolvar(name="b")
@@ -1275,6 +1327,23 @@ class TestGlobal:
         assert cp.Model(cons.decompose(how="task"), active == True).solve(solver=solver)
         assert cp.Model(cons.decompose(how="time"), active == True).solve(solver=solver)
 
+    def test_cumulative_optional_negative_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+
+        # a present task can not have a negative duration, an absent task can
+        start = cp.intvar(0,5, shape=2, name="start")
+        dur = cp.intvar(-2,2, shape=2, name="dur")
+        end = cp.intvar(-2,7, shape=2, name="end")
+        is_present = cp.boolvar(shape=2, name="is_present")
+        for cons in [cp.CumulativeOptional(start, dur, demand=1, capacity=1, is_present=is_present),
+                     cp.CumulativeOptional(start, dur, end, demand=1, capacity=1, is_present=is_present)]:
+            for c in [cons, cp.all(cons.decompose(how="task")[0]), cp.all(cons.decompose(how="time")[0])]:
+                assert not cp.Model(c, dur[0] == -1, is_present[0]).solve(solver=solver)
+                assert cp.Model(c, dur[0] == -1, ~is_present[0]).solve(solver=solver)
+
     def test_reservoir_value(self):
         start = cp.intvar(0, 5, shape=3, name="start")
         cons = cp.Reservoir(start, [2, -1, -3], -3, 2)
@@ -1417,7 +1486,6 @@ class TestGlobal:
 
         assert cp.Model([cons, s == 0]).solve(solver="pumpkin")
         assert cons.value() is True
-
 
     def test_cumulative_nested_expressions(self):
         import numpy as np
@@ -1563,7 +1631,13 @@ class TestGlobal:
         assert cp.Model(cons).solve(solver="ortools")
         assert cons.value()
 
-    def test_optional_cumulative(self):
+    @pytest.mark.usefixtures("solver")
+    def test_optional_cumulative(self, solver):
+        if solver == "pysdd":
+            pytest.skip(f"{solver} does not support integer variables")
+        if solver == "rc2":
+            pytest.skip(f"{solver} only supports optimization problems")
+
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 3, 2]
         end = cp.intvar(0, 10, shape=4, name="end")
@@ -1571,45 +1645,73 @@ class TestGlobal:
         is_present = cp.boolvar(shape=4)
         capacity = 10
         expr = cp.CumulativeOptional(start, duration, end, demand, capacity, is_present)
-        assert cp.Model(expr).solve()
+        assert cp.Model(expr).solve(solver=solver)
         assert expr.value()
         assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
         # also test decomposition
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr.decompose()).solve(solver=solver)
         assert expr.value()
         assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
 
+        # also test without end times
+        expr = cp.CumulativeOptional(start, duration, demand=demand, capacity=capacity, is_present=is_present)
+        assert cp.Model(expr).solve(solver=solver)
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+
+        # absent tasks consume none of the resource, so they can overlap freely
+        expr = cp.CumulativeOptional(start, duration, end, demand, capacity, [False, True, False, False])
+        assert cp.Model(expr, cp.all(start == start[0])).solve(solver=solver)
+        assert expr.value()
+
         # weird cases, allow negative duration or demand when task is not present
         expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, False])
-        assert cp.Model(expr).solve()
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr).solve(solver=solver)
+        assert cp.Model(expr.decompose()).solve(solver=solver)
 
         expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, True])
-        assert cp.Model(expr).solve() is False
-        assert cp.Model(expr.decompose()).solve() is False
+        assert cp.Model(expr).solve(solver=solver) is False
+        assert cp.Model(expr.decompose()).solve(solver=solver) is False
 
         expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, False])
-        assert cp.Model(expr).solve()
-        assert cp.Model(expr.decompose()).solve()
+        assert cp.Model(expr).solve(solver=solver)
+        assert cp.Model(expr.decompose()).solve(solver=solver)
 
         expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, True])
-        assert cp.Model(expr).solve() is False
-        assert cp.Model(expr.decompose()).solve() is False
+        assert cp.Model(expr).solve(solver=solver) is False
+        assert cp.Model(expr.decompose()).solve(solver=solver) is False
 
 
-    def test_optional_no_overlap(self):
+    @pytest.mark.usefixtures("solver")
+    def test_optional_no_overlap(self, solver):
+        if solver == "pysdd":
+            pytest.skip(f"{solver} does not support integer variables")
+        if solver == "rc2":
+            pytest.skip(f"{solver} only supports optimization problems")
+
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 6, 2]
         end = cp.intvar(0, 10, shape=4, name="end")
         is_present = cp.boolvar(shape=4)
         expr = cp.NoOverlapOptional(start, duration, end, is_present)
-        assert cp.Model(expr, cp.any(is_present)).solve()
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver)
         assert expr.value()
         assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
         # also test decomposition
-        assert cp.Model(expr.decompose(), cp.any(is_present)).solve()
+        assert cp.Model(expr.decompose(), cp.any(is_present)).solve(solver=solver)
         assert expr.value()
         assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # also test without end times
+        expr = cp.NoOverlapOptional(start, duration, is_present=is_present)
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver)
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # absent tasks do not have to be scheduled, so they can overlap freely
+        expr = cp.NoOverlapOptional(start, duration, end, [False, True, False, False])
+        assert cp.Model(expr, cp.all(start == start[0])).solve(solver=solver)
+        assert expr.value()
 
         # test large task
         start = cp.intvar(0, 10, shape=4, name="start")
@@ -1617,9 +1719,9 @@ class TestGlobal:
         end = cp.intvar(0, 10, shape=4, name="end")
         is_present = cp.boolvar(shape=4)
         expr = cp.NoOverlapOptional(start, duration, end, is_present)
-        assert cp.Model(expr, cp.any(is_present)).solve() is False
+        assert cp.Model(expr, cp.any(is_present)).solve(solver=solver) is False
 
-    
+
     def test_ite(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
@@ -1875,7 +1977,7 @@ class TestGlobal:
         if solver == "rc2":
             pytest.skip("rc2 only supports optimization")
         if solver == "pumpkin":
-            pytest.skip("Pumpkin does not support variables as duration")
+            pytest.skip(f"Pumpkin does not support variables as duration")
 
         # same, but now 0 is only in the domain of the duration variables
         start = cp.intvar(0,5, shape=3, name="start")
@@ -1923,6 +2025,22 @@ class TestGlobal:
         assert cp.Model(cons, start == [1,0,5], dur == [0,5,3], is_present == [True, True, True]).solve(solver=solver)
         assert cons.value() is True
         assert cp.Model(cons, start == [1,0,2], dur == [0,5,3], is_present == [True, True, True]).solve(solver=solver) is False
+
+    def test_no_overlap_optional_negative_duration(self, solver):
+        if solver == "pysdd":
+            pytest.skip("pysdd does not support integer variables")
+        if solver == "rc2":
+            pytest.skip("rc2 only supports optimization")
+
+        # a present task can not have a negative duration, an absent task can
+        start = cp.intvar(0,5, shape=2, name="start")
+        dur = cp.intvar(-2,2, shape=2, name="dur")
+        end = cp.intvar(-2,7, shape=2, name="end")
+        is_present = cp.boolvar(shape=2, name="is_present")
+        for cons in [cp.NoOverlapOptional(start, dur, is_present=is_present), cp.NoOverlapOptional(start, dur, end, is_present)]:
+            for c in [cons, cp.all(cons.decompose()[0])]:
+                assert not cp.Model(c, dur[0] == -1, is_present[0]).solve(solver=solver)
+                assert cp.Model(c, dur[0] == -1, ~is_present[0]).solve(solver=solver)
 
 
 
@@ -2390,14 +2508,14 @@ def test_issue801_expr_in_cumulative(solver):
     bv = cp.boolvar(shape=3,name="bv")
 
     assert cp.Model(cp.NoOverlap(bv * start, dur, end)).solve(solver=solver)
-    if solver != "pumpkin": # Pumpkin does not support variables as duration
+    if solver != "pumpkin": #  only support integers as duration, not variables
         assert cp.Model(cp.NoOverlap(bv * start,bv * dur, end)).solve(solver=solver)
     assert cp.Model(cp.NoOverlap(bv * start, dur, bv * end)).solve(solver=solver)
 
     # also for cumulative
     assert cp.Model(cp.Cumulative(bv * start, dur, end,1, 3)).solve(solver=solver)
     assert cp.Model(cp.Cumulative(bv * start, dur, bv * end, 1, 3)).solve(solver=solver)
-    if solver != "pumpkin": # Pumpkin does not support variables as duration, demand or capacity
+    if solver != "pumpkin": # only support integers as duration, demand or capacity, not variables
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)

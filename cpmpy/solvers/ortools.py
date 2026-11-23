@@ -624,6 +624,9 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == "regular":
                 array, transitions, start, accepting = cpm_expr.args
                 array = self.solver_vars(array)
+                if len(accepting) == 0:
+                    # no accepting state: no word is accepted (OR-Tools' AddAutomaton rejects an empty set of final states)
+                    return self.ort_model.AddBoolOr([])
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting],
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":

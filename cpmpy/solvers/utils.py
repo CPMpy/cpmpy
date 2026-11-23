@@ -35,6 +35,7 @@ from .pindakaas import CPM_pindakaas
 from .highs import CPM_highs
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
+from .hermax import CPM_hermax
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -98,6 +99,7 @@ class SolverLookup():
                 ("highs", CPM_highs),
                 ("hexaly", CPM_hexaly),
                 ("rc2", CPM_rc2),
+                ("hermax", CPM_hermax),
                 ("scip", CPM_scip),
                ]
 
