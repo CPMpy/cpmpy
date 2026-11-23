@@ -17,6 +17,23 @@ class TestSolvers:
         assert isinstance(~bv, NegBoolView)
         assert isinstance(~(~bv), _BoolVarImpl)
 
+    def test_negboolview_value_setter(self):
+        bv = cp.boolvar(name="b")
+        bv._value = True
+        # building the view must not clear a value the variable already has
+        view = ~bv
+        assert bv.value() is True
+        assert view.value() is False
+        assert str(view) == "~b"
+
+        view._value = True
+        assert bv.value() is False
+        assert view.value() is True
+
+        view._value = None
+        assert bv.value() is None
+        assert view.value() is None
+
     def test_boolvar(self):
         for i in range(2, 10):
             bv = cp.boolvar(i)
