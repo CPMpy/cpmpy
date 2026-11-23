@@ -848,7 +848,7 @@ class TestSolvers:
         s = cp.SolverLookup.get(solver, m)
         assert s.solve()
         assert sum(xi.value() for xi in x) in (2, 4)
-
+        
 
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
