@@ -83,6 +83,40 @@ class TestSum:
         assert model.solve()
         assert v.value() == 1
 
+
+class TestNestedNaryOperators:
+    # nested same-name n-ary ops are merged into the toplevel;
+    def test_and(self):
+        bv = boolvar(shape=4)
+        expr = Operator('and', [bv[0], Operator('and', [bv[1], bv[2]])])
+        assert list(expr.args) == [bv[0], bv[1], bv[2]]
+        expr = Operator('and', [Operator('and', [bv[0], bv[1]]), bv[2]])
+        assert list(expr.args) == [bv[0], bv[1], bv[2]]
+        expr = Operator('and', [Operator('and', [bv[0], bv[1]]),
+                                Operator('and', [bv[2], bv[3]])])
+        assert list(expr.args) == list(bv)
+
+    def test_or(self):
+        bv = boolvar(shape=4)
+        expr = Operator('or', [bv[0], Operator('or', [bv[1], bv[2]])])
+        assert list(expr.args) == [bv[0], bv[1], bv[2]]
+        expr = Operator('or', [Operator('or', [bv[0], bv[1]]), bv[2]])
+        assert list(expr.args) == [bv[0], bv[1], bv[2]]
+        expr = Operator('or', [Operator('or', [bv[0], bv[1]]),
+                               Operator('or', [bv[2], bv[3]])])
+        assert list(expr.args) == list(bv)
+
+    def test_sum(self):
+        iv = intvar(0, 5, shape=4)
+        expr = Operator('sum', [iv[0], Operator('sum', [iv[1], iv[2]])])
+        assert list(expr.args) == [iv[0], iv[1], iv[2]]
+        expr = Operator('sum', [Operator('sum', [iv[0], iv[1]]), iv[2]])
+        assert list(expr.args) == [iv[0], iv[1], iv[2]]
+        expr = Operator('sum', [Operator('sum', [iv[0], iv[1]]),
+                                Operator('sum', [iv[2], iv[3]])])
+        assert list(expr.args) == list(iv)
+
+
 class TestWeightedSum:
     def setup_method(self) -> None:
         self.ivs = cp.intvar(lb=0, ub=5, shape=4)
