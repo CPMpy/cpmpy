@@ -113,10 +113,7 @@ class CPM_hermax(SolverInterface):
     supported_reified_global_constraints = frozenset({
         "alldifferent", "lex_less", "lex_lesseq", "cumulative", "no_overlap", "table", "negative_table",
     })
-    supported_half_reified_global_constraints = supported_reified_global_constraints | frozenset({
-        "alldifferent_except_0", "alldifferent_except_n", "allequal_except_n", "increasing", "precedence",
-        "regular", "mdd",
-    })
+    supported_half_reified_global_constraints = supported_global_constraints
 
     @staticmethod
     def supported():
@@ -453,6 +450,7 @@ class CPM_hermax(SolverInterface):
             csemap=self._csemap,
         )
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(
             cpm_cons,
             supported=frozenset({"or", "sum", "wsum", "sub"}) | self.supported_half_reified_global_constraints,
@@ -463,7 +461,6 @@ class CPM_hermax(SolverInterface):
             supported=frozenset({"sum", "wsum", "sub"}),
             csemap=self._csemap,
         )
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hermax":
