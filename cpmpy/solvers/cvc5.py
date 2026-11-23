@@ -208,8 +208,7 @@ class CPM_cvc5(SolverInterface):
             self.cvc5_solver.set(**kwargs)
         self._unsat_cores = unsat_cores
         if unsat_cores:
-            # must be set before the first constraint is posted
-            self.cvc5_solver.set("produce-unsat-cores", "true")
+            self.cvc5_solver.set("produce-unsat-assumptions", "true")
 
         self._proof = proof
         self._proof_format = proof_format if proof_format is not None else "alethe"
@@ -363,7 +362,7 @@ class CPM_cvc5(SolverInterface):
     def _write_proof_files(self):
         """
             Writes the proof (``<proof>.<proof_format>``) and SMT-LIB2 problem (``<proof>.smt2``)
-            files for the last ``solve()`` call, for use with :meth:`verify` and :meth:`get_proof_files`.
+            files for the last ``solve()`` call, for use with :meth:`verify`.
 
             cvc5 can only produce a proof of unsatisfiability: when the last result was UNSAT, both
             files are filled in; otherwise the ``.smt2`` file is still written (for inspection) but
@@ -758,8 +757,10 @@ class CPM_cvc5(SolverInterface):
         assert (self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE), "Can only extract core form UNSAT model"
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
-        return [self.assumption_dict[cvc5_var] for cvc5_var in self.cvc5_solver.unsat_core()
-                if cvc5_var in self.assumption_dict]
+        import cvc5.pythonic as cvc5
+
+        return [self.assumption_dict[cvc5.BoolRef(term, self.cvc5_solver.ctx)]
+                for term in self.cvc5_solver.solver.getUnsatAssumptions()]
 
     def verify(self, verifier: str = "carcara", verifier_args: list[str] = ["check"], time_limit: Optional[float] = None, display_output: bool = False):
         """
