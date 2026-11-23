@@ -229,23 +229,21 @@ class CPM_exact(SolverInterface):
             
         # call the solver, with parameters
         start = time.time()
+        n_sols_before = dict(self.xct_solver.getStats())["solutions"]
         my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)
         end = time.time()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         self.objective_value_ = None
         # translate exit status
         #   see 'toOptimum' documentation:
         #   https://gitlab.com/nonfiction-software/exact/-/blob/main/src/interface/IntProg.cpp#L877
-        if my_status == "UNSAT": # found unsatisfiability
-            if self.has_objective() and self.xct_solver.hasSolution(): # optimisation problem -> unsat = no better solution found
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-            else:
-                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status == "SAT": # the optimal value has been found
+        if my_status == "UNSAT":
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif my_status == "SAT": # (optimal) solution found
             assert self.xct_solver.hasSolution()
             # COP
             if self.has_objective():
@@ -256,7 +254,8 @@ class CPM_exact(SolverInterface):
         elif my_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "TIMEOUT": # found timeout
-            if self.has_objective() and self.xct_solver.hasSolution(): # found a (sub-)optimal solution
+            # hasSolution() also reflects solutions from earlier calls, so check whether this call found a new one
+            if self.has_objective() and dict(self.xct_solver.getStats())["solutions"] > n_sols_before: # found a (sub-)optimal solution
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # no solution found
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
@@ -266,8 +265,10 @@ class CPM_exact(SolverInterface):
         # True/False depending on self.cpm_status
         ret = self._solve_return(self.cpm_status)
         self._fillVars(has_solution=ret)
-        if self.has_objective():
-            if self.objective_is_min_:
+        if ret and self.has_objective():
+            if my_status == "TIMEOUT": # toOptimum returns 0 as objective value on timeout
+                self.objective_value_ = self.objective_.value()
+            elif self.objective_is_min_:
                 self.objective_value_ = obj_val
             else: # maximize, so actually negative value
                 self.objective_value_ = -obj_val
@@ -321,7 +322,7 @@ class CPM_exact(SolverInterface):
                 self._fillVars(has_solution=False) # erases the solution
                 # update exit status
                 self.cpm_status = SolverStatus(self.name)
-                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.solve_time = total_end - total_start
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
                 # early exit
                 return 0
@@ -331,7 +332,7 @@ class CPM_exact(SolverInterface):
                 total_end = time.time()
                 # update exit status
                 self.cpm_status = SolverStatus(self.name)
-                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.solve_time = total_end - total_start
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
                 # early exit
                 return 0
@@ -369,7 +370,7 @@ class CPM_exact(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = total_end - total_start
+        self.cpm_status.solve_time = total_end - total_start
 
         if solsfound: # found some solutions
             if solsfound == solution_limit: # matched solution limit

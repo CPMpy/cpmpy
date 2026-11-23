@@ -40,7 +40,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression
+    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression, BoolVal
     from cpmpy.expressions.variables import NDVarArray
 
 NP_TYPES: Final = frozenset({
@@ -55,7 +55,7 @@ def is_bool(arg):
     return isinstance(arg, (bool, np.bool_, cp.BoolVal))
 
 
-def is_int(arg):
+def is_int(arg: object) -> TypeGuard[bool | np.bool_ | BoolVal | int | np.integer]:
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
     return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer))

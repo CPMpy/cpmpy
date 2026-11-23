@@ -5,10 +5,10 @@ This transformation is necessary for all non-CP solvers, and also used to decomp
 global constraints and global functions not implemented in a CP-solver.
 
 While a solver may natively support a global constraint, it may not support it natively in a reified context.
-In this case, we will als also decompose the global constraint.
+In this case, we will also decompose the global constraint.
 
 For numerical global functions, we will only decompose them if they are not supported in non-reified context.
-Even if the solver does not explicitely support them in a subexpression,
+Even if the solver does not explicitly support them in a subexpression,
 we can rewrite them using func:`cpmpy.transformations.reification.reify_rewrite` to a non-reified version when the function is total.
 E.g., bv <-> max(a,b,c) >= 4 can be rewritten as [bv <-> IV0 >= 4, IV0 == max(a,b,c)]
 
@@ -46,6 +46,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       csemap: Optional[CSEMap] = None,
                       decompose_custom: Optional[Dict[str, CustomDecomp]] = None,
                       decompose_custom_positive: Optional[Dict[str, CustomDecomp]] = None,
+                      supported_half_reified: Optional[AbstractSet[str]] = None,
                       ) -> list[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
@@ -60,6 +61,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param csemap: CSEMap object used to avoid decomposing the same global constraint twice
     :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
     :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
+    :param supported_half_reified: a set of names of global constraints that are supported when half-reified at the toplevel, i.e. ``BE -> Global``.
 
     To decompose a global constraint in positive context:
     1. Check `decompose_positive_custom`
@@ -82,6 +84,8 @@ def decompose_in_tree(lst_of_expr: list[Expression],
         supported = frozenset[str]()
     if supported_reified is None:
         supported_reified = frozenset[str]()
+    if supported_half_reified is None:
+        supported_half_reified = frozenset[str]()
 
     todolist: list[Expression] = []  # these still need to be decomposed
     newlist: list[Expression] = []
@@ -149,9 +153,21 @@ def decompose_in_tree(lst_of_expr: list[Expression],
         elif expr.has_subexpr():
             # first, special case for positive reified
             decomposed_positive = False
-            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
+            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint):
+                cond, subexpr = expr.args
+                if subexpr.name in supported_half_reified:
+                    # supported (half-)reified global, keep it and only decompose the condition and its arguments
+                    args_changed, newargs, args_toplevel = _decompose_in_tree_args([cond, *subexpr.args], supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    todolist.extend(args_toplevel)
+                    if args_changed:
+                        changed = True
+                        subexpr = copy.copy(subexpr)
+                        subexpr.update_args(newargs[1:])
+                        expr = Operator("->", [newargs[0], subexpr])
+                    newlist.append(expr)
+                    continue
+
                 changed = True
-                subexpr = expr.args[1]
                 if decompose_custom_positive is not None and subexpr.name in decompose_custom_positive:
                     exprs, toplevel_exprs = decompose_custom_positive[subexpr.name](subexpr)
                 elif decompose_custom is not None and subexpr.name in decompose_custom:
@@ -181,7 +197,8 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 
     # recurse on any newly generated toplevel expressions
     if len(todolist) > 0:
-        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom,
+                                           supported_half_reified=supported_half_reified)
     elif changed:
         return newlist
     else:  # not changed

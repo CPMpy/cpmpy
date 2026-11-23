@@ -84,13 +84,14 @@ class CPM_choco(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                    "table", 'negative_table', "short_table", "regular", "InDomain",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "allequal",
+                                    "table", 'negative_table', "short_table", "regular", "indomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
                                     "lex_lesseq", "lex_less", "mdd",
                                     "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
     @staticmethod
     def supported():
@@ -100,9 +101,9 @@ class CPM_choco(SolverInterface):
             import pychoco as chc
             chc_version = CPM_choco.version()
             # check it's the correct version
-            # CPMPy uses features only available from 0.2.1
-            if Version(chc_version) < Version("0.2.1"):
-                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+            # CPMPy uses features only available from 0.3.0
+            if Version(chc_version) < Version("0.3.0"):
+                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.3.0, "
                               f"but you have version {chc_version}.")
                 return False
             return True
@@ -168,7 +169,20 @@ class CPM_choco(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds 
-                kwargs:                         any keyword argument, sets parameters of solver object
+            
+            Choco supports setting limits on the search process and various logging options.
+            Examples include:
+
+            =============================   =======================================================
+            Argument                        Description
+            =============================   =======================================================
+            ``node_limit``                  Number of nodes limit for search
+            ``backtrack_limit``             Number of backtracks limit for search
+            ``show_statistics=True``        Show statistics after solving is done
+            ``show_decisions=True``         Show decisions during solving
+            =============================   =======================================================
+
+            More information at https://choco-solver.org/docs/solving/limits/ and https://choco-solver.org/docs/solving/statistics/
 
         """
         # ensure all vars are known to solver
@@ -176,6 +190,13 @@ class CPM_choco(SolverInterface):
 
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
+
+        choco_kwargs = dict()
+        for arg, value in kwargs.items():
+            if hasattr(self.chc_solver, arg) and value is True:
+                getattr(self.chc_solver, arg)() # e.g., show_statistics()
+            else:
+                choco_kwargs[arg] = value # passed to solve call
 
         start = time.time()
         
@@ -186,36 +207,38 @@ class CPM_choco(SolverInterface):
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
-            sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
+            sol = self.chc_solver.find_optimal_solution(maximize=not self.minimize_obj,
                                                         objective=self.solver_var(self.obj),
-                                                        **kwargs)
+                                                        **choco_kwargs)
         else:
-            sol = self.chc_solver.find_solution()
+            sol = self.chc_solver.find_solution(**choco_kwargs)
         end = time.time()
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
+        search_state = self.chc_solver.get_search_state()
         # translate exit status
         # A) Found a solution
         if sol is not None:
             # COP
             if self.has_objective():
-                if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
+                if search_state == "TERMINATED":
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-                else: # solved, but optimality not proven
+                elif search_state == "STOPPED":
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            # CSP
+                else:
+                    raise ValueError(f"Unexpected search state: {search_state}")
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        # B) Found unsat
-        elif time_limit is None or self.cpm_status.runtime < time_limit: # proven unsat
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        # C) Timeout
-        else:
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN  # can happen when timeout is reached...
-
+        else: # B) no solution found
+            if search_state == "TERMINATED":
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE # proven
+            elif search_state == "STOPPED":
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN # not proven unsat
+            else:
+                raise ValueError(f"Unexpected search state: {search_state}")
 
         # True/False depending on self.chc_status
         has_sol = sol is not None
@@ -266,8 +289,9 @@ class CPM_choco(SolverInterface):
 
         start = time.time()
         if self.has_objective():
+            if solution_limit is not None:
+                raise ValueError("A solution limit is currently not supported when enumerating optimal solutions, enforce an optimal objective value manually before calling solveAll.")
             sols = self.chc_solver.find_all_optimal_solutions(maximize=not self.minimize_obj,
-                                                              solution_limit=solution_limit,
                                                               objective=self.solver_var(self.obj),
                                                               **kwargs)
         else:
@@ -276,17 +300,17 @@ class CPM_choco(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        self.cpm_status.solve_time = end - start
 
         if len(sols): # solutions found
             if (len(sols) == solution_limit): # matched the set limit (if given)
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            elif (time_limit is None) or (self.cpm_status.runtime < time_limit): # found all solutions
+            elif (time_limit is None) or (self.cpm_status.solve_time < time_limit): # found all solutions
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else: # reached timeout
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else: # no solutions found
-            if (time_limit is None) or (self.cpm_status.runtime < time_limit): # unsat problem
+            if (time_limit is None) or (self.cpm_status.solve_time < time_limit): # unsat problem
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             else: # timeout
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
@@ -414,6 +438,7 @@ class CPM_choco(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
@@ -569,12 +594,10 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {"alldifferent", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
-                elif cpm_expr.name == 'alldifferent_except0':
-                    return self.chc_model.all_different_except_0(chc_args)
                 elif cpm_expr.name == 'allequal':
                     return self.chc_model.all_equal(chc_args)
                 elif cpm_expr.name == "circuit":
@@ -598,6 +621,10 @@ class CPM_choco(SolverInterface):
 #                    return self.chc_model.lex_chain_less(chc_args)
 
             # but not all
+            elif cpm_expr.name == 'alldifferent_except_0':
+                assert (len(cpm_expr.args) == 2) # args = [array, [0]]
+                assert (cpm_expr.args[1] == [0])
+                return self.chc_model.all_different_except_0(self._to_vars(cpm_expr.args[0]))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
@@ -616,7 +643,7 @@ class CPM_choco(SolverInterface):
                 # take value lower than anything else
                 chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
-                return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
+                return self.chc_model.table(self.solver_vars(array), chc_table, uvalue=chc_star)
             elif cpm_expr.name == "regular":
                 from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
                 array, transitions, start, accepting = cpm_expr.args
@@ -650,7 +677,7 @@ class CPM_choco(SolverInterface):
                 _HandleWrapper.__init__(chc_mdd, chc_handle)
                 return self.chc_model.mddc(self._to_vars(array), chc_mdd)
 
-            elif cpm_expr.name == 'InDomain':
+            elif cpm_expr.name == 'indomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)

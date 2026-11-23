@@ -27,6 +27,9 @@ Available formats
    * - ``dimacs``
      - ✓
      - ✓
+   * - ``gdimacs``
+     - ✓
+     - ✓
    * - ``fzn``
      - ✓
      - ✓
@@ -60,6 +63,9 @@ Available formats
    * - ``rcpsp``
      - ✓
      -
+   * - ``sudoku``
+     - ✓
+     -
 
 
 Format-specific loaders and writers:
@@ -68,11 +74,13 @@ Format-specific loaders and writers:
     :maxdepth: 1
 
     io/dimacs
+    io/gdimacs
     io/jsplib
     io/nurserostering
     io/opb
     io/rcpsp
     io/scip
+    io/sudoku
     io/wcnf
     io/xcsp3
     

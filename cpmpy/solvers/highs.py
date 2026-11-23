@@ -417,7 +417,7 @@ class CPM_highs(SolverInterface):
         model_status = self.highs.getModelStatus()
         
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.highs.getRunTime()
+        self.cpm_status.solve_time = self.highs.getRunTime()
 
         # map HiGHS model status to CPMpy ExitStatus
         _has_feasible_sol = (info.primal_solution_status

@@ -73,7 +73,7 @@ from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, MDD, Regular
 from ..expressions.globalfunctions import Multiplication, FloatSum
-from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args, implies
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -96,14 +96,15 @@ class CPM_minizinc(SolverInterface):
     https://minizinc-python.readthedocs.io/
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "alldifferent_except_n", "allequal",
+                                              "inverse", "ite", "xor", "table", "indomain", "negative_table", "mdd", "regular", "cumulative", "cumulative_optional", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
-                                              "precedence", "no_overlap",
+                                              "precedence", "no_overlap", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "nd_element"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence", "regular"}
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
     required_version = (2, 8, 2)
 
@@ -349,7 +350,7 @@ class CPM_minizinc(SolverInterface):
             =======================  ===========             
             
             
-            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by omitting the '-' (e.g. 'f' instead of '-f')?
             
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
@@ -424,13 +425,13 @@ class CPM_minizinc(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         runtime = 0
         if 'time' in mzn_result.statistics:
-            self.cpm_status.runtime = self.mzn_time_to_seconds(mzn_result.statistics.get("time"))
+            self.cpm_status.solve_time = self.mzn_time_to_seconds(mzn_result.statistics.get("time"))
         else:
             runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("flatTime", 0))
             runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("initTime", 0))
             runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("solveTime", 0))
             if runtime != 0:
-                self.cpm_status.runtime = runtime
+                self.cpm_status.solve_time = runtime
             else:
                 raise NotImplementedError  # Please report on github, minizinc probably changed their time names/types
 
@@ -628,6 +629,7 @@ class CPM_minizinc(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 
@@ -720,9 +722,14 @@ class CPM_minizinc(SolverInterface):
             str_rev = zero_based(expr.args[1])
             return "inverse({}, {})".format(str_fwd, str_rev)
 
-        if expr.name == "alldifferent_except0":
-            args_str = [self._convert_expression(e) for e in expr.args]
-            return "alldifferent_except_0([{}])".format(",".join(args_str))
+        if expr.name == "alldifferent_except_0":
+            return "alldifferent_except_0({})".format(self._convert_expression(expr.args[0]))
+
+        if expr.name == "alldifferent_except_n":
+            arr, n = expr.args
+            arr_str = self._convert_expression(arr)
+            str_n = "{" + ",".join(self._convert_expression(v) for v in n) + "}"
+            return "alldifferent_except({}, {})".format(arr_str, str_n)
 
         if expr.name in ["lex_lesseq", "lex_less"]:
             X = [self._convert_expression(e) for e in expr.args[0]]
@@ -760,6 +767,34 @@ class CPM_minizinc(SolverInterface):
                                      self._convert_expression(demand),
                                      self._convert_expression(capacity))
 
+        elif expr.name == "cumulative_optional":
+            extra_cons = []
+            if len(expr.args) == 5:
+                start, dur, demand, capacity, is_present = expr.args
+            else:
+                start, dur, end, demand, capacity, is_present = expr.args
+                extra_cons += [implies(p, s + d == e) for s, d, e, p in zip(start, dur, end, is_present)]
+
+            global_str = "cumulative({},{},{},{})"
+            # ensure duration is non-negative (only enforced for the tasks that are present)
+            dur, dur_cons = get_nonneg_args(dur, is_present)
+            extra_cons += dur_cons
+            # ensure demand is non-negative (only enforced for the tasks that are present)
+            demand, demand_cons = get_nonneg_args(demand, is_present)
+            extra_cons += demand_cons
+
+            # absent tasks do not have to be scheduled: expressed with an optional start time
+            opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
+                                                              self._convert_expression(s))
+                         for s, p in zip(start, is_present)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format("[{}]".format(",".join(opt_start)),
+                                     self._convert_expression(dur),
+                                     self._convert_expression(demand),
+                                     self._convert_expression(capacity))
+
         elif expr.name == "no_overlap":
             extra_cons = []
             if len(expr.args) == 2:
@@ -776,6 +811,28 @@ class CPM_minizinc(SolverInterface):
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
             return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+
+        elif expr.name == "no_overlap_optional":
+            extra_cons = []
+            if len(expr.args) == 3:
+                start, dur, is_present = expr.args
+            else:
+                start, dur, end, is_present = expr.args
+                extra_cons += [implies(p, s + d == e) for s, d, e, p in zip(start, dur, end, is_present)]
+
+            global_str = "disjunctive({},{})"
+            # ensure duration is non-negative (only enforced for the tasks that are present)
+            dur, dur_cons = get_nonneg_args(dur, is_present)
+            extra_cons += dur_cons
+
+            # absent tasks do not have to be scheduled: expressed with an optional start time
+            opt_start = ["if {} then {} else <> endif".format(self._convert_expression(p),
+                                                              self._convert_expression(s))
+                         for s, p in zip(start, is_present)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format("[{}]".format(",".join(opt_start)), self._convert_expression(dur))
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
@@ -882,23 +939,21 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "gcc":
             assert isinstance(expr, GlobalCardinalityCount)  # typecheck that it has a .closed()
             vars, vals, occ = expr.args
-            vars = self._convert_expression(vars)
-            vals = self._convert_expression(vals)
-            occ = self._convert_expression(occ)
+            vars_str = self._convert_expression(vars)
+            vals_str = self._convert_expression(vals)
+            occ_str = self._convert_expression(occ)
             if expr.closed is False:
                 name = "global_cardinality"
             else:
                 name = "global_cardinality_closed"
-            return "{}({},{},{})".format(name, vars, vals, occ)
+            return "{}({},{},{})".format(name, vars_str, vals_str, occ_str)
 
-        elif expr.name == "div":
-            return "{} div {}".format(*args_str)
-
-        elif expr.name == "mod":
-            return "{} mod {}".format(*args_str)
-
-        elif expr.name == "pow":
-            return "{}^{}".format(*args_str)
+        elif expr.name in ("div", "mod", "pow"):
+            # wrap args that are a subexpression in ()
+            lhs, rhs = (f"({s})" if isinstance(a, Expression) else s for a, s in zip(expr.args, args_str))
+            if expr.name == "pow":
+                return f"{lhs}^{rhs}"
+            return f"{lhs} {expr.name} {rhs}"
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
@@ -906,23 +961,23 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "mul":
             assert isinstance(expr, Multiplication)
             if expr.is_lhs_num:
-                return "{}*({})".format(args_str[1], args_str[0])
+                return "({})*({})".format(args_str[1], args_str[0])
             else:
                 return "({}) * ({})".format(args_str[1], args_str[0])
 
         elif expr.name == "count":
             vars, val = expr.args
-            vars = self._convert_expression(vars)
-            val = self._convert_expression(val)
-            return "count({},{})".format(vars, val)
+            vars_str = self._convert_expression(vars)
+            val_str = self._convert_expression(val)
+            return "count({},{})".format(vars_str, val_str)
 
         elif expr.name == "among":
             vars, vals = expr.args
-            vars = self._convert_expression(vars)
-            vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
-            return "among({},{})".format(vars, vals)
+            vars_str = self._convert_expression(vars)
+            vals_str = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
+            return "among({},{})".format(vars_str, vals_str)
 
-        elif expr.name == "InDomain":
+        elif expr.name == "indomain":
             # InDomain(expr, domain_list) - convert domain_list to a set
             arg0_str = self._convert_expression(expr.args[0])
             domain = expr.args[1]

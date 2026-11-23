@@ -51,19 +51,16 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
         Initialize the XCSP3 Dataset.
         """
 
-        self.root = pathlib.Path(root)
         self.year = year
         self.track = track
 
-        dataset_dir = self.root / self.name / str(year) / track
-        
         if not str(year).startswith('20'):
             raise ValueError("Year must start with '20'")
         if not track:
             raise ValueError("Track must be specified, e.g. COP, CSP, MiniCOP, ...")
         
         super().__init__(
-            dataset_dir=dataset_dir,
+            root=root, subdirs=(str(year), track),
             transform=transform, target_transform=target_transform, 
             download=download, extension=".xml.lzma",
             **kwargs

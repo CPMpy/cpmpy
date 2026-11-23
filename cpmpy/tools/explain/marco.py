@@ -3,6 +3,7 @@
 """
 
 import cpmpy as cp
+from cpmpy.exceptions import NotSupportedError
 from cpmpy.transformations.get_variables import get_variables
 
 from .utils import make_assump_model
@@ -40,12 +41,14 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
     # map solver for computing hitting sets
     map_solver = cp.SolverLookup.get(map_solver)
-    do_solution_hint = do_solution_hint and hasattr(map_solver, 'solution_hint')  # solver may not support solution hinting...
-
     map_solver += cp.any(assump)
+    
     if do_solution_hint:
         hint = [1]*len(assump)
-        map_solver.solution_hint(assump, hint) # we want large subsets, more likely to be a MUS
+        try:
+            map_solver.solution_hint(assump, hint) # we want large subsets, more likely to be a MUS
+        except NotSupportedError: # not all solvers support solution hinting
+            do_solution_hint = False
 
     deletion_order = {a : -len(get_variables(dmap[a])) for a in assump} # avoid recomputing
 

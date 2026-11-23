@@ -72,7 +72,7 @@ Use :func:`load_formats` and :func:`write_formats` to inspect the currently regi
     from cpmpy.tools.io import load_formats, write_formats
 
     print(load_formats()) 
-    >> ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'cnf', 'wcnf', 'opb', 'jsplib', 'rcpsp', 'nurserostering']
+    >> ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'cnf', 'wcnf', 'opb', 'jsplib', 'rcpsp', 'nurserostering', 'sudoku']
     print(write_formats())
     >> ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'cnf', 'wcnf', 'opb']
 
@@ -101,12 +101,14 @@ from .utils import get_extension, get_format
 from .jsplib import load_jsplib        
 from .nurserostering import load_nurserostering
 from .rcpsp import load_rcpsp
+from .sudoku import load_sudoku
 
 # Standard format loaders and writers
 from .opb import load_opb, write_opb
 from .scip_formats import load_scip_format, write_scip_format
 from .wcnf import load_wcnf
 from .dimacs import load_dimacs, write_dimacs
+from .gdimacs import load_gdimacs, write_gdimacs
 from .xcsp3 import load_xcsp3
 
 _all__ = [
@@ -120,11 +122,14 @@ _all__ = [
     "write_scip_format",
     "load_dimacs",
     "write_dimacs",
+    "load_gdimacs",
+    "write_gdimacs",
     "load_wcnf",
     "load_xcsp3",
     "load_jsplib",
     "load_rcpsp",
     "load_nurserostering",
+    "load_sudoku",
     "get_extension",
     "get_format",
 ]

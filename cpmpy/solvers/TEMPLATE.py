@@ -82,9 +82,12 @@ class CPM_template(SolverInterface):
     # [GUIDELINE] list all supported global constraints and global functions
     #           (e.g., 'alldifferent', 'max', 'element', ...)
     supported_global_constraints = frozenset({'alldifferent', 'max', 'element', 'div'})
-    # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
-    #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
+    # [GUIDELINE] list all global constraints supported in (fully) reified context
+    #           (e.g., 'alldifferent' if your solver supports `b == AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
+    # [GUIDELINE] list all global constraints supported in half-reified context
+    #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
+    supported_half_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -233,7 +236,7 @@ class CPM_template(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds
+        self.cpm_status.solve_time = self.TPL_solver.time() # wallclock time in (float) seconds
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
@@ -408,12 +411,13 @@ class CPM_template(SolverInterface):
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons) # if the solver requires supported partial function globals to be safened, use the follwing instead:
+        cpm_cons = no_partial_functions(cpm_cons) # if the solver requires supported partial function globals to be safened, use the following instead:
         # cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"element", "nd_element", "div", "mod"}))        
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -552,7 +556,7 @@ class CPM_template(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds (of entire solveAll call)
+        self.cpm_status.solve_time = self.TPL_solver.time() # wallclock time in (float) seconds (of entire solveAll call)
 
         # Translate solver exit status to CPMpy exit status
         # CSP & COP:

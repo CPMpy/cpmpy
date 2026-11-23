@@ -76,6 +76,7 @@ class CPM_pysdd(SolverInterface):
 
     supported_global_constraints = frozenset({"xor"})
     supported_reified_global_constraints = frozenset({"xor"})
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
     @staticmethod
     def supported():
@@ -161,7 +162,7 @@ class CPM_pysdd(SolverInterface):
             has_sol = not self.pysdd_root.is_false()
 
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = 0.0
+        self.cpm_status.solve_time = 0.0
 
         # translate exit status
         if has_sol:
@@ -309,6 +310,7 @@ class CPM_pysdd(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons

@@ -5,6 +5,7 @@ import re
 import tempfile
 import pytest
 import numpy as np
+from shutil import which
 import cpmpy as cp
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 from cpmpy.expressions.globalconstraints import GlobalConstraint
@@ -399,6 +400,12 @@ class TestSolvers:
         # modulo
         assert  cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc")
 
+        # nested arguments of div, mod and pow
+        y = cp.intvar(0, 5, shape=2)
+        assert  cp.Model([ y[0] // (y[1] + 1) == 2, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) % (y[1] + 1) == 0, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) ** 2 == 36, y == [5, 1] ]).solve(solver="minizinc")
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="MiniZinc not installed")
@@ -581,6 +588,42 @@ class TestSolvers:
 
         with open(proof_file+".proof", "r") as f:
             assert f.readline()[:-1] == "pseudo-Boolean proof version 1.1"# check header of proof-file
+
+    @staticmethod
+    def _hard_random_3sat(n=250, ratio=4.5):
+        # random 3-SAT near the phase transition, not decided by Exact within several seconds
+        rng = np.random.default_rng(0)
+        x = cp.boolvar(shape=n)
+        return [cp.any([x[v] if rng.random() < .5 else ~x[v] for v in rng.choice(n, 3, replace=False)])
+                for _ in range(int(n * ratio))]
+
+    @pytest.mark.requires_solver("exact")
+    def test_exact_timeout_no_stale_solution(self, solver):
+        # Exact's hasSolution() remains True after an earlier solve,
+        # a timeout without new solution should not report the old one
+        o = cp.intvar(0, 10, name="o")
+        s = cp.SolverLookup.get(solver)
+        s.minimize(o)
+        assert s.solve()
+        assert s.status().exitstatus == ExitStatus.OPTIMAL
+
+        s += self._hard_random_3sat()
+        assert not s.solve(time_limit=1)
+        assert s.status().exitstatus == ExitStatus.UNKNOWN
+        assert o.value() is None
+        assert s.objective_value() is None
+
+    @pytest.mark.requires_solver("exact")
+    def test_exact_timeout_objective_value(self, solver):
+        # Exact's toOptimum() returns 0 as objective value on timeout
+        b = cp.boolvar(name="b")
+        o = cp.intvar(1, 10, name="o")
+        cons = [b.implies(c) for c in self._hard_random_3sat()]  # b=1 not decided within time limit
+        s = cp.SolverLookup.get(solver, cp.Model(cons, maximize=b + o))
+        assert s.solve(time_limit=1)
+        assert s.status().exitstatus == ExitStatus.FEASIBLE
+        assert s.objective_value() == (b + o).value()
+        assert s.objective_value() >= 1
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
@@ -796,29 +839,6 @@ class TestSolvers:
         m = cp.Model([x + y == 2, wsum == 9])
         assert m.solve(solver="minizinc")
 
-
-    @pytest.mark.skipif(not CPM_pumpkin.supported(), reason="Gurobi not installed")
-    def test_pumpkin_proof(self):
-        x = cp.intvar(0,10, shape=3)
-        m = cp.Model(cp.AllDifferent(x))
-        m += cp.sum(x) <= 2
-
-        # old version, does not work anymore
-        with pytest.raises(ValueError):
-            m.solve(solver="pumpkin", proof_name="test_proof.drcp")
-        
-        # need to supply proof in constructor
-        proof_name=tempfile.NamedTemporaryFile(suffix=".drcp", delete=False).name
-        s = cp.SolverLookup.get("pumpkin", m, proof=proof_name)
-        assert s.solve() is False
-        with open(proof_name, "r") as f:
-            proof = f.read()
-            assert ("UNSAT" in proof)
-
-        # cannot supply proof in solve
-        with pytest.raises(ValueError):
-            s.solve(proof=proof_name)
-
     @pytest.mark.requires_solver("pumpkin")
     def test_pumpkin_indomain_expression(self, solver):
         # InDomain on a non-variable expression (e.g. a sum) must be flattened 
@@ -828,7 +848,7 @@ class TestSolvers:
         s = cp.SolverLookup.get(solver, m)
         assert s.solve()
         assert sum(xi.value() for xi in x) in (2, 4)
-
+        
 
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
@@ -861,7 +881,7 @@ class TestSupportedSolvers:
         assert m.solve(solver=solver, time_limit=1)
 
         try:
-            m.solve(solver=solver, time_limit=-1)
+            cp.SolverLookup.get(solver, m).solve(time_limit=-1)
             assert False
         except ValueError:
             pass
@@ -1110,6 +1130,13 @@ class TestSupportedSolvers:
             pytest.skip("solver does not support this test context")
         if solver == 'cplex':
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
+
+        kwargs = dict()
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
+        else:
+            kwargs["solution_limit"] = 15
+            
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
@@ -1117,14 +1144,27 @@ class TestSupportedSolvers:
         m += x // y == d
         m += x % y == r
         sols = set()
-        solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        m.solveAll(solver=solver, **kwargs, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
             assert (cp.Division(xv, yv)).value() == dv
             assert (cp.Modulo(xv, yv)).value() == rv
 
+
+    def test_div_towards_zero(self, solver):
+        
+        x,y,z = cp.intvar(-10,10, shape=3)
+        cons = x // y == z
+        m = cp.Model(cons, x == -10, y == 3, z == -3)
+        assert m.solve(solver=solver)
+        
+        m = cp.Model(cons, x == 10, y == -3, z == -3)
+        assert m.solve(solver=solver)
+
+        m = cp.Model(cons, x == -10, y == -3, z == 3)
+        assert m.solve(solver=solver)
+        
 
     def test_status(self, solver):
 
@@ -1155,11 +1195,48 @@ class TestSupportedSolvers:
         # normally, should not be able to solve within 1s...
         assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
+        s = cp.SolverLookup.get(solver, m)
+        s.solve(time_limit=1)
+        # normally, should not be able to solve within 1s, ensure status is set by solver interface here
+        assert s.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
+
         # now trivally unsat
         m += cp.sum(bv) <= 0
         m.solve(solver=solver)
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
+
+    def test_status_runtime(self, solver):
+        
+        n = 500
+        seed = 42
+        np.random.seed(seed)
+
+        bv = cp.boolvar(shape=n)
+        model = cp.Model()
+        for _ in range(round(4.26 * n)):
+            lits = [x if np.random.random() < 0.5 else ~x for x in np.random.choice(bv, size=3)]
+            model += cp.any(lits)
+
+        model.solve(solver=solver, time_limit=3) # enough to not time-out the transformations
+        assert model.status().runtime is not None
+        assert model.status().runtime > 0
+
+        assert model.status().solve_time is not None
+        assert model.status().solve_time > 0
+        
+        assert model.status().runtime > model.status().solve_time # model overrides runttime with wallclock time
+
+        # test via solver interface
+        s = cp.SolverLookup.get(solver, model)
+        s.solve(time_limit=1)
+        assert s.status().runtime is not None
+        assert s.status().runtime > 0
+
+        assert s.status().solve_time is not None
+        assert s.status().solve_time > 0
+        
+        assert s.status().runtime == s.status().solve_time # solver interfce patches runtime to solve time for backwards compatibility
 
 
 
@@ -1258,15 +1335,50 @@ class TestSupportedSolvers:
         kwargs = {}
         if solver in ("gurobi", "cplex"):
             kwargs["solution_limit"] = 10
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
         p, q = cp.boolvar(2)
         model = cp.Model(p.implies(3 * q == 2))
         assert model.solve(solver)
         assert model.solveAll(solver, **kwargs) == 2
 
+    def test_prooflogging(self, solver):
+
+        cls = cp.SolverLookup.lookup(solver)
+        args = inspect.signature(cls.__init__)
+        if "proof" not in args.parameters.keys():
+            pytest.skip(reason=f"{solver} does not support prooflogging")
+
+        basename = solver.split(":")[0]
+        if basename == "gcs" and which("veripb") is None:
+            pytest.skip(reason="veripb not on path")
+        if basename == "pysat" and which("drat-trim") is None:
+            pytest.skip(reason="drat-trim not on path")
+        
+        a,b,c,d = cp.intvar(1,3,shape=4)
+        m = cp.Model(a != b, a != c, a != d, b != c, b != d, c != d)
+    
+        prooffile = tempfile.NamedTemporaryFile(delete=False).name
+        s = cp.SolverLookup.get(solver, m, proof=prooffile)
+        assert s.solve() is False
+        assert s._proof is not None
+
+        for file in s.get_proof_files():
+            with open(file, "r") as f:
+                proof = f.read()
+                assert len(proof) > 0, f"proof file {file} is empty"
+
+        print(basename)
+        if basename != "pumpkin": # does not support external verification
+            assert s.verify() is True
+            assert hasattr(s, "verify_status"), "verify() should set verify_status on solver interface"
 
 @pytest.mark.generate_constraints.with_args(numexprs)
 @pytest.mark.flaky(reruns=3)
 def test_objective_numexprs(solver, constraint):
+
+    if constraint.name.startswith("reservoir") and solver == "z3":
+        pytest.skip("Decomposition of reservoir triggers upstream z3 bug: https://github.com/Z3Prover/z3/issues/11024")
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     lb, ub = constraint.get_bounds()
@@ -1306,6 +1418,30 @@ def test_scip_special_cardinality():
     assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
     assert s.solve()
     assert bvs.value().sum() <= 3
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_cumulative_native():
+    if not hasattr(CPM_scip().scip_model, "addConsCumulative"):
+        pytest.skip("PySCIPOpt without addConsCumulative")
+
+    start = cp.intvar(0, 10, shape=3)
+    model = cp.Model(cp.Cumulative(start, [3, 2, 2], demand=[2, 3, 1], capacity=3))
+    s = cp.SolverLookup.get("scip", model)
+    assert any(c.getConshdlrName() == "cumulative" for c in s.scip_model.getConss())
+    assert s.solve()
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_no_overlap_native():
+    if not hasattr(CPM_scip().scip_model, "addConsCumulative"):
+        pytest.skip("PySCIPOpt without addConsCumulative")
+
+    start = cp.intvar(0, 10, shape=3)
+    model = cp.Model(cp.NoOverlap(start, [2, 1, 1]))
+    s = cp.SolverLookup.get("scip", model)
+    assert any(c.getConshdlrName() == "cumulative" for c in s.scip_model.getConss())
+    assert s.solve()
 
 
 @pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")

@@ -81,6 +81,7 @@ class CPM_z3(SolverInterface):
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mul", "mod"})
     supported_reified_global_constraints = supported_global_constraints
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
     @staticmethod
     def supported():
@@ -207,9 +208,9 @@ class CPM_z3(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         st = self.z3_solver.statistics()
         if 'time' not in st.keys():
-            self.cpm_status.runtime = 0
+            self.cpm_status.solve_time = 0.0
         else:
-            self.cpm_status.runtime = st.get_key_value('time')
+            self.cpm_status.solve_time = st.get_key_value('time')
 
         # translate exit status
         if my_status == "sat":
@@ -382,6 +383,7 @@ class CPM_z3(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 

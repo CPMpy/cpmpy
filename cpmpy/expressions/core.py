@@ -656,7 +656,7 @@ class BoolVal(Expression):
 
         Args:
             other (BoolExprLike): the right-hand-side of the implication
-            simplify (bool): simplify the implication, even if it means `other` dissappears from user-view
+            simplify (bool): simplify the implication, even if it means `other` disappears from user-view
 
         Simplification rule:
             - BoolVal(False) -> other :: BoolVal(True)
@@ -802,7 +802,8 @@ class Operator(Expression):
                     l = len(a.args)
                     arg_list[i:i+1] = a.args
                     i += l
-                i += 1
+                else:
+                    i += 1
 
         super().__init__(name, tuple(arg_list))
 

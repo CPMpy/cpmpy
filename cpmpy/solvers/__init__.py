@@ -8,7 +8,7 @@ different assumption variables toggled on/off, and the solver will reuse informa
 See :ref:`supported-solvers` for the list of solvers and their capabilities.
 
 To benefit from incrementality, you have to instantiate the solver object and reuse it, rather than working on a Model object.
-Solvers must be instantiated throught the static :class:`cp.SolverLookup <cpmpy.solvers.utils.SolverLookup>` class:
+Solvers must be instantiated through the static :class:`cp.SolverLookup <cpmpy.solvers.utils.SolverLookup>` class:
 
 - :meth:`cp.SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` -- List all installed solvers (including subsolvers).
 - :meth:`cp.SolverLookup.get(solvername, model=None) <cpmpy.solvers.utils.SolverLookup.get>` -- Initialize a specific solver.
@@ -43,6 +43,7 @@ List of solver submodules
     cplex
     hexaly
     rc2
+    hermax
     scip
     highs
 
@@ -80,6 +81,7 @@ from .pumpkin import CPM_pumpkin
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
+from .hermax import CPM_hermax
 from .scip import CPM_scip
 from .highs import CPM_highs
 
@@ -90,6 +92,7 @@ __all__ = [
     "CPM_exact",
     "CPM_gcs",
     "CPM_gurobi",
+    "CPM_hermax",
     "CPM_hexaly",
     "CPM_highs",
     "CPM_minizinc",

@@ -53,7 +53,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal, Nested
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist, is_int
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -73,8 +73,10 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "mod", "pow", "element"})
-    supported_reified_global_constraints = frozenset()
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "pow", "element", "nvalue", "nvalue_except",  # no mod, CPMpy rounds towards zero
+                                                   "alldifferent", "xor"}) 
+    supported_reified_global_constraints = frozenset({"alldifferent", "xor"})
+    supported_half_reified_global_constraints = supported_reified_global_constraints
 
 
     @staticmethod
@@ -129,7 +131,7 @@ class CPM_hexaly(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_hexaly: Install the python package 'cpmpy[hexaly]' to use this solver interface.") 
         elif not self.license_ok():
-            raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occured during license check. Make sure your license is activated!")
+            raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occurred during license check. Make sure your license is activated!")
 
         from hexaly.optimizer import HexalyOptimizer
 
@@ -168,7 +170,7 @@ class CPM_hexaly(SolverInterface):
             - iteration_limit: max number of iterations
             - verbosity: verbosity level
 
-            full list of parameters availble at:
+            full list of parameters available at:
             https://www.hexaly.com/docs/last/pythonapi/optimizer/hxparam.html
         """
         from hexaly.optimizer import HxObjectiveDirection
@@ -199,11 +201,12 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # new status, translate runtime
+        t0 = time.time()
         self.hex_model.close() # model must be closed
         self.hex_solver.solve()
         self.hex_sol = self.hex_solver.get_solution()
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
+        self.cpm_status.solve_time = time.time() - t0 # wallclock time in (float) seconds
 
         # unregister solution callback
         if callback is not None:
@@ -368,6 +371,7 @@ class CPM_hexaly(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
+                                     supported_half_reified=self.supported_half_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 
@@ -446,12 +450,25 @@ class CPM_hexaly(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
             if cpm_expr.name == "alldifferent":
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
-                return self.hex_model.distinct(hex_arr)
+                return self.hex_model.count(self.hex_model.distinct(hex_arr)) == len(cpm_expr.args)
+            if cpm_expr.name == "xor":
+                return self.hex_model.xor(self._hex_expr(cpm_expr.args))
             raise ValueError(f"Global constraint {cpm_expr} is not supported by hexaly")
 
         elif isinstance(cpm_expr, GlobalFunction):
-            if cpm_expr.name == "nvalues":
-                return self.hex_model.distinct(self._hex_expr(cpm_expr.args))
+            if cpm_expr.name == "nvalue":
+                hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
+                return self.hex_model.count(self.hex_model.distinct(hex_arr))
+            if cpm_expr.name == "nvalue_except":
+                arr, n = cpm_expr.args
+                arr = flatlist(arr)
+                n = argval(n)
+                hex_arr = self.hex_model.array(self._hex_expr(arr))
+                nv = self.hex_model.count(self.hex_model.distinct(hex_arr))
+                if len(arr) == 0:
+                    return nv
+                appears = self.hex_model.or_(*(self._hex_expr(a == n) for a in arr))
+                return nv - self.hex_model.iif(appears, 1, 0)
             if cpm_expr.name == "element":
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args[0]))
                 idx = self._hex_expr(cpm_expr.args[1])
@@ -472,9 +489,6 @@ class CPM_hexaly(SolverInterface):
                        self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
                        self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
                        self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
-            if cpm_expr.name == "mod":
-                a, b = self._hex_expr(cpm_expr.args)
-                return a % b
             if cpm_expr.name == "pow":
                 a, b = self._hex_expr(cpm_expr.args)
                 return a ** b
