@@ -47,7 +47,7 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, ConstraintsLike
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.utils import is_num, is_int, is_boolexpr
@@ -428,12 +428,12 @@ class CPM_hermax(SolverInterface):
     def has_objective(self):
         return self.objective_ is not None
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -461,16 +461,19 @@ class CPM_hermax(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hermax":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_hermax":
         """
             Eagerly add a constraint to the underlying solver.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
+
         get_variables(cpm_expr, collect=self.user_vars)
 
         for cpm_con in self.transform(cpm_expr):
