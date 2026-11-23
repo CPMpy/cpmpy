@@ -445,7 +445,7 @@ class NegBoolView(_BoolVarImpl):
         self.name = f"~{bv.name}"
 
     @property
-    def _value(self) -> Optional[bool]:
+    def _value(self) -> Optional[int]:
         """Inverted value of the viewed variable. The view itself stores nothing."""
         v = self._bv._value
         if v is None:
@@ -453,14 +453,15 @@ class NegBoolView(_BoolVarImpl):
         return not v
 
     @_value.setter
-    def _value(self, v: Optional[bool]) -> None:
+    def _value(self, v: Optional[int]) -> None:
         self._bv._value = None if v is None else not v
 
     def value(self) -> Optional[bool]:
         """ the negation of the value obtained in the last solve call by the viewed variable
             (or 'None')
         """
-        return self._value
+        v = self._value
+        return None if v is None else bool(v)
 
     def clear(self) -> None:
         """ clear, for the viewed variable, the value obtained from the last solve call
