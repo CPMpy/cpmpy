@@ -76,7 +76,7 @@ class ParameterTuner:
 
 
         # Get all possible hyperparameter configurations
-        combos = list(param_combinations(tunables)) if len(tunables) else []
+        combos = list(param_combinations(tunables))
         combos_np = self._params_to_np(combos)
 
         # Ensure random start
@@ -187,7 +187,7 @@ class GridSearchTuner(ParameterTuner):
             print(f" - took {self.best_runtime:.1f} seconds")
         # Get all possible hyperparameter configurations, without the parameters that are fixed
         tunables = {key: values for key, values in self.all_params.items() if key not in fix_params}
-        combos = list(param_combinations(tunables)) if len(tunables) else []
+        combos = list(param_combinations(tunables))
         shuffle(combos) # test in random order
 
         if max_tries is not None:
