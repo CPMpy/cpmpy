@@ -151,7 +151,7 @@ class CPM_cvc5(SolverInterface):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None, unsat_cores: bool = False, proof: Optional[str] = None,
-                 proof_format: Optional[str] = None, check_proofs: bool = True):
+                 proof_format: Optional[str] = None, check_proofs: bool = True, **kwargs):
         """
         Constructor of the native solver object
 
@@ -176,6 +176,19 @@ class CPM_cvc5(SolverInterface):
                                 proof).
             check_proofs (bool): when ``proof`` is set, run cvc5's internal proof check after an unsat
                                 result (``check-proofs``). On by default; pass ``False`` to skip it.
+            **kwargs: cvc5 solver options, applied before the model is posted. cvc5 freezes almost
+                                every option on the first asserted constraint (``setOption`` then raises
+                                "solver is already fully initialized"), so this is the place to set them.
+
+                                The option list is at https://cvc5.github.io/docs/latest/options.html
+
+                                =============================   ============
+                                Argument                        Description
+                                =============================   ============
+                                ``rlimit-per``                  resource limit per ``check``
+                                ``random-seed``                 random seed
+                                ``compute-partitions``          number of parallel workers (default=0)
+                                =============================   ============
         """
         if not self.supported():
             raise ModuleNotFoundError("CPM_cvc5: Install the python package 'cpmpy[cvc5]' to use this solver interface.")
@@ -190,6 +203,9 @@ class CPM_cvc5(SolverInterface):
         # initialise the native solver object
         self.cvc5_solver = cvc5.Solver()
         self.assumption_dict: dict[Any, _BoolVarImpl] = {}
+        # post cvc5 solver options before freeze
+        if kwargs:
+            self.cvc5_solver.set(**kwargs)
         self._unsat_cores = unsat_cores
         if unsat_cores:
             # must be set before the first constraint is posted
@@ -232,21 +248,11 @@ class CPM_cvc5(SolverInterface):
                 assumptions:                        iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
-                **kwargs:                           any keyword argument, sets parameters of solver object
-
-            An overview of the cvc5 solver parameters can found at
-            https://cvc5.github.io/docs/latest/options.html
-
-            You can use any of these parameters as keyword argument to `solve()` and they will
-            be forwarded to the solver. Examples include:
-
-            =============================   ============
-            Argument                        Description
-            =============================   ============
-            ``rlimit-per``                    set resource limit
-            ``random-seed``                   random seed
-            ``compute-partitions``            number of parallel workers (default=0)
-            =============================   ============
+                **kwargs:                           cvc5 options. Most options are frozen once a constraint has been
+                                                    posted and must be passed to the constructor instead (see
+                                                    :meth:`__init__`); passing one of those here raises ``ValueError``.
+                                                    A few stay settable per call, for example the per-check resource
+                                                    limit: ``s.solve(**{"reproducible-resource-limit": 1000})``.
         """
 
         import cvc5.pythonic as cvc5
@@ -256,6 +262,10 @@ class CPM_cvc5(SolverInterface):
                              "`cpmpy.SolverLookup.get('cvc5', model, proof='path/to/proof')`")
         if "verify" in kwargs or "verifier" in kwargs or "verifier_args" in kwargs or "display_output" in kwargs:
             raise ValueError("Proof-verification is only supported through the `verify()` method, not as a keyword argument to solve.")
+
+        # before solver_vars(): integer bounds are assertions, and the first assertion
+        # freezes almost every cvc5 option
+        self._set_solver_options(kwargs)
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -277,10 +287,6 @@ class CPM_cvc5(SolverInterface):
             cvc5_assum_vars = []
             self.assumption_dict = {}  # no assumptions used in this call, avoid a stale core in get_core()
 
-        # call the solver, with parameters
-        for (key, value) in kwargs.items():
-            self.cvc5_solver.setOption(key, value)
-
         # check assumption variables, timing the call ourselves: cvc5's own 'global::totalTime'
         # statistic is cumulative over the solver's lifetime, not per-call
         start_time = time.time()
@@ -298,7 +304,7 @@ class CPM_cvc5(SolverInterface):
         elif my_status == "unknown":
             try:
                 model = self.cvc5_solver.model()
-                if model: # a solution was found, just not the optimal one (or not proven)
+                if model:
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
                 # can happen when timeout is reached...
                 else:
@@ -331,6 +337,27 @@ class CPM_cvc5(SolverInterface):
                 cpm_var.clear()
 
         return has_sol
+
+
+    def _set_solver_options(self, options: dict):
+        """
+            Apply cvc5 options. Must run before the first asserted constraint for every
+            option except the handful cvc5 still accepts afterwards (``tlimit-per``,
+            ``verbosity``, output channels). A frozen option raises ``ValueError``
+            pointing at the constructor, where :meth:`__init__` sets ``**kwargs``
+            before the model is posted.
+        """
+        for key, value in options.items():
+            try:
+                self.cvc5_solver.set(key, value)
+            except RuntimeError as e:
+                if "already fully initialized" not in str(e):
+                    raise
+                raise ValueError(
+                    f"CPM_cvc5: option '{key}' cannot be set in solve(); cvc5 freezes it "
+                    f"once a constraint has been posted. Pass it to the constructor, e.g. "
+                    f"cp.SolverLookup.get('cvc5', model, **{{'{key}': ...}})."
+                ) from e
 
 
     def _write_proof_files(self):
@@ -395,7 +422,7 @@ class CPM_cvc5(SolverInterface):
                 time_limit: stop after this many seconds (default: None)
                 solution_limit: stop after this many solutions (default: None)
                 call_from_model: whether the method is called from a CPMpy Model instance or not
-                **kwargs: any keyword argument, sets parameters of solver object (see `solve()`)
+                **kwargs: cvc5 options, forwarded to `solve()`. Most must be set in the constructor.
 
             Returns:
                 number of solutions found
