@@ -460,21 +460,22 @@ class Circuit(GlobalConstraint):
         order = cp.intvar(0, n - 1, shape=n)
 
         constraining : list[Expression] = []
+        defining: list[Expression] = []
+        
         constraining.extend(x >= 0 for x in succ) # lower bound on successors
         constraining.extend(x < n for x in succ)  # upper bound on successors
         constraining.extend(cp.sum(succ[j] == i for j in range(n)) == 1 for i in range(n))  # each node i has exactly one predecessor
-        constraining.append(cp.AllDifferent(order))  # redundant constraint
-        constraining.append(order[0] == 0)
+        defining.append(cp.AllDifferent(order))  # redundant constraint
+        defining.append(order[0] == 0)
 
-        defining: list[Expression] = []
         for i in range(n):
             for j in range(n):
                 if i == j:
                     # forbid self-loops
                     constraining.append(succ[i] != j)
-                if j != 0:
+                elif j != 0:
                     # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
-                    defining.append((succ[i] == j) == (order[i] + 1 == order[j]))
+                    constraining.append((succ[i] == j) == (order[i] + 1 == order[j]))
 
         return constraining, defining
 
@@ -886,6 +887,8 @@ class Regular(GlobalConstraint):
         
         if not is_any_list(transitions):
             raise TypeError("The second argument of a regular constraint should be a list of transitions")
+        if len(transitions) == 0:
+            raise ValueError("Regular constraint must be given at least one transition")
         _node_type = type(transitions[0][0])
         for s,v,e in transitions:
             if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
@@ -901,6 +904,9 @@ class Regular(GlobalConstraint):
         for s, v, e in transitions:
             node_set.update([s,e])
             self.trans_dict[(s, v)] = e
+        # The start and accepting nodes need an id, even if they do not appear in any transition
+        node_set.add(start)
+        node_set.update(accepting)
         self.nodes = sorted(node_set)
         # normalize node_ids to be 0..n-1, allows for smaller domains
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
@@ -927,19 +933,27 @@ class Regular(GlobalConstraint):
         lb, ub = min(lbs), max(ubs)
 
         transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+        n_states = len(self.nodes)
 
         if complete:
             # add a sink node for transitions that are not defined. When the Regular constraint is in positive context, this is not needed
-            sink = len(self.nodes)
-            self.nodes.append(sink)
-            self.node_map[sink] = sink
+            # The sink only exists in normalized ids: it is not added to self.nodes/self.node_map (solver interfaces read those),
+            # and a user node id may coincide with the sink's normalized id.
+            sink = n_states
+            n_states += 1
             transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
+            transitions.extend([[sink, v, sink] for v in range(lb, ub + 1)])
+
+        id_start = self.node_map[start]
+        start_transitions = [[v, e] for s, v, e in transitions if s == id_start]
+        if len(start_transitions) == 0:
+            return [cp.BoolVal(False)], [] # no transition leaves the start node, cannot be satisfied
 
         # keep track of current state when traversing the array
-        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
-        id_start = self.node_map[start]
+        # shape must be a tuple: intvar(..., shape=1) returns a scalar, not an array
+        state_vars = intvar(0, n_states-1, shape=(len(arr),))
         # optimization: we know the entry node of the automaton, results in smaller table
-        cons: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
+        cons: list[Expression] = [Table([arr[0], state_vars[0]], start_transitions)]
         # define the rest of the automaton using transition table
         cons.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
         # last state must be accepting
@@ -976,6 +990,15 @@ class Regular(GlobalConstraint):
             nodes_set.add(src)
             nodes_set.add(dst)
             values_set.add(value)
+
+        # The start and accepting nodes need an id even without transitions
+        nodes_set.add(start)
+        nodes_set.update(accepting)
+
+        if complete:
+            # The sink node must also capture values in the domain of the array that do not occur in any transition
+            lbs, ubs = get_bounds(arr)
+            values_set.update(range(min(lbs), max(ubs) + 1))
 
         nodes = sorted(nodes_set)
         values = sorted(values_set)
@@ -1028,9 +1051,10 @@ class Regular(GlobalConstraint):
                 defining.append(cp.sum(s[0, j, q] for j in range(len(values))) == 0)
 
         # Enforce flow constraints: flow in = flow out
+        flow_cons = []
         for i in range(1, len(arr)):
             for q in range(len(nodes)):
-                defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
+                flow_cons.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
                 defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) <= 1) # redundant constraint
                 defining.append(cp.sum(s[i, j, q] for (j, _) in flow_out[q]) <= 1) # redundant constraint
 
@@ -1048,7 +1072,12 @@ class Regular(GlobalConstraint):
             for j in range(len(values)):
                 defining.append(cp.sum(s[i, j, q] for q in range(len(nodes))) == (arr[i] == values[j]))
 
-        return constraining, defining
+        if complete:
+            # With a flow from root to sink for every possible assignment, flow constraints can be defining
+            return constraining, defining + flow_cons
+        else:
+            # Without a flow from root to sink for every possible assignment, flow constraints must be constraining
+            return constraining + flow_cons, defining
 
 
     def value(self) -> Optional[bool]:
@@ -1193,8 +1222,9 @@ class MDD(GlobalConstraint):
         dummy_nodes.append(sink_node)
 
         necessary_levels = []
-        for id1 in list(extended_mapping.keys()):
-            level = levels[id1]
+        for id1, level in levels.items():
+            if level == n:
+                continue
             domain = range(arr[level].lb, arr[level].ub + 1)
             for v in domain:
                 if v not in extended_mapping[id1]:
@@ -2343,7 +2373,6 @@ class NoOverlapOptional(GlobalConstraint):
 
         The constraint enforces that all present tasks are scheduled without overlapping, and for each present task, the constraint enforces that:
         - duration >= 0
-        - demand >= 0
         - start + duration == end
 
         if the task is not present, it does not enforce any of the above.
@@ -2389,17 +2418,19 @@ class NoOverlapOptional(GlobalConstraint):
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
-        cons = []
+        cons: list[Expression] = []
 
         if len(self.args) == 3:
             start, duration, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
             start, duration, end, is_present = self.args
-            cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
+            cons.extend(implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start)))
+
+        cons.extend(implies(p, d >= 0) for d, p in zip(duration, is_present))  # enforce non-negative durations when present
 
         for (s1, d1, e1, p1), (s2, d2, e2, p2) in all_pairs(zip(start, duration, end, is_present)):
-            cons += [implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1]))]
+            cons.append(implies(p1 & p2, cp.any([d1 == 0, d2 == 0, e1 <= s2, e2 <= s1])))
         return cons, []
 
     def value(self) -> Optional[bool]:

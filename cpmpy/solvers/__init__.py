@@ -43,6 +43,7 @@ List of solver submodules
     cplex
     hexaly
     rc2
+    hermax
     scip
     highs
     cvc5
@@ -81,6 +82,7 @@ from .pumpkin import CPM_pumpkin
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
+from .hermax import CPM_hermax
 from .scip import CPM_scip
 from .highs import CPM_highs
 from .cvc5 import CPM_cvc5
@@ -93,6 +95,7 @@ __all__ = [
     "CPM_exact",
     "CPM_gcs",
     "CPM_gurobi",
+    "CPM_hermax",
     "CPM_hexaly",
     "CPM_highs",
     "CPM_minizinc",
