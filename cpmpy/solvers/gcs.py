@@ -61,7 +61,7 @@ from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, ExprLike, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, ExprLike, NestedBoolExprLike, ConstraintsLike
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_int, is_any_list
@@ -436,7 +436,7 @@ class CPM_gcs(SolverInterface):
         else:
             self.gcs.maximise(self.solver_var(obj_var))
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -446,7 +446,7 @@ class CPM_gcs(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -471,7 +471,7 @@ class CPM_gcs(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         return cpm_cons
     
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_gcs":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_gcs":
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
         Note that we don't store the constraints in a cpm_model,
@@ -479,11 +479,14 @@ class CPM_gcs(SolverInterface):
         then post those primitive constraints directly to the native solver
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy constraint, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy constraint, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
+
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
 

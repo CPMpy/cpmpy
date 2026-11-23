@@ -1504,11 +1504,12 @@ class Xor(GlobalConstraint):
         Arguments:
             arg_list (ListLike[BoolExprLike]): List of expressions or constants, to be xor'ed
         """
+        # convert to list to not silently fail on generator expressions
+        arg_list = list(arg_list)
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
         # convention for commutative binary operators:
         # swap if right is constant and left is not
-        arg_list = list(arg_list)
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
         super().__init__("xor", tuple(arg_list))

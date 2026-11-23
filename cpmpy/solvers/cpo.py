@@ -49,7 +49,7 @@ import time
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -423,7 +423,7 @@ class CPM_cpo(SolverInterface):
         return self.cpo_model.get_objective() is not None
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -433,7 +433,7 @@ class CPM_cpo(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -448,7 +448,7 @@ class CPM_cpo(SolverInterface):
         # no flattening required
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_cpo":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_cpo":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -462,11 +462,13 @@ class CPM_cpo(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
 
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

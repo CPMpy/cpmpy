@@ -42,7 +42,7 @@ from datetime import timedelta
 from typing import Iterable, Optional, List, Any, Set
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, NestedBoolExprLike
+from ..expressions.core import Expression, BoolVal, Comparison, NestedBoolExprLike, ConstraintsLike
 from ..expressions.utils import eval_comparison, is_int
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint
@@ -255,7 +255,7 @@ class CPM_pindakaas(SolverInterface):
 
         raise TypeError(f"Unexpected type: {cpm_var}")
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -265,7 +265,7 @@ class CPM_pindakaas(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -288,7 +288,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pindakaas":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_pindakaas":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -302,11 +302,14 @@ class CPM_pindakaas(SolverInterface):
             are auxiliary variables created by transformations.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
+
         import pindakaas as pdk
 
         if self.unsatisfiable:

@@ -62,7 +62,7 @@ import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike, ConstraintsLike
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.linearize import only_positive_coefficients, decompose_linear
@@ -393,7 +393,7 @@ class CPM_pysat(SolverInterface):
 
         raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
-    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+    def transform(self, cpm_expr: ConstraintsLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -410,7 +410,7 @@ class CPM_pysat(SolverInterface):
             - Pseudo-Boolean constraints (`wsum`)
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or list thereof, which can be enforced as constraint(s)
 
             Returns:
                 list[Expression]: transformed constraints
@@ -434,7 +434,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
-    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pysat":
+    def add(self, cpm_expr: ConstraintsLike) -> "CPM_pysat":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -451,11 +451,14 @@ class CPM_pysat(SolverInterface):
             are applied in `transform()`.
 
             Arguments:
-                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+                cpm_expr (ConstraintsLike): CPMpy expression, or a collection thereof, which can be enforced as constraint(s)
 
             Returns:
                 self
         """
+        # unravel (nested) lists and generator expressions, e.g. `add(x != 3 for x in Y)`, into a flat list
+        cpm_expr = toplevel_list(cpm_expr)
+
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
 
