@@ -436,10 +436,13 @@ class NegBoolView(_BoolVarImpl):
         Do not create this object directly, use the `~` operator instead: `~bv`
     """
     def __init__(self, bv: _BoolVarImpl):
-        # as it is always created using the ~ operator (only available for _BoolVarImpl)
-        # it already comply with the asserts of the __init__ of _BoolVarImpl and can use 
-        _IntVarImpl.__init__(self, 1 - bv.ub, 1 - bv.lb, name=f"~{bv.name}")
+        # Link the viewed variable first. Do not call _NumVarImpl.__init__: it assigns
+        # self._value, and this view's setter would clear a value bv already has.
         self._bv = bv
+        self.lb = int(1 - bv.ub)
+        self.ub = int(1 - bv.lb)
+        assert self.lb in (0, 1) and self.ub in (0, 1)
+        self.name = f"~{bv.name}"
 
     @property
     def _value(self) -> Optional[bool]:
