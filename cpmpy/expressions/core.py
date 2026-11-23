@@ -107,10 +107,11 @@ IterLike: TypeAlias = Union[ListLike[T], Generator[T, None, None]]  # ListLike o
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
 BoolExprLike: TypeAlias = Union["Expression", bool, np.bool_]  # subtype of ExprLike (bool subtype int)
 NestedBoolExprLike: TypeAlias = Union[BoolExprLike, ListLike["NestedBoolExprLike"]]  # single or (nested) ListLike of BoolExprLike
-# Everything that can be expressed as constraints in CPMpy, at the highest level. Only for user-originating input 
-# that is consumed immediately, never for stored data (use NestedBoolExprLike there). Generators used as arguments 
-# of expressions, e.g. `cp.sum(x for x in Y)`, are not part of this: they are consumed by the expression's constructor.
-# `toplevel_list()` is the first normaliser: it brings a ConstraintsLike down to a flat list[Expression].
+# Everything that can be expressed as constraints in CPMpy, at the highest level (originating from the user, before any processing). 
+# Only for user input, never for stored data (use NestedBoolExprLike there). Eg. users can add multiple expressions using a generator,
+# which adds modeling flexibility but is not adviced for internal use. 
+# `toplevel_list()` is the first normaliser: it brings a `ConstraintsLike` down to a flat `list[Expression]`.
+# Generators used as arguments of expressions, e.g. `cp.sum(x for x in Y)`, are not part of this: they are consumed by the expression's constructor.
 ConstraintsLike: TypeAlias = Union[BoolExprLike, IterLike["ConstraintsLike"]]
 
 class Expression(object):
