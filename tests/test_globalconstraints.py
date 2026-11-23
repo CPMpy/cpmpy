@@ -752,6 +752,58 @@ class TestGlobal:
         cp.Model(constraining + defining).solveAll(solver=solver, display=lambda: linear_sols.add(tuple(argvals(x))), **kwargs)
         assert linear_sols == solutions
 
+    def test_regular_decompose_does_not_mutate(self):
+        # the sink node of the complete decomposition must not leak into the constraint's node bookkeeping,
+        # which solver interfaces (choco, minizinc, ortools) read directly
+        x = cp.intvar(0, 1, shape=3)
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "b"), ("b", 0, "b")], "a", ["b"])
+        nodes, node_map = list(reg.nodes), dict(reg.node_map)
+        reg.decompose()
+        reg.decompose()
+        assert reg.nodes == nodes
+        assert reg.node_map == node_map
+
+    def test_regular_single_variable(self, solver):
+        x = cp.intvar(0, 2, name="x")
+        reg = cp.Regular([x], [("a", 1, "b"), ("a", 2, "a")], "a", ["b"])
+
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10)
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        true_sols, false_sols = set(), set()
+        cp.Model(reg).solveAll(solver=solver, display=lambda: true_sols.add(x.value()), **kwargs)
+        cp.Model(~reg).solveAll(solver=solver, display=lambda: false_sols.add(x.value()), **kwargs)
+        assert true_sols == {1}
+        assert false_sols == {0, 2}
+
+        # complete decomposition directly
+        value, defining = reg.decompose()
+        sols = set()
+        cp.Model(defining + [~cp.all(value)]).solveAll(display=lambda: sols.add(x.value()))
+        assert sols == {0, 2}
+
+    def test_regular_no_accepting(self, solver):
+        x = cp.intvar(0, 1, shape=2)
+        reg = cp.Regular(x, [("a", 0, "a"), ("a", 1, "a")], "a", [])
+        if solver in ("gurobi", "cplex"):
+            kwargs = dict(solution_limit=10)
+        elif solver == "hexaly":
+            kwargs = dict(time_limit=5)
+        else:
+            kwargs = dict()
+
+        assert not cp.Model(reg).solve(solver=solver)
+        assert cp.Model(~reg).solveAll(solver=solver, **kwargs) == 4
+
+    def test_regular_no_transitions(self):
+        x = cp.intvar(0, 1, shape=2)
+        with pytest.raises(ValueError):
+            cp.Regular(x, [], "a", ["a"])
+
     def test_regular_linear_positive_reif(self):
         x = cp.intvar(0, 1, shape=4, name="x")
         b = cp.boolvar(name="b")
