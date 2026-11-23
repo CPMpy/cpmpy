@@ -436,21 +436,28 @@ class NegBoolView(_BoolVarImpl):
         Do not create this object directly, use the `~` operator instead: `~bv`
     """
     def __init__(self, bv: _BoolVarImpl):
-        #assert(isinstance(bv, _BoolVarImpl))
-        self._bv = bv
         # as it is always created using the ~ operator (only available for _BoolVarImpl)
         # it already comply with the asserts of the __init__ of _BoolVarImpl and can use 
-        # __init__ from _IntVarImpl
-        _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
+        _IntVarImpl.__init__(self, 1 - bv.ub, 1 - bv.lb, name=f"~{bv.name}")
+        self._bv = bv
+
+    @property
+    def _value(self) -> Optional[bool]:
+        """Inverted value of the viewed variable. The view itself stores nothing."""
+        v = self._bv._value
+        if v is None:
+            return None
+        return not v
+
+    @_value.setter
+    def _value(self, v: Optional[bool]) -> None:
+        self._bv._value = None if v is None else not v
 
     def value(self) -> Optional[bool]:
         """ the negation of the value obtained in the last solve call by the viewed variable
             (or 'None')
         """
-        v = self._bv.value()
-        if v is None:
-            return None
-        return not v
+        return self._value
 
     def clear(self) -> None:
         """ clear, for the viewed variable, the value obtained from the last solve call
