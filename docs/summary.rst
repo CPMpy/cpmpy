@@ -90,6 +90,7 @@ Global Constraints
         AllEqualExceptN
 
         Circuit
+        CircuitArcs
         Inverse
         Table
         ShortTable

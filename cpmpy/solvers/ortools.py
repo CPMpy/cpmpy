@@ -53,7 +53,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
-from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalconstraints import DirectConstraint, CircuitArcs
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
@@ -85,7 +85,7 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "reservoir", "reservoir_optional", "circuit",
+    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "reservoir", "reservoir_optional", "circuit", "circuit_arcs",
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
@@ -733,6 +733,30 @@ class CPM_ortools(SolverInterface):
                         extra_cons.append(cons)
                 self.add(extra_cons)
                 ort_arcs = [(i,j, self.solver_var(b)) for (i,j), b in arc_vars.items()]
+                return self.ort_model.AddCircuit(ort_arcs)
+            elif cpm_expr.name == "circuit_arcs":
+                assert isinstance(cpm_expr, CircuitArcs)
+                lits = cpm_expr.args
+                tails, heads = cpm_expr.tails, cpm_expr.heads
+                ort_arcs = []
+                for tail, head, lit in zip(tails, heads, lits):
+                    ort_tail = cpm_expr.node_map[tail]
+                    ort_head = cpm_expr.node_map[head]
+                    # a true self-loop would drop the node; keep every node on the tour
+                    if tail == head:
+                        if is_true_cst(lit):
+                            return self.ort_model.Add(False)
+                        if not is_false_cst(lit):
+                            self.add([lit == False])
+                        ort_arcs.append((ort_tail, ort_head, False))
+                        continue
+                    if is_true_cst(lit):
+                        ort_lit = True
+                    elif is_false_cst(lit):
+                        ort_lit = False
+                    else:
+                        ort_lit = self.solver_var(lit)
+                    ort_arcs.append((ort_tail, ort_head, ort_lit))
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
