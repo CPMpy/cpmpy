@@ -290,7 +290,7 @@ class IntVarEncDirect(IntVarEnc):
             lit, _ = get_or_make_var(expr, csemap=csemap)
             # ensure that the original variable's name is never replaced. This can happen when a BV is encoded, which does occur.
             if self.__class__.NAMED and lit.name != expr.name:
-                lit.name = f"BV[{expr}]"
+                lit.name = f"BV[{expr!r}]"
             x_enc.append(lit)
         super().__init__(x, x_enc)
 
@@ -346,7 +346,7 @@ class IntVarEncOrder(IntVarEnc):
             lit, _ = get_or_make_var(expr, csemap=csemap)
             # ensure that the original variable's name is never replaced. This can happen when a BV is encoded, which does occur.
             if self.__class__.NAMED and lit.name != expr.name:
-                lit.name = f"BV[{expr}]"
+                lit.name = f"BV[{expr!r}]"
             x_enc.append(lit)
         super().__init__(x, x_enc)
 
@@ -405,7 +405,7 @@ class IntVarEncLog(IntVarEnc):
         """Create binary encoding of integer variable `x`."""
         # the binary encoding requires a logarithmic number of Boolean `bit`s
         bits = math.ceil(math.log2(_dom_size(x)))
-        super().__init__(x, [cp.boolvar(name=f"bit({x},{k})" if self.__class__.NAMED else None) for k in range(bits)])
+        super().__init__(x, [cp.boolvar(name=f"bit({x!r},{k})" if self.__class__.NAMED else None) for k in range(bits)])
         # TODO possibly something like: super().__init__(x,  ((( ((x - x.lb) ** k) % 2) == 1) for k in range(bits)), csemap=csemap)
 
     def encode_domain_constraint(self):
