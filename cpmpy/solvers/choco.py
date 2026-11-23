@@ -288,8 +288,9 @@ class CPM_choco(SolverInterface):
 
         start = time.time()
         if self.has_objective():
+            if solution_limit is not None:
+                raise ValueError("A solution limit is currently not supported when enumerating optimal solutions, enforce an optimal objective value manually before calling solveAll.")
             sols = self.chc_solver.find_all_optimal_solutions(maximize=not self.minimize_obj,
-                                                              solution_limit=solution_limit,
                                                               objective=self.solver_var(self.obj),
                                                               **kwargs)
         else:
