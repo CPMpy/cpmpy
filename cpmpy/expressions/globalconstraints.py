@@ -941,7 +941,7 @@ class Regular(GlobalConstraint):
             # and a user node id may coincide with the sink's normalized id.
             sink = n_states
             n_states += 1
-            transitions.extend([[i, v, sink] for i, n in enumerate(self.nodes) for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
+            transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
             transitions.extend([[sink, v, sink] for v in range(lb, ub + 1)])
 
         id_start = self.node_map[start]
