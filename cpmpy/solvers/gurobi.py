@@ -284,7 +284,7 @@ class CPM_gurobi(SolverInterface):
                     raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
                 revar = self.grb_model.addVar(vtype=GRB.BINARY, name=name)
             else:
-                revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
+                revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=cpm_var.name)
             self._varmap[name] = revar
             return revar
 
