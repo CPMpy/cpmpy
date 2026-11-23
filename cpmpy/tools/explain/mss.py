@@ -55,7 +55,10 @@ def mss_grow(soft, hard=[], solver="ortools"):
     assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"mss_grow requires a solver that supports assumption variables, use mss_grow_naive with {solver} instead"
 
     (m, soft, assump) = make_assump_model(soft, hard=hard)
-    s = cp.SolverLookup.get(solver, m)
+    if solver == "cvc5":
+        s = cp.SolverLookup.get(solver, m, unsat_cores=True)
+    else:
+        s = cp.SolverLookup.get(solver, m)
 
     if hasattr(s, "solution_hint"):
         # warm start satisfiable subset
