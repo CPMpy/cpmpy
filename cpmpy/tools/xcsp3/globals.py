@@ -51,7 +51,7 @@ from cpmpy.expressions.core import Expression, Operator, ListLike, ExprLike
 from cpmpy.expressions.globalconstraints import GlobalConstraint, AllDifferent, InDomain, DirectConstraint, Table
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
-    get_bounds, eval_comparison
+    get_bounds, eval_comparison, format_arg
 from cpmpy.expressions.variables import cpm_array, intvar, boolvar, _IntVarImpl, NDVarArray
 from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any, min as cpm_min
 
@@ -466,8 +466,8 @@ class NotInDomain(GlobalConstraint):
     def value(self):
         return argval(self.args[0]) not in argvals(self.args[1])
 
-    def __repr__(self):
-        return "{} not in {}".format(self.args[0], self.args[1])
+    def _format(self, canonical: bool) -> str:
+        return "{} not in {}".format(format_arg(self.args[0], canonical), format_arg(self.args[1], canonical))
 
 
 class NoOverlap2d(GlobalConstraint):
