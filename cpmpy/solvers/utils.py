@@ -36,6 +36,7 @@ from .highs import CPM_highs
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
 from .hermax import CPM_hermax
+from .cvc5 import CPM_cvc5
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -96,6 +97,7 @@ class SolverLookup():
                 ("rc2", CPM_rc2),
                 ("hermax", CPM_hermax),
                 ("scip", CPM_scip),
+                ("cvc5", CPM_cvc5)
                ]
 
     @classmethod

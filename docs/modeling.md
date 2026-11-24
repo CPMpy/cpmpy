@@ -278,6 +278,28 @@ m = cp.Model(
 )
 ```
 
+(integer-division-and-modulo-semantics)=
+### Integer division and modulo semantics
+
+When you write `x // y` or `x % y` on CPMpy expressions, you get `cp.Division(x,y)` and `cp.Modulo(x,y)`, two [global functions](#global-functions) with a very specific convention: they round **towards zero**. This is *not* the same as Python's own `//`/`%` operators on plain integers, which **floor** (round towards negative infinity). The two conventions agree whenever `x` and `y` have the same sign, but disagree whenever they don't.
+
+
+```python
+import cpmpy as cp
+
+x = cp.intvar(-10, 10)
+y = cp.intvar(-10, 10)
+
+d, m = cp.Division(x, y), cp.Modulo(x, y)
+x._value, y._value = -7, 3           # pretend we found this solution
+
+print(d.value(), m.value())          # -2  -1   <- CPMpy: truncated, sign follows x
+print(-7 // 3, -7 % 3)               # -3   2   <- Python: floored, sign follows y
+```
+
+![CPMpy vs Python division](divmod_conventions.svg)
+<p style="text-align:center; font-size:0.85em; color:#666;">Both round x/y to an integer, just differently: CPMpy rounds towards zero, Python rounds down.</p>
+
 ### NumPy operations
 
 CPMpy's arrays of decision variables are subclasses of `numpy.ndarray`, so many NumPy operations work on them. The rule of thumb is that an operation is supported when its **result shape is known at modeling time**. Element-wise operators (`+,-,*,//,%`, comparisons, `&|^~`), aggregations (`sum/min/max/...`), reshaping (`reshape`, transpose, slicing, ...) and dot products like `np.dot(x,w)` all fall in this category:

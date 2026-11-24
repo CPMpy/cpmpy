@@ -46,6 +46,7 @@ List of solver submodules
     hermax
     scip
     highs
+    cvc5
 
 =========================
 List of helper submodules
@@ -84,11 +85,13 @@ from .rc2 import CPM_rc2
 from .hermax import CPM_hermax
 from .scip import CPM_scip
 from .highs import CPM_highs
+from .cvc5 import CPM_cvc5
 
 __all__ = [
     "CPM_choco",
     "CPM_cplex",
     "CPM_cpo",
+    "CPM_cvc5",
     "CPM_exact",
     "CPM_gcs",
     "CPM_gurobi",

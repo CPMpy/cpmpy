@@ -37,6 +37,8 @@ solver_dependencies = {
     "scip": ["pyscipopt>=6.1"],
     "rc2": ["python-sat>=1.9.dev5,<1.9dev17", "pypblib"],
     "hermax": ["hermax>=1.3.4"],
+    "cvc5": ["cvc5>=1.3.4"],  # older releases have proof-export quirks that trip up
+                              # external Alethe checkers like Carcara
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 

@@ -37,7 +37,10 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft))
-    s = cp.SolverLookup.get(solver, model)
+    if solver == "cvc5":
+        s = cp.SolverLookup.get(solver, model, unsat_cores=True)
+    else:
+        s = cp.SolverLookup.get(solver, model)
 
     # map solver for computing hitting sets
     map_solver = cp.SolverLookup.get(map_solver)

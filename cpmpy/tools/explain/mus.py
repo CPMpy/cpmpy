@@ -44,7 +44,10 @@ def mus(soft, hard=[], solver="ortools"):
 
     # make assumption (indicator) variables and soft-constrained model
     (m, soft, assump) = make_assump_model(soft, hard=hard)
-    s = cp.SolverLookup.get(solver, m)
+    if solver == "cvc5":
+        s = cp.SolverLookup.get(solver, m, unsat_cores=True)
+    else:
+        s = cp.SolverLookup.get(solver, m)
 
     # create dictionary from assump to soft
     dmap = dict(zip(assump, soft))
@@ -103,7 +106,10 @@ def quickxplain(soft, hard=[], solver="ortools"):
     assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"quickxplain requires a solver that supports assumption variables, use quickxplain_naive with {solver} instead"
 
     model, soft, assump = make_assump_model(soft, hard)
-    s = cp.SolverLookup.get(solver, model)
+    if solver == "cvc5":
+        s = cp.SolverLookup.get(solver, model, unsat_cores=True)
+    else:
+        s = cp.SolverLookup.get(solver, model)
 
     assert s.solve(assumptions=assump) is False, "The model should be UNSAT!"
     dmap = dict(zip(assump, soft))
@@ -165,7 +171,10 @@ def ocus(soft, hard=[], weights=None, meta_constraint=True, solver="ortools", hs
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft)) # map assumption variables to constraints
 
-    s = cp.SolverLookup.get(solver, model)
+    if solver == "cvc5":
+        s = cp.SolverLookup.get(solver, model, unsat_cores=True)
+    else:
+        s = cp.SolverLookup.get(solver, model)
     if do_solution_hint:
         try:
             s.solution_hint(assump, [1]*len(assump)) # algo is constructive, so favor large subsets
