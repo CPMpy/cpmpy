@@ -56,6 +56,11 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
         remaining_keys = list(all_params.keys())
         cur_params = dict()
 
+    if len(remaining_keys) == 0:
+        # no parameters, single empty combination
+        yield dict(cur_params)
+        return
+
     cur_key = remaining_keys[0]
     for cur_value in all_params[cur_key]:
         cur_params[cur_key] = cur_value
