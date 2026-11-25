@@ -999,3 +999,59 @@ class TestUtils:
             assert isinstance(expr, Comparison)
             assert str(expr.args[0]) == "x"
             assert expr.args[1] == True# should always put the constant on the right
+
+
+class TestStrRepr:
+    def test_list_and_array_share_repr(self):
+        x = cp.intvar(0, 3, shape=3, name="x")
+        lst = list(x)
+        idx = cp.intvar(0, 2, name="i")
+        same = [
+            (cp.Element(x, idx), cp.Element(lst, idx)),
+            (cp.LexLess(x, x), cp.LexLess(lst, lst)),
+            (cp.Inverse(x, x), cp.Inverse(lst, lst)),
+            (cp.Table(x, [[0, 1, 2], [1, 2, 0]]), cp.Table(lst, [[0, 1, 2], [1, 2, 0]])),
+        ]
+        for left, right in same:
+            assert repr(left) == repr(right)
+            assert bool(left == right)
+
+    def test_variable_description_is_only_in_str(self):
+        v = cp.intvar(0, 5, name="v")
+        v.set_description("the decision")
+        assert v.name == "v"
+        assert str(v) == "the decision"
+        assert repr(v) == "v"
+        assert str(v >= 1) == "the decision >= 1"
+        assert repr(v >= 1) == "v >= 1"
+
+        a, b, c = cp.boolvar(shape=3, name=list("abc"))
+        a.set_description("alpha")
+        assert str(a | b) == "(alpha) or (b)"
+        assert repr(a | b) == "(a) or (b)"
+        assert str(a | b | c) == "or(alpha, b, c)"
+        assert repr(a | b | c) == "or(a, b, c)"
+
+    def test_expression_description_is_only_in_str(self):
+        a, b, c = cp.boolvar(shape=3, name=list("abc"))
+        child = a | b
+        child.set_description("either")
+        parent = child.implies(c)
+        assert str(child) == "either"
+        assert repr(child) == "(a) or (b)"
+        assert str(parent) == "(either) -> (c)"
+        assert repr(parent) == "((a) or (b)) -> (c)"
+
+    def test_encoding_name_ignores_description(self):
+        from cpmpy.transformations.int2bool import IntVarEnc, IntVarEncDirect
+
+        iv = cp.intvar(0, 2, name="iv")
+        iv.set_description("the choice")
+        named = IntVarEnc.NAMED
+        IntVarEnc.NAMED = True
+        try:
+            enc = IntVarEncDirect(iv)
+        finally:
+            IntVarEnc.NAMED = named
+        assert iv.name == "iv"
+        assert [lit.name for lit in enc.vars()] == ["BV[iv == 0]", "BV[iv == 1]", "BV[iv == 2]"]

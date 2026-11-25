@@ -84,7 +84,6 @@
         FloatSum
 
 """
-import sys
 import warnings  # for deprecation warning
 import math
 from typing import Any, Optional, Iterable, NoReturn, Final, cast
@@ -94,7 +93,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
 from .variables import intvar, cpm_array, NDVarArray, _NumVarImpl, NegBoolView
-from .utils import argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
+from .utils import argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int, format_arg
 
 
 class GlobalFunction(Expression):
@@ -433,12 +432,10 @@ class Multiplication(GlobalFunction):
         super().update_args((x, y), has_subexpr=has_subexpr)
         self.is_lhs_num = is_lhs_num
 
-    def __repr__(self) -> str:
-        x, y = self.args
-
+    def _format(self, canonical: bool) -> str:
+        x, y = format_arg(self.args[0], canonical), format_arg(self.args[1], canonical)
         if self.is_lhs_num:
             return "{} * ({})".format(x, y)
-
         return "({}) * ({})".format(x, y)
 
     def __neg__(self):
@@ -551,14 +548,14 @@ class Division(GlobalFunction):
         """
         super().__init__("div", (x, y))
 
-    def __repr__(self):
+    def _format(self, canonical: bool) -> str:
         """
         Returns:
             str: String representation of integer division as 'x div y'
         """
-        x,y = self.args
-        return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        x, y = self.args
+        return "{} div {}".format(f"({format_arg(x, canonical)})" if isinstance(x, Expression) else format_arg(x, canonical),
+                                  f"({format_arg(y, canonical)})" if isinstance(y, Expression) else format_arg(y, canonical))
 
     def decompose(self):
         """
@@ -645,14 +642,14 @@ class Modulo(GlobalFunction):
         """
         super().__init__("mod", (x, y))
 
-    def __repr__(self):
+    def _format(self, canonical: bool) -> str:
         """
         Returns:
             str: String representation with 'mod' as notation
         """
-        x,y = self.args
-        return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        x, y = self.args
+        return "{} mod {}".format(f"({format_arg(x, canonical)})" if isinstance(x, Expression) else format_arg(x, canonical),
+                                  f"({format_arg(y, canonical)})" if isinstance(y, Expression) else format_arg(y, canonical))
 
     def decompose(self):
         """
@@ -903,15 +900,15 @@ class Element(GlobalFunction):
         bnds = [get_bounds(x) for x in arr]
         return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
-    def __repr__(self) -> str:
+    def _format(self, canonical: bool) -> str:
         """
         Custom string representation of the Element global function in 'Arr[Idx]' format.
 
         Returns:
             str: String representation of the Element global function.
         """
-        with np.printoptions(linewidth=sys.maxsize, threshold=sys.maxsize):
-            return f"{self.args[0]}[{self.args[1]}]"
+        arr, idx = self.args
+        return f"{format_arg(arr, canonical)}[{format_arg(idx, canonical)}]"
 
 
 class NDElement(GlobalFunction):
@@ -1014,7 +1011,7 @@ class NDElement(GlobalFunction):
         bnds = [get_bounds(x) for x in arr.flat]
         return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
-    def __repr__(self) -> str:
+    def _format(self, canonical: bool) -> str:
         """
         Custom string representation of the NDElement global function in 'Arr[i0, i1, ...]' format.
 
@@ -1022,9 +1019,8 @@ class NDElement(GlobalFunction):
             str: String representation of the NDElement global function.
         """
         arr, *indices = self.args
-        idx_repr = ", ".join(str(i) for i in indices)
-        with np.printoptions(linewidth=sys.maxsize, threshold=sys.maxsize):
-            return f"{arr}[{idx_repr}]"
+        idx_repr = ", ".join(format_arg(i, canonical) for i in indices)
+        return f"{format_arg(arr, canonical)}[{idx_repr}]"
 
 def element(arg_list):
     """

@@ -97,7 +97,7 @@ from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, It
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool, format_arg
 from ..exceptions import TypeError
 
 # Common typing helpers
@@ -120,7 +120,8 @@ class Expression(object):
     - :func:`~cpmpy.expressions.core.Expression.is_bool`:               whether its return type is Boolean
     - :func:`~cpmpy.expressions.core.Expression.value`:                 the value of the expression, default None
     - :func:`implies(x) <cpmpy.expressions.core.Expression.implies>`:   logical implication of this expression towards `x`
-    - :func:`~cpmpy.expressions.core.Expression.__repr__`:              for pretty printing the expression
+    - :func:`~cpmpy.expressions.core.Expression.__repr__`:              cananical string representation of the expression
+    - :meth:`~cpmpy.expressions.core.Expression.__str__`:               human-readable string representation of the expression, returns description if set.
     - :meth:`~cpmpy.expressions.core.Expression.set_description`:      optional custom :meth:`__str__` text (class default ``_description`` is ``None``; set on the instance when used)
     - any ``__op__`` python operator overloading
     """
@@ -170,24 +171,20 @@ class Expression(object):
 
     def __str__(self) -> str:
         d = self._description
-        if d is None or not d.override_print:
-            return self.__repr__()
-        out = d.text
-        if d.full_print:
-            out += " -- " + self.__repr__()
-        return out
-
+        if d is not None and d.override_print:
+            out = d.text
+            if d.full_print:
+                out += " -- " + repr(self)
+            return out
+        return self._format(canonical=False)
 
     def __repr__(self) -> str:
-        strargs = []
-        for arg in self.args:
-            if isinstance(arg, np.ndarray):
-                # flatten
-                strarg = ",".join(map(str, arg.flat))
-                strargs.append(f"[{strarg}]")
-            else:
-                strargs.append(f"{arg}")
-        return "{}({})".format(self.name, ",".join(strargs))
+        return self._format(canonical=True)
+
+    def _format(self, canonical: bool) -> str:
+        """Helper function to dispatch to the correct format method for the expression."""
+        parts = [format_arg(arg, canonical) for arg in self.args]
+        return "{}({})".format(self.name, ",".join(parts))
 
     def __hash__(self) -> int:
         return hash(self.__repr__())
@@ -552,6 +549,7 @@ class Expression(object):
                          "Do not use an expression as argument in an `if` statement and use cpmpy.any, cpmpy.max instead of python builtins\n"
                          "If you think this is an error, please report on github")
 
+
 class BoolVal(Expression):
     """
         Wrapper for python or numpy BoolVals
@@ -694,11 +692,13 @@ class Comparison(Expression):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, (left, right))
 
-    def __repr__(self) -> str:
+    def _format(self, canonical: bool) -> str:
+        left = format_arg(self.args[0], canonical)
+        right = format_arg(self.args[1], canonical)
         if all(isinstance(x, Expression) for x in self.args):
-            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
-        # if not: prettier printing without braces
-        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+            return "({}) {} ({})".format(left, self.name, right)
+        # one side is a constant: prettier printing without braces
+        return "{} {} {}".format(left, self.name, right) 
     
     def __bool__(self) -> bool:
         # will be called when comparing elements in a container, but always with `==`
@@ -812,26 +812,26 @@ class Operator(Expression):
         """
         return Operator.allowed[self.name][1]
 
-    def __repr__(self) -> str:
-
+    def _format(self, canonical: bool) -> str:
         # special cases
         if self.name == '-': # unary -
-            return "-({})".format(self.args[0])
+            return "-({})".format(format_arg(self.args[0], canonical))
 
         # weighted sum
         if self.name == 'wsum':
-            return f"sum({self.args[0]} * {self.args[1]})"
+            return "sum({} * {})".format(format_arg(self.args[0], canonical), format_arg(self.args[1], canonical))
 
         if len(self.args) == 1:
-            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 omitted in print
+            return "{}({})".format(self.name, format_arg(self.args[0], canonical))  # tuple of size 1 omitted in print
         elif len(self.args) == 2:  # infix printing of two arguments
             printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
             arg0, arg1 = self.args
-            str_arg0 = f"({arg0})" if isinstance(arg0, Expression) else str(arg0)
-            str_arg1 = f"({arg1})" if isinstance(arg1, Expression) else str(arg1)
+            str_arg0 = f"({format_arg(arg0, canonical)})" if isinstance(arg0, Expression) else format_arg(arg0, canonical)
+            str_arg1 = f"({format_arg(arg1, canonical)})" if isinstance(arg1, Expression) else format_arg(arg1, canonical)
             return f"{str_arg0} {printname} {str_arg1}"
-        else:  # n-ary
-            return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
+        else:  # n-ary; same spelling as str(tuple) but each argument goes through format_arg
+            inner = ", ".join(format_arg(a, canonical) for a in self.args)
+            return f"{self.name}({inner})"
 
     def value(self) -> Optional[int]:
         """

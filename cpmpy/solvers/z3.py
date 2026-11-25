@@ -291,10 +291,10 @@ class CPM_z3(SolverInterface):
                 if isinstance(cpm_var, NegBoolView):
                     revar = z3.Not(self.solver_var(cpm_var._bv))
                 else:
-                    revar = z3.Bool(str(cpm_var))
+                    revar = z3.Bool(cpm_var.name)
 
             else:
-                revar = z3.Int(str(cpm_var))
+                revar = z3.Int(cpm_var.name)
                 # set bounds
                 self.z3_solver.add(revar >= cpm_var.lb)
                 self.z3_solver.add(revar <= cpm_var.ub)

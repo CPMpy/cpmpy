@@ -25,6 +25,7 @@ Internal utilities for expression handling.
         all_pairs
         argval
         argvals
+        format_arg
         eval_comparison
         get_bounds     
 """
@@ -35,7 +36,7 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final, Any
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
@@ -157,6 +158,27 @@ def argvals(arr):
     if is_any_list(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
+
+
+def format_arg(arg: Any, canonical: bool) -> str:
+    """Format any argument of an expression to a string.
+
+    Args:
+        arg: The argument to format.
+        canonical: Whether to use canonical representation.
+
+    Returns:
+        The string representation of the argument.
+    """
+    if isinstance(arg, cp.expressions.core.Expression):
+        return repr(arg) if canonical else str(arg)
+    if isinstance(arg, np.ndarray) and arg.ndim == 0:
+        return format_arg(arg.item(), canonical)
+    if isinstance(arg, (list, tuple, np.ndarray)):
+        return "[" + ", ".join(format_arg(a, canonical) for a in arg) + "]"
+    if isinstance(arg, np.generic):
+        return str(arg.item())
+    return repr(arg) if canonical else str(arg)
 
 def argvals_intexpr(lst: Iterable[int|Expression]) -> Optional[list[int]]:
     """ A well-typed helper function to get the values of a list of int|Expression, or None if any expression is not assigned """

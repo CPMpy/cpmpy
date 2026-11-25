@@ -105,7 +105,7 @@ class TestTransSafen:
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"element"})
         assert set(map(str, safe_expr)) == {
-            '[x[0] x[1] x[2]][IV0] == 2',
+            '[x[0], x[1], x[2]][IV0] == 2',
             '((i >= 0) and (i <= 2)) -> ((IV0) == (i))',
             '(i >= 0) and (i <= 2)',
             '(not((i >= 0) and (i <= 2))) -> (IV0 == 0)',

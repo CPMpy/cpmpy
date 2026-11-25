@@ -148,7 +148,7 @@ import cpmpy as cp
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray, _NumVarImpl
-from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_int, is_boolexpr, implies, argval
+from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_int, is_boolexpr, implies, argval, format_arg
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -1363,10 +1363,10 @@ class MDD(GlobalConstraint):
                 return False
         return True # can only have reached end node
 
-    def __repr__(self) -> str:
+    def _format(self, canonical: bool) -> str:
         "Print the MDD and the internally stored table"
         table = [[id1, v, id2] for id1, edges in self.mapping.items() for v, id2 in edges.items()]
-        return f"MDD({self.args[0]}, {table}, {self.root_node})"
+        return f"MDD({format_arg(self.args[0], canonical)}, {table}, {self.root_node})"
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
@@ -1418,9 +1418,9 @@ class IfThenElse(GlobalConstraint):
         return [condition.implies(if_true), 
                 recurse_negation(condition).implies(if_false)], []
 
-    def __repr__(self) -> str:
+    def _format(self, canonical: bool) -> str:
         condition, if_true, if_false = self.args
-        return "If {} Then {} Else {}".format(condition, if_true, if_false)
+        return "If {} Then {} Else {}".format(format_arg(condition, canonical), format_arg(if_true, canonical), format_arg(if_false, canonical))
 
 
 
@@ -1485,9 +1485,9 @@ class InDomain(GlobalConstraint):
             return None
         return bool(np.any(arr == exprval))
 
-    def __repr__(self) -> str:
+    def _format(self, canonical: bool) -> str:
         expr, arr = self.args
-        return "{} in {}".format(expr, arr)
+        return "{} in {}".format(format_arg(expr, canonical), format_arg(arr, canonical))
 
     def negate(self) -> Expression:
         expr, arr = self.args
@@ -1567,10 +1567,11 @@ class Xor(GlobalConstraint):
             return None
         return sum(arrvals) % 2 == 1
 
-    def __repr__(self) -> str:
+    def _format(self, canonical: bool) -> str:
         if len(self.args) == 2:
-            return "{} xor {}".format(*self.args)
-        return "xor({})".format(self.args)
+            return "{} xor {}".format(format_arg(self.args[0], canonical), format_arg(self.args[1], canonical))
+        inner = ", ".join(format_arg(a, canonical) for a in self.args)
+        return f"xor(({inner}))"
 
     def negate(self) -> Expression:
         from cpmpy.transformations.negation import recurse_negation
