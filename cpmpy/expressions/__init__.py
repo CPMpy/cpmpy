@@ -18,7 +18,7 @@ List of submodules
 """
 
 # we only import methods/classes that are used for modelling
-# others need to be imported by the developer explicitely
+# others need to be imported by the developer explicitly
 from .variables import boolvar, intvar, cpm_array
 from .globalconstraints import (
     AllDifferent,
@@ -46,6 +46,8 @@ from .globalconstraints import (
     LexChainLess,
     LexChainLessEq,
     Precedence,
+    Reservoir,
+    ReservoirOptional,
     NoOverlap,
     NoOverlapOptional,
     NegativeTable,
@@ -123,6 +125,8 @@ __all__ = [
     "NoOverlapOptional",
     "Precedence",
     "Regular",
+    "Reservoir",
+    "ReservoirOptional",
     "ShortTable",
     "Table",
     "Xor",

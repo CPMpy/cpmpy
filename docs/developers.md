@@ -4,7 +4,6 @@ CPMpy is an open source project and we are happy for you to read and change the 
 
 This page introduces how to get started on developing on CPMpy itself, with a focus on sharing these changes back with us for inclusion.
 
-
 ## Setting up your development environment
 
 The easiest is to use the pip to do an 'editable install' of your local CPMpy folder. 
@@ -82,3 +81,6 @@ When fixing a bug, you should also add a test that checks we don't break it agai
 
 We are happy to do code reviews and discuss good ways to fix something or add a new feature. So do not hesitate to create a pull request for work-in-progress code. In fact, almost all pull requests go through at least 1 revision iteration.
 
+## For agents
+
+The AGENTS.md file contains general guidelines for coding agents working on the CPMpy codebase, including testing practices.
